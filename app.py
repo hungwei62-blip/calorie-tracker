@@ -1,436 +1,479 @@
-"""\u4eba\u5de5\u667a\u80fd\u4eba\u54e1\u591a\u4eba\u71b1\u91cf\u8207\u98f2\u6c34\u8a18\u9304 Web App\u3002
+"""
+AI 智能多人熱量與飲水紀錄 Web App。
 
-\u4f9d\u64da\u300a\u5c08\u6848\u958b\u767c\u9700\u6c42\u66f8\u300b\uff0c\u4f7f\u7528 Streamlit \u55ae\u9801\u5e0c\u67b6\u69cb + Gemini 2.5 Flash + Google Sheets + Firebase Storage\u3002
+依照專案開發需求書：Streamlit + Gemini 2.5 Flash + Google Sheets + Firebase Storage。
+支援 5 個餐別、AI 文字/照片分析、份數微調、今日/週進度儀表板。
 """
 
 from __future__ import annotations
 
-import io
 from datetime import date, datetime, timedelta
+from io import BytesIO
 
 import streamlit as st
 from PIL import Image
 
 from services import auth, firebase, gemini, metrics, sheets
 
-
-MEAL_TYPES = ["\u65e9\u9910", "\u5348\u9910", "\u665a\u9910", "\u5c0f\u9ede", "\u98f2\u6c34"]
+MEAL_TYPES = ["早餐", "午餐", "晚餐", "小點", "飲水"]
+MEAL_EMOJI = {"早餐": "🌅", "午餐": "🍱", "晚餐": "🌙", "小點": "🍪", "飲水": "💧"}
+NUTRIENT_KEYS = ("calorie", "protein", "carb", "fat")
+CACHE_TTL = 60
+DEFAULT_GOALS = {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
 
 
 def init_session() -> None:
-    if "user_id" not in st.session_state:
-        st.session_state.user_id = None
-    if "username" not in st.session_state:
-        st.session_state.username = None
-    if "pending_analysis" not in st.session_state:
-        st.session_state.pending_analysis = None
-    if "pending_meal_type" not in st.session_state:
-        st.session_state.pending_meal_type = None
+    """初始化所有 session_state key。"""
+    defaults = {
+        "user_id": None,
+        "username": None,
+        "page": "記一餐",
+        "pending_meal_type": None,
+        "input_mode": None,
+        "pending_analysis": None,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
-def page_login() -> None:
-    st.title("🍱 \u4eba\u5de5\u667a\u80fd\u591a\u4eba\u71b1\u91cf\u8a18\u9304")
-    st.caption("\u4f7f\u7528 Gemini 2.5 Flash \u4ee5 Google Sheets \u4f5c\u70ba\u500b\u4eba\u4ee5\u53ca\u8a18\u9304\u4e2d\u5fc3\u3002")
-
-    tab_login, tab_register = st.tabs(["\u767b\u5165", "\u8a3b\u518a"])
-
-    with tab_login:
-        with st.form("login_form"):
-            username = st.text_input("\u5e33\u865f")
-            password = st.text_input("\u5bc6\u78bc", type="password")
-            submitted = st.form_submit_button("\u767b\u5165", use_container_width=True)
-        if submitted:
-            if not username or not password:
-                st.error("\u8acb\u586b\u5165\u5e33\u865f\u8207\u5bc6\u78bc")
-                return
-            try:
-                rows = sheets.get_users_rows()
-            except Exception as exc:
-                st.error(f"\u8b80\u53d6\u4f7f\u7528\u8005\u8868\u5931\u6557: {exc}")
-                return
-            user = auth.find_user(rows, username)
-            if not user or not auth.verify_password(password, user.get("password_hash", "")):
-                st.error("\u5e33\u865f\u6216\u5bc6\u78bc\u4e0d\u6b63\u78ba")
-                return
-            st.session_state.user_id = user["user_id"]
-            st.session_state.username = user["username"]
-            st.success(f"\u6b61\u8fce\u56de\u4f86\uff0c{user['username']}")
-            st.rerun()
-
-    with tab_register:
-        with st.form("register_form"):
-            new_user = st.text_input("\u65b0\u5e33\u865f")
-            new_pw = st.text_input("\u5bc6\u78bc", type="password")
-            new_pw2 = st.text_input("\u78ba\u8a8d\u5bc6\u78bc", type="password")
-            submitted = st.form_submit_button("\u8a3b\u518a", use_container_width=True)
-        if submitted:
-            if not new_user or not new_pw:
-                st.error("\u5e33\u865f\u8207\u5bc6\u78bc\u4e0d\u53ef\u4ee5\u662f\u7a7a")
-                return
-            if new_pw != new_pw2:
-                st.error("\u5169\u6b21\u5bc6\u78bc\u4e0d\u4e00\u81f4")
-                return
-            if len(new_pw) < 6:
-                st.error("\u5bc6\u78bc\u9577\u5ea6\u9700\u4ee5\u516d\u500b\u5b57\u5143\u4ee5\u4e0a")
-                return
-            try:
-                rows = sheets.get_users_rows()
-            except Exception as exc:
-                st.error(f"\u9023\u7dda Sheets \u5931\u6557: {exc}")
-                return
-            if auth.find_user(rows, new_user):
-                st.error("\u5e33\u865f\u5df2\u88ab\u4f7f\u7528")
-                return
-            try:
-                user_id = auth.make_user_id()
-                pw_hash = auth.hash_password(new_pw)
-                sheets.append_user(
-                    user_id=user_id,
-                    username=new_user.strip(),
-                    password_hash=pw_hash,
-                    created_at=auth.now_iso(),
-                    goals={},  # \u4f7f\u7528\u9810\u8a2d\u76ee\u6a19
-                )
-            except Exception as exc:
-                st.error(f"\u8a3b\u518a\u5931\u6557: {exc}")
-                return
-            st.session_state.user_id = user_id
-            st.session_state.username = new_user.strip()
-            st.success("\u8a3b\u518a\u6210\u529f\uff0c\u81ea\u52d5\u767b\u5165")
-            st.rerun()
+@st.cache_data(ttl=CACHE_TTL)
+def _fetch_records_cached(user_id: str) -> list:
+    """帶 60 秒快取的紀錄讀取，避免 Sheets 429。"""
+    return sheets.get_records(user_id=user_id)
 
 
-def page_logout_sidebar() -> None:
-    with st.sidebar:
-        st.write(f"👤 {st.session_state.username}")
-        if st.button("\u767b\u51fa", use_container_width=True):
-            for k in ("user_id", "username", "pending_analysis", "pending_meal_type"):
-                st.session_state[k] = None
-            st.rerun()
+@st.cache_data(ttl=CACHE_TTL)
+def _fetch_goals_cached(user_id: str) -> dict:
+    return sheets.get_user_goals(user_id)
 
 
-def _run_analysis(image_bytes: bytes | None, content_type: str | None, text: str) -> dict:
+def _clear_analysis_cache() -> None:
+    """寫入新紀錄後清掉快取，下次讀取會重新抓。"""
+    try:
+        _fetch_records_cached.clear()
+    except Exception:
+        pass
+    try:
+        _fetch_goals_cached.clear()
+    except Exception:
+        pass
+
+
+def _run_analysis(image_bytes, content_type, text):
+    """呼叫 Gemini 分析照片或文字，回傳結構化 dict。"""
     if image_bytes is not None:
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        return gemini.analyze_image(img)
+        image = Image.open(BytesIO(image_bytes))
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        return gemini.analyze_image(image)
     return gemini.analyze_text(text)
 
 
-def _upload_image_safely(image_bytes: bytes, content_type: str, user_id: str) -> str:
-    try:
-        return firebase.upload_image(image_bytes, content_type, user_id)
-    except Exception as exc:
-        st.warning(f"\u7167\u7247\u4e0a\u50b3\u5931\u6557 ({exc})\uff0c\u5c07\u4ee5\u7a7a\u4f86\u7e7c\u7e8c\u3002\u8a18\u9304\u4ecd\u6703\u4fdd\u7559\u3002")
-        return ""
+def _today_range() -> tuple:
+    today = date.today()
+    return today, today
+
+
+def _week_range() -> tuple:
+    today = date.today()
+    start = metrics.week_start(today)
+    return start, today
+
+
+
+def page_login() -> None:
+    """登入 / 註冊頁，無登入時的入口。"""
+    st.title("🍽️ 熱量與飲水紀錄")
+    st.caption("請先登入或註冊以開始紀錄。")
+
+    tab_login, tab_signup = st.tabs(["登入", "註冊"])
+
+    with tab_login:
+        with st.form("login_form"):
+            username = st.text_input("帳號", key="login_user")
+            password = st.text_input("密碼", type="password", key="login_pwd")
+            submit = st.form_submit_button("登入", use_container_width=True)
+        if submit:
+            try:
+                rows = sheets.get_users_rows()
+            except Exception as exc:
+                st.error("讀取使用者資料失敗: " + str(exc))
+                return
+            user = auth.find_user(rows, username)
+            if not user:
+                st.error("找不到此帳號。")
+                return
+            if not auth.verify_password(password, user.get("password_hash", "")):
+                st.error("密碼錯誤。")
+                return
+            st.session_state.user_id = user.get("user_id")
+            st.session_state.username = user.get("username")
+            st.success("登入成功！")
+            st.rerun()
+
+    with tab_signup:
+        with st.form("signup_form"):
+            new_user = st.text_input("新帳號", key="signup_user")
+            new_pwd = st.text_input("新密碼", type="password", key="signup_pwd")
+            new_pwd2 = st.text_input("再次輸入密碼", type="password", key="signup_pwd2")
+            submit2 = st.form_submit_button("建立帳號", use_container_width=True)
+        if submit2:
+            if not new_user or not new_pwd:
+                st.error("帳號與密碼不可為空。")
+                return
+            if new_pwd != new_pwd2:
+                st.error("兩次密碼不一致。")
+                return
+            if len(new_pwd) < 4:
+                st.warning("建議密碼至少 4 個字元。")
+            try:
+                rows = sheets.get_users_rows()
+            except Exception as exc:
+                st.error("讀取使用者資料失敗: " + str(exc))
+                return
+            if auth.find_user(rows, new_user):
+                st.error("此帳號已被使用。")
+                return
+            try:
+                uid = auth.make_user_id()
+                pwd_hash = auth.hash_password(new_pwd)
+                sheets.append_user(uid, new_user, pwd_hash, auth.now_iso(), DEFAULT_GOALS)
+            except Exception as exc:
+                st.error("建立帳號失敗: " + str(exc))
+                return
+            st.session_state.user_id = uid
+            st.session_state.username = new_user
+            st.success("註冊成功並已登入！")
+            st.rerun()
+
 
 
 def page_log_meal() -> None:
-    st.header("📝 \u8a18\u4e00\u9910")
+    """主流程：選餐別 → 選輸入方式 → AI 分析 → 份數微調 → 確認送出。"""
+    st.header("🍴 記一餐")
+    meal = st.session_state.pending_meal_type
+
+    if meal is None:
+        _render_meal_picker()
+        return
+
+    _hdr_emoji = MEAL_EMOJI.get(meal, "")
+    st.subheader(_hdr_emoji + " 記錄: " + meal)
+    if st.button("← 重選餐別", key="reset_meal"):
+        st.session_state.pending_meal_type = None
+        st.session_state.input_mode = None
+        st.session_state.pending_analysis = None
+        st.rerun()
+        return
 
     if st.session_state.pending_analysis is None:
-        st.subheader("\u9078\u64c7\u9910\u5225")
-        cols = st.columns(len(MEAL_TYPES))
-        for col, meal in zip(cols, MEAL_TYPES):
-            if col.button(meal, key=f"meal_{meal}", use_container_width=True):
+        _render_input_section(meal)
+        return
+
+    _render_review_section(meal)
+
+
+def _render_meal_picker() -> None:
+    """5 個入口卡片。"""
+    st.write("請選擇一餐：")
+    cols = st.columns(5)
+    for i, meal in enumerate(MEAL_TYPES):
+        emoji = MEAL_EMOJI.get(meal, "")
+        with cols[i]:
+            label = emoji + " " + meal
+            if st.button(label, key="pick_meal_"+meal, use_container_width=True):
                 st.session_state.pending_meal_type = meal
+                st.session_state.input_mode = None
+                st.session_state.pending_analysis = None
                 st.rerun()
 
-    if st.session_state.pending_meal_type and st.session_state.pending_analysis is None:
-        meal = st.session_state.pending_meal_type
-        st.subheader(f"\u8a18\u9304: {meal}")
-        mode = st.radio(
-            "\u8f38\u5165\u65b9\u5f0f",
-            ["📷 \u62cd\u7167", "🖼\ufe0f \u5f9e\u5716\u5eab\u4e0a\u50b3", "\u270d\ufe0f \u624b\u6253\u6587\u5b57"],
-            horizontal=True,
-        )
-        image_bytes: bytes | None = None
-        content_type: str | None = None
-        text: str = ""
-        with st.form("input_form"):
-            if mode == "📷 \u62cd\u7167":
-                shot = st.camera_input("\u62cd\u7167")
-                if shot is not None:
-                    image_bytes = shot.getvalue()
-                    content_type = shot.type or "image/jpeg"
-            elif mode == "🖼\ufe0f \u5f9e\u5716\u5eab\u4e0a\u50b3":
-                upload = st.file_uploader("\u4e0a\u50b3\u7167\u7247", type=["jpg", "jpeg", "png", "webp"])
-                if upload is not None:
-                    image_bytes = upload.getvalue()
-                    content_type = upload.type or "image/jpeg"
-            else:
-                text = st.text_area("\u98df\u7269\u63cf\u8ff0", placeholder="\u4f8b\u5982\uff1a\u4e00\u500b\u4fbf\u7576\u542b\u6eff\u9eb5\u9eb5\u3001\u9d3b\u8089\u3001\u4e09\u5f0f\u9752\u83dc")
-            send = st.form_submit_button("\u9001\u51fa\u5206\u6790", use_container_width=True)
-        if send:
-            if image_bytes is None and not text.strip():
-                st.error("\u8acb\u63d0\u4f9b\u7167\u7247\u6216\u6587\u5b57\u63cf\u8ff0")
-                return
-            with st.spinner("Gemini \u5206\u6790\u4e2d..."):
-                try:
-                    result = _run_analysis(image_bytes, content_type, text)
-                except Exception as exc:
-                    st.error(f"\u5206\u6790\u5931\u6557: {exc}")
-                    return
-            st.session_state.pending_analysis = {
-                "raw": result,
-                "image_bytes": image_bytes,
-                "content_type": content_type,
-            }
+
+def _render_input_section(meal) -> None:
+    """Step 1: 讓使用者選輸入方式；Step 2: 依選擇呈現對應 widget。"""
+    mode = st.session_state.input_mode
+    if mode is None:
+        st.write("請選擇輸入方式：")
+        cols = st.columns(3)
+        if cols[0].button("📷 拍照", use_container_width=True, key="mode_photo"):
+            st.session_state.input_mode = "photo"
             st.rerun()
-        if st.button("\u2190 \u91cd\u9078\u9910\u5225"):
-            st.session_state.pending_meal_type = None
+        if cols[1].button("🖼️ 從圖庫上傳", use_container_width=True, key="mode_upload"):
+            st.session_state.input_mode = "upload"
+            st.rerun()
+        if cols[2].button("✍️ 手打文字", use_container_width=True, key="mode_text"):
+            st.session_state.input_mode = "text"
             st.rerun()
         return
 
-    # \u5206\u6790\u7d50\u679c\u4ee5\u53ca\u4efd\u6578\u7ba1\u7406
-    # 保護: 未選餐別亦無分析結果時 (如剛登入), 避免 KeyError
-    if not st.session_state.pending_meal_type or st.session_state.pending_analysis is None:
-        return
-
-    meal = st.session_state.pending_meal_type
-    pending = st.session_state.pending_analysis
-    raw: dict = pending["raw"]
-
-    st.subheader(f"\u5206\u6790\u7d50\u679c: {meal}")
-    st.markdown(f"**\u98df\u7269\u6458\u8981**\uff1a{raw.get('food_summary', '')}")
-
-    portion = st.number_input(
-        "\u4efd\u6578 (\u9810\u8a2d 1.0 = \u4e00\u6b63\u4efd\uff0c0.5 = \u4e00\u534a\uff0c1.5 = \u4e00\u6b21\u5403 1.5 \u500b\u4fbf\u7576\u90a3\u9ebc\u591a)",
-        min_value=0.0,
-        max_value=10.0,
-        value=1.0,
-        step=0.1,
-    )
-
-    water_ml = st.number_input(
-        "飲水量 (ml)。若本餐不含飲料，請填 0；難以估算的飲料可以不填。",
-        min_value=0,
-        max_value=5000,
-        value=0,
-        step=50,
-    )
-
-    final = {
-        "calorie": float(raw.get("calories", 0) or 0) * portion,
-        "protein": float(raw.get("protein", 0) or 0) * portion,
-        "carb": float(raw.get("carb", 0) or 0) * portion,
-        "fat": float(raw.get("fat", 0) or 0) * portion,
-        "water_ml": water_ml,  # 使用者手動輸入，不再以 Gemini 回傳為主
-    }
-
-    cols = st.columns(5)
-    for col, (key, label, unit) in zip(cols, metrics.METRIC_FIELDS):
-        with col:
-            val = final["water_ml" if key == "water" else key]
-            st.metric(label, f"{val:.1f} {unit}")
-
-    cols2 = st.columns(2)
-    if cols2[0].button("\u270d\ufe0f \u91cd\u65b0\u7de8\u8f2f\u63cf\u8ff0", use_container_width=True):
-        st.session_state.pending_analysis = None
+    mode_label = {"photo": "📷 拍照", "upload": "🖼️ 從圖庫上傳", "text": "✍️ 手打文字"}.get(mode, mode)
+    st.write("已選輸入方式: " + mode_label)
+    if st.button("← 重選輸入方式", key="reset_mode"):
+        st.session_state.input_mode = None
         st.rerun()
-    if cols2[1].button("\u2705 \u78ba\u8a8d\u9001\u51fa", use_container_width=True, type="primary"):
-        image_url = ""
-        if pending.get("image_bytes") and pending.get("content_type"):
-            image_url = _upload_image_safely(pending["image_bytes"], pending["content_type"], st.session_state.user_id)
-        try:
-            sheets.append_record(
-                timestamp=auth.now_iso(),
-                user_id=st.session_state.user_id,
-                meal_type=meal,
-                food_summary=raw.get("food_summary", ""),
-                calories=final["calorie"],
-                protein=final["protein"],
-                carb=final["carb"],
-                fat=final["fat"],
-                water_ml=final["water_ml"],
-                image_url=image_url,
-                portion=portion,
-            )
-        except Exception as exc:
-            st.error(f"\u5beb\u5165 Sheets \u5931\u6557: {exc}")
+        return
+
+    image_bytes = None
+    content_type = None
+    text = ""
+    with st.form("input_form_"+meal, clear_on_submit=False):
+        if mode == "photo":
+            shot = st.camera_input("拍照", key="cam_"+meal)
+            if shot is not None:
+                image_bytes = shot.getvalue()
+                content_type = shot.type or "image/jpeg"
+        elif mode == "upload":
+            upload = st.file_uploader("上傳照片", type=["jpg", "jpeg", "png", "webp"], key="up_"+meal)
+            if upload is not None:
+                image_bytes = upload.getvalue()
+                content_type = upload.type or "image/jpeg"
+        else:
+            text = st.text_area("食物描述", placeholder="例如: 一個便當含炒麵、雞腿、三式青菜", key="txt_"+meal)
+        send = st.form_submit_button("送出分析", use_container_width=True)
+    if send:
+        if image_bytes is None and not text.strip():
+            st.error("請提供照片或文字描述")
             return
-        st.success("\u5df2\u4fdd\u7559\u8a18\u9304")
-        st.session_state.pending_analysis = None
-        st.session_state.pending_meal_type = None
+        with st.spinner("Gemini 分析中..."):
+            try:
+                result = _run_analysis(image_bytes, content_type, text)
+            except Exception as exc:
+                _err = "分析失敗: "
+                st.error(_err + str(exc))
+                return
+        st.session_state.pending_analysis = {
+            "raw": result,
+            "image_bytes": image_bytes,
+            "content_type": content_type,
+            "meal": meal,
+        }
         st.rerun()
+
+
+def _render_review_section(meal) -> None:
+    """顯示 AI 結果 + 份數微調 + 飲水量手動輸入 + 確認送出。"""
+    pending = st.session_state.pending_analysis
+    raw = pending.get("raw", {})
+    if not raw:
+        st.error("沒有分析結果，請重新上傳。")
+        if st.button("← 重新開始"):
+            st.session_state.pending_analysis = None
+            st.rerun()
+        return
+    summary = str(raw.get("food_summary", ""))
+    st.success("AI 結果: " + summary)
+
+    with st.form("review_form"):
+        portion = st.number_input("份數", min_value=0.0, value=1.0, step=0.25, format="%.2f")
+        edited_summary = st.text_input("食物摘要（可修改）", value=summary)
+        if meal == "飲水":
+            water_ml = st.number_input("飲水量 (ml)", min_value=0.0, value=500.0, step=50.0, format="%.0f")
+        else:
+            water_ml = st.number_input("額外飲水量 (ml, 可選)", min_value=0.0, value=0.0, step=50.0, format="%.0f")
+        st.write("**最終送出值**")
+        final_rows = []
+        for key, label, unit in metrics.METRIC_FIELDS:
+            if key == "water":
+                base = water_ml
+            else:
+                _val = raw.get(key, 0)
+                base = float(_val) if _val is not None else 0.0
+            final = base * portion if key != "water" else base
+            _line = "- {lab}: {v:.1f} {u}".replace("{lab}", label).replace("{v}", str(round(final, 2))).replace("{u}", unit)
+            final_rows.append(_line)
+        st.markdown(chr(10).join(final_rows))
+        col1, col2 = st.columns(2)
+        confirm = col1.form_submit_button("✅ 確認送出", use_container_width=True)
+        reedit = col2.form_submit_button("✏️ 重新編輯描述", use_container_width=True)
+
+    if reedit:
+        st.session_state.pending_analysis = None
+        st.session_state.input_mode = "text"
+        st.rerun()
+        return
+    if confirm:
+        try:
+            _commit_record(meal, edited_summary, raw, portion, water_ml, pending)
+        except Exception as exc:
+            st.error("寫入 Sheets 失敗: " + str(exc))
+            return
+        st.success("已送出！")
+        st.session_state.pending_meal_type = None
+        st.session_state.input_mode = None
+        st.session_state.pending_analysis = None
+        st.balloons()
+        st.rerun()
+
+
+def _commit_record(meal, summary, raw, portion, water_ml, pending) -> None:
+    """把 AI 結果 × portion 寫入 Sheets。"""
+    uid = st.session_state.user_id
+    image_url = ""
+    if pending.get("image_bytes"):
+        try:
+            image_url = firebase.upload_image(pending["image_bytes"], pending.get("content_type") or "image/jpeg", uid)
+        except Exception as exc:
+            st.warning("照片上傳失敗，僅寫入文字結果: " + str(exc))
+    _get = raw.get
+    cal = float(_get("calories", 0) or 0) * portion
+    pro = float(_get("protein", 0) or 0) * portion
+    crb = float(_get("carb", 0) or 0) * portion
+    fat = float(_get("fat", 0) or 0) * portion
+    sheets.append_record(
+        auth.now_iso(),
+        uid,
+        meal,
+        summary,
+        cal,
+        pro,
+        crb,
+        fat,
+        water_ml,
+        image_url,
+        portion,
+    )
+    _clear_analysis_cache()
+
 
 
 def page_today() -> None:
-    st.header("📅 \u4eca\u65e5\u9032\u5ea6")
+    """今日分頁：5 條進度條 + 累積/目標數字，不做視覺警示。"""
+    st.header("📅 今日進度")
+    uid = st.session_state.user_id
     try:
-        records = sheets.get_records(st.session_state.user_id)
-        goals = sheets.get_user_goals(st.session_state.user_id)
+        records = _fetch_records_cached(uid)
+        goals = _fetch_goals_cached(uid)
     except Exception as exc:
-        st.error(f"\u8b80\u53d6\u8a18\u9304\u5931\u6557: {exc}")
+        st.error("讀取記錄失敗: " + str(exc))
         return
-
-    today = date.today()
-    today_records = metrics.filter_records(records, today, today)
+    start, end = _today_range()
+    today_records = metrics.filter_records(records, start, end)
     totals = metrics.sum_totals(today_records)
-
-    fields = [
-        ("\u71b1\u91cf", "calorie", "kcal"),
-        ("\u86cb\u767d\u8cea", "protein", "g"),
-        ("\u7cd6\u985e", "carb", "g"),
-        ("\u8102\u8cea", "fat", "g"),
-        ("\u98f2\u6c34\u91cf", "water", "ml"),
-    ]
-    cols = st.columns(5)
-    for col, (label, key, unit) in zip(cols, fields):
-        with col:
-            cur = getattr(totals, key)
-            goal = goals.get(key, 0)
-            st.metric(label, f"{cur:.0f} / {goal:.0f} {unit}")
-
-    st.subheader("\u8a08\u7b97\u9032\u5ea6")
-    for label, key, _ in fields:
-        cur = getattr(totals, key)
-        goal = goals.get(key, 0) or 1
-        ratio = min(max(cur / goal, 0.0), 1.0)
-        st.write(f"{label}\uff1a{cur:.0f} / {goals.get(key, 0):.0f}")
+    for key, label, unit in metrics.METRIC_FIELDS:
+        g = goals.get(key, 0.0)
+        v = float(totals.get(key, 0.0))
+        ratio = (v / g) if g > 0 else 0.0
+        ratio = max(0.0, min(ratio, 1.0))
+        st.metric(label=label, value="{:.1f} {}".format(v, unit), delta="目標 {:.1f} {}".format(g, unit), delta_color="off")
         st.progress(ratio)
-
-    st.subheader("\u4eca\u65e5\u660e\u7d30")
-    if not today_records:
-        st.info("\u4eca\u5929\u9084\u6c92\u6709\u8a18\u9304")
+    st.subheader("今日明細")
+    if today_records:
+        _show_records_table(today_records)
     else:
-        rows = [
-            {
-                "\u6642\u9593": r.get("timestamp", "")[:16],
-                "\u9910\u5225": r.get("meal_type", ""),
-                "\u6458\u8981": r.get("food_summary", ""),
-                "\u71b1\u91cf": float(r.get("calories", 0) or 0),
-                "\u86cb\u767d": float(r.get("protein", 0) or 0),
-                "\u7cd6": float(r.get("carb", 0) or 0),
-                "\u8102": float(r.get("fat", 0) or 0),
-                "\u98f2\u6c34": float(r.get("water_ml", 0) or 0),
-            }
-            for r in sorted(today_records, key=lambda r: r.get("timestamp", ""))
-        ]
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+        st.info("今天還沒有任何紀錄。")
 
 
 def page_history() -> None:
-    st.header("📊 \u6b77\u53f2\u8207\u9031\u9032\u5ea6")
+    """歷史分頁：週統計 + 評比標籤 + 折線圖。"""
+    st.header("📊 歷史與週進度")
+    uid = st.session_state.user_id
     try:
-        records = sheets.get_records(st.session_state.user_id)
-        goals = sheets.get_user_goals(st.session_state.user_id)
+        records = _fetch_records_cached(uid)
+        goals = _fetch_goals_cached(uid)
     except Exception as exc:
-        st.error(f"\u8b80\u53d6\u8a18\u9304\u5931\u6557: {exc}")
+        st.error("讀取記錄失敗: " + str(exc))
         return
+    ws, we = _week_range()
+    days = (we - ws).days + 1
+    week_records = metrics.filter_records(records, ws, we)
+    totals = metrics.sum_totals(week_records)
 
-    today = date.today()
-    default_start = metrics.week_start(today)
-    col_a, col_b = st.columns(2)
-    with col_a:
-        start = st.date_input("\u8d77\u59cb\u65e5", value=default_start)
-    with col_b:
-        end = st.date_input("\u7d50\u675f\u65e5", value=today)
-
-    in_range = metrics.filter_records(records, start, end)
-    if not in_range:
-        st.info("\u9019\u500b\u5340\u9593\u5167\u6c92\u6709\u8a18\u9304")
-        return
-
-    # \u9031\u7d71\u8a08 (\u4f7f\u7528\u4f7f\u7528\u8005\u8a2d\u5b9a\u7684\u5340\u9593\u8d77\u59cb\u65e5\u4f5c\u70ba\u4e00\u9031\u4e00\u8d77\u9ede\uff0c\u4f46\u53ea\u7d71\u8a08\u300c\u9031\u76ee\u6a19\u300d\u4e0a\u9650)
-    ws = metrics.week_start(start)
-    we = ws + timedelta(days=6)
-    week_records = metrics.filter_records(in_range, ws, min(we, end))
-    week_totals = metrics.sum_totals(week_records)
-    days_passed = (min(end, we) - ws).days + 1
-
-    st.subheader(f"\u672c\u9031\u7d71\u8a08 ({ws} \u81f3 {min(end, we)}\uff0c\u5171 {days_passed} \u5929)")
-    cols = st.columns(5)
-    field_def = [
-        ("\u71b1\u91cf", "calorie", "kcal"),
-        ("\u86cb\u767d\u8cea", "protein", "g"),
-        ("\u7cd6\u985e", "carb", "g"),
-        ("\u8102\u8cea", "fat", "g"),
-        ("\u98f2\u6c34\u91cf", "water", "ml"),
-    ]
-    statuses: dict[str, tuple[str, float]] = {}
-    for col, (label, key, unit) in zip(cols, field_def):
-        cur = getattr(week_totals, key)
-        goal = goals.get(key, 0) * days_passed
-        with col:
-            st.metric(label, f"{cur:.0f} / {goal:.0f} {unit}")
-        ratio = cur / goal if goal else 0
-        statuses[key] = metrics.classify(ratio)
-
-    # \u72c0\u614b\u6a19\u7c64
-    for label, key, _ in field_def:
-        status, pct = statuses[key]
-        diff = metrics.format_pct(pct)
-        msg = f"**{label}**\uff1a{status} ({diff})"
-        if status == "\u9054\u6210":
-            st.success(msg)
-        elif status == "\u672a\u9054":
-            st.warning(msg)
+    st.subheader("本週累積 vs 目標")
+    for key, label, unit in metrics.METRIC_FIELDS:
+        g_day = goals.get(key, 0.0)
+        week_goal = g_day * days
+        v = float(totals.get(key, 0.0))
+        ratio = (v / week_goal) if week_goal > 0 else 0.0
+        status, pct = metrics.classify(ratio)
+        st.metric(label=label, value="{:.1f} {}".format(v, unit), delta="目標 {:.1f} {}（{} 天）".format(week_goal, unit, days), delta_color="off")
+        pct_str = "達成率 {:.0%}".format(ratio)
+        if status == "未達":
+            st.warning(f"本週 {label} 未達，{pct_str}")
+        elif status == "超標":
+            st.error(f"本週 {label} 超標，{pct_str}")
         else:
-            st.error(msg)
+            st.success(f"本週 {label} 達成，{pct_str}")
 
-    # \u8d70\u52e2\u5716
-    st.subheader("\u6bcf\u65e5\u8d70\u52e2")
-    by_day: dict[date, metrics.Totals] = {}
-    for r in in_range:
-        d = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00")).date() if r.get("timestamp") else None
-        if d is None:
-            continue
-        t = by_day.setdefault(d, metrics.Totals())
-        t.calorie += float(r.get("calories", 0) or 0)
-        t.protein += float(r.get("protein", 0) or 0)
-        t.carb += float(r.get("carb", 0) or 0)
-        t.fat += float(r.get("fat", 0) or 0)
-        t.water += float(r.get("water_ml", 0) or 0)
-    days_sorted = sorted(by_day.keys())
-    chart_data = {
-        "\u71b1\u91cf": [by_day[d].calorie for d in days_sorted],
-        "\u86cb\u767d\u8cea": [by_day[d].protein for d in days_sorted],
-        "\u7cd6\u985e": [by_day[d].carb for d in days_sorted],
-        "\u8102\u8cea": [by_day[d].fat for d in days_sorted],
-        "\u98f2\u6c34\u91cf": [by_day[d].water for d in days_sorted],
+    st.subheader("本週每日趨勢")
+    chart = {
+        "date": [],
+        "熱量": [],
+        "蛋白": [],
+        "碳水": [],
+        "脂質": [],
+        "飲水": [],
     }
-    st.line_chart({"x": [d.isoformat() for d in days_sorted], **chart_data}, x="x")
+    for i in range(days):
+        d = ws + timedelta(days=i)
+        day_recs = metrics.filter_records(records, d, d)
+        day_totals = metrics.sum_totals(day_recs)
+        chart["date"].append(d.isoformat())
+        chart["熱量"].append(float(day_totals.get("calorie", 0.0)))
+        chart["蛋白"].append(float(day_totals.get("protein", 0.0)))
+        chart["碳水"].append(float(day_totals.get("carb", 0.0)))
+        chart["脂質"].append(float(day_totals.get("fat", 0.0)))
+        chart["飲水"].append(float(day_totals.get("water", 0.0)))
+    st.line_chart(chart, x="date")
 
-    st.subheader("\u8a18\u9304\u660e\u7d30")
-    rows = [
-        {
-            "\u65e5\u671f": r.get("timestamp", "")[:10],
-            "\u9910\u5225": r.get("meal_type", ""),
-            "\u6458\u8981": r.get("food_summary", ""),
-            "\u71b1\u91cf": float(r.get("calories", 0) or 0),
-            "\u86cb\u767d": float(r.get("protein", 0) or 0),
-            "\u7cd6": float(r.get("carb", 0) or 0),
-            "\u8102": float(r.get("fat", 0) or 0),
-            "\u98f2\u6c34": float(r.get("water_ml", 0) or 0),
-            "\u4efd\u6578": float(r.get("portion", 1) or 1),
-        }
-        for r in sorted(in_range, key=lambda r: r.get("timestamp", ""), reverse=True)
-    ]
+    st.subheader("本週明細")
+    if week_records:
+        _show_records_table(week_records)
+    else:
+        st.info("本週還沒有任何紀錄。")
+
+    with st.expander("🔎 完整歷史"):
+        all_recs = [r for r in records]
+        if all_recs:
+            _show_records_table(all_recs)
+        else:
+            st.info("尚無任何紀錄。")
+
+
+def _show_records_table(records) -> None:
+    """把 list[dict] 整理成 dataframe 給使用者看。"""
+    rows = []
+    for r in records:
+        rows.append({
+            "時間": r.get("timestamp", ""),
+            "餐別": r.get("meal_type", ""),
+            "摘要": r.get("food_summary", ""),
+            "熱量": r.get("calories", 0),
+            "蛋白": r.get("protein", 0),
+            "碳水": r.get("carb", 0),
+            "脂質": r.get("fat", 0),
+            "飲水": r.get("water_ml", 0),
+            "份數": r.get("portion", 1),
+        })
+    rows.sort(key=lambda x: str(x.get("時間", "")), reverse=True)
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
 def main() -> None:
-    st.set_page_config(page_title="\u4eba\u5de5\u667a\u80fd\u71b1\u91cf\u8a18\u9304", page_icon="🍱", layout="wide")
+    """App 入口：未登入 → 登入頁；已登入 → 側邊欄切換分頁。"""
+    st.set_page_config(page_title="熱量與飲水紀錄", page_icon="🍽️", layout="wide")
     init_session()
-
     if not st.session_state.user_id:
         page_login()
         return
-
-    page_logout_sidebar()
-    tab1, tab2, tab3 = st.tabs(["📝 \u8a18\u4e00\u9910", "📅 \u4eca\u65e5", "📊 \u6b77\u53f2"])
-    with tab1:
+    with st.sidebar:
+        st.write("👤 " + str(st.session_state.username or ""))
+        page = st.radio("切換分頁", ["記一餐", "今日", "歷史"], index=["記一餐", "今日", "歷史"].index(st.session_state.get("page", "記一餐")))
+        st.session_state.page = page
+        if st.button("🚪 登出", use_container_width=True):
+            for k in list(st.session_state.keys()):
+                if k != "page":
+                    del st.session_state[k]
+            st.session_state.user_id = None
+            st.session_state.username = None
+            st.rerun()
+    if st.session_state.page == "記一餐":
         page_log_meal()
-    with tab2:
+    elif st.session_state.page == "今日":
         page_today()
-    with tab3:
+    else:
         page_history()
 
 
 if __name__ == "__main__":
     main()
-else:
-    # Streamlit runs app.py as module
-    main()
-
 
