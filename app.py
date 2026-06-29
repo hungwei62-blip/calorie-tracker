@@ -167,11 +167,37 @@ def page_log_meal() -> None:
         st.rerun()
         return
 
+    if meal == "飲水":
+        _render_water_section(meal)
+        return
+
     if st.session_state.pending_analysis is None:
         _render_input_section(meal)
         return
 
     _render_review_section(meal)
+
+
+def _render_water_section(meal) -> None:
+    """飲水簡化流程：單一 ml 輸入 + 確認鈕，直接寫入 Sheets，不送 Gemini。"""
+    st.subheader("💧 飲水")
+    with st.form("water_form"):
+        water_ml = st.number_input("飲水量 (ml)", min_value=0.0, value=500.0, step=50.0, format="%.0f")
+        confirm = st.form_submit_button("✅ 確認送出", use_container_width=True)
+    if not confirm:
+        return
+    summary = ("飲水 " + str(int(water_ml)) + "ml")
+    try:
+        _commit_record(meal, summary, {}, 1.0, water_ml, {})
+    except Exception as exc:
+        st.error("寫入 Sheets 失敗: " + str(exc))
+        return
+    st.success("已送出！")
+    st.session_state.pending_meal_type = None
+    st.session_state.input_mode = None
+    st.session_state.pending_analysis = None
+    st.balloons()
+    st.rerun()
 
 
 def _render_meal_picker() -> None:
