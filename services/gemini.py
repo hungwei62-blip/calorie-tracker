@@ -1,6 +1,6 @@
 """Gemini 2.5 Flash \u71df\u990a\u8b58\u5225\u670d\u52d9\u3002
 
-\u8b58\u5225\u7d50\u679c\u5305\u542b\u4e94\u500b\u6b04\u4f4d\uff1afood_summary / calories / protein / carb / fat / water_ml
+\u8b58\u5225\u7d50\u679c\u5305\u542b\u4e94\u500b\u6b04\u4f4d\uff1afood_summary / calories / protein / carb / fat
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ ENV_VAR = "gemini_api_key"  # Streamlit secrets key (\u5c0d\u61c9\u4f4e\u9ad8\u5
 SYSTEM_PROMPT = """\u4f60\u662f\u4e00\u4f4d\u5c08\u696d\u7684\u71df\u990a\u5e2b\u3002\u8acb\u56b4\u683c\u5206\u6790\u4f7f\u7528\u8005\u63d0\u4f9b\u7684\u300c\u98df\u7269\u7167\u7247\u300d\u6216\u300c\u6587\u5b57\u63cf\u8ff0\u300d\uff0c\u4f30\u7b97\u9019\u4e00\u6b63\u4efd / \u9020\u98df\u7269\u7684\u300c\u6574\u9ad4\u300d\u71df\u990a\u7e3d\u548c\uff0c\u4e0d\u8981\u5148\u4f30\u55ae\u4f4d\u518d\u8a08\u7b97\u3002
 
 \u4f30\u7b97\u5169\u9805\u4ee5\u5916\u6642\uff0c\u8acb\u4ee5 0 \u586b\u4f4d\uff1a
-1. \u300c\u91cd\u91cf\u300d\uff1a\u82e5\u7121\u6cd5\u4f30\u7b97\uff0c\u4f7f\u7528\u4e2d\u5e38\u898b\u4f86\u5dee\u4e0d\u591a\u7684\u53c3\u8003\u91cd\u91cf\uff1b\u82e5\u9805\u76ee\u662f\u300c\u98f2\u6c34\u300d\u985e\u578b\uff0c\u8acb\u4f30\u7b97\u300c\u98f2\u7528\u91cf\u300d\u4e26\u586b\u5165 water_ml\u3002
+1. \u300c\u91cd\u91cf\u300d\uff1a\u82e5\u7121\u6cd5\u4f30\u7b97\uff0c\u4f7f\u7528\u4e2d\u5e38\u898b\u4f86\u5dee\u4e0d\u591a\u7684\u53c3\u8003\u91cd\u91cf\uff1b\u82e5\u9805\u76ee\u662f\u300c\u98f2\u6c34\u300d\u985e\u578b\uff0c\u8acb\u4f30\u7b97\u300c\u98f2\u7528\u91cf\u300d\u672c\u4efb\u52d9\u4e0d\u9700\u8981\u4f30\u7b97\u98f2\u6c34\u91cf\uff0c\u98f2\u6c34\u91cf\u7531\u4f7f\u7528\u8005\u53e6\u884c\u586b\u5165
 2. \u300c\u98f2\u6c34\u91cf\u300d\uff1a\u82e5\u7167\u7247\u4e2d\u7121\u660e\u78ba\u98f2\u6599\u8b49\u64da\uff0c\u8acb\u56de\u50b3 0\uff1b\u53ea\u6709\u80fd\u78ba\u5b9a\u8b58\u5225\u51fa\u300c\u6c34\u3001\u8336\u3001\u53ef\u6a02\u3001\u5496\u5561\u300d\u7b49\u98f2\u6599\u624d\u586b\u5165\u8a72\u985e\u4f30\u7b97\u503c\u3002
 
 \u8acb\u56b4\u683c\u9075\u5b88\u4ee5\u4e0b JSON \u683c\u5f0f\u56de\u50b3\uff0c\u4e0d\u8981\u5305\u542b\u4efb\u4f55 markdown \u6a19\u7c64\uff08\u5982 ```json\uff09\u3001\u4e0d\u8981\u5305\u542b\u984d\u5916\u7684\u89e3\u91cb\u6587\u5b57\u6216\u7a7a\u683c\uff1a
@@ -29,7 +29,6 @@ SYSTEM_PROMPT = """\u4f60\u662f\u4e00\u4f4d\u5c08\u696d\u7684\u71df\u990a\u5e2b\
   \"protein\": 0,
   \"carb\": 0,
   \"fat\": 0,
-  \"water_ml\": 0
 }"""
 
 RESPONSE_SCHEMA = types.Schema(
@@ -40,9 +39,8 @@ RESPONSE_SCHEMA = types.Schema(
         "protein": types.Schema(type=types.Type.NUMBER),
         "carb": types.Schema(type=types.Type.NUMBER),
         "fat": types.Schema(type=types.Type.NUMBER),
-        "water_ml": types.Schema(type=types.Type.NUMBER),
     },
-    required=["food_summary", "calories", "protein", "carb", "fat", "water_ml"],
+    required=["food_summary", "calories", "protein", "carb", "fat"],
 )
 
 CONFIG = types.GenerateContentConfig(
@@ -86,12 +84,12 @@ def _parse_response(response: Any) -> dict[str, Any]:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Gemini \u56de\u50b3\u4e0d\u662f\u6709\u6548 JSON: {text!r}") from exc
-    expected = {"food_summary", "calories", "protein", "carb", "fat", "water_ml"}
+    expected = {"food_summary", "calories", "protein", "carb", "fat"}
     missing = expected - set(data.keys())
     if missing:
         raise RuntimeError(f"Gemini \u56de\u50b3\u7f3a\u5c11\u6b04\u4f4d: {sorted(missing)}")
     # \u8b8a\u578b\u5b89\u5168\uff1a\u6578\u503c\u8b8a\u70ba float\uff0c\u4efb\u4f55\u7121\u6cd5\u8b6f\u8b80\u7684\u503c\u4ee5 0 \u4ee3\u66ff
-    for k in ("calories", "protein", "carb", "fat", "water_ml"):
+    for k in ("calories", "protein", "carb", "fat"):
         try:
             data[k] = float(data[k])
         except (TypeError, ValueError):

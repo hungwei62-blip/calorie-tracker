@@ -201,12 +201,20 @@ def page_log_meal() -> None:
         step=0.1,
     )
 
+    water_ml = st.number_input(
+        "飲水量 (ml)。若本餐不含飲料，請填 0；難以估算的飲料可以不填。",
+        min_value=0,
+        max_value=5000,
+        value=0,
+        step=50,
+    )
+
     final = {
         "calorie": float(raw.get("calories", 0) or 0) * portion,
         "protein": float(raw.get("protein", 0) or 0) * portion,
         "carb": float(raw.get("carb", 0) or 0) * portion,
         "fat": float(raw.get("fat", 0) or 0) * portion,
-        "water_ml": float(raw.get("water_ml", 0) or 0) * portion,
+        "water_ml": water_ml,  # 使用者手動輸入，不再以 Gemini 回傳為主
     }
 
     cols = st.columns(5)
@@ -229,7 +237,7 @@ def page_log_meal() -> None:
                 user_id=st.session_state.user_id,
                 meal_type=meal,
                 food_summary=raw.get("food_summary", ""),
-                calories=final["calories"],
+                calories=final["calorie"],
                 protein=final["protein"],
                 carb=final["carb"],
                 fat=final["fat"],
