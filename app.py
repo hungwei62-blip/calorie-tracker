@@ -210,9 +210,8 @@ def page_log_meal() -> None:
     }
 
     cols = st.columns(5)
-    for col, (key, label) in zip(cols, metrics.METRIC_FIELDS):
+    for col, (key, label, unit) in zip(cols, metrics.METRIC_FIELDS):
         with col:
-            unit = "ml" if key == "water" else ("kcal" if key == "calorie" else "g")
             val = final["water_ml" if key == "water" else key]
             st.metric(label, f"{val:.1f} {unit}")
 
