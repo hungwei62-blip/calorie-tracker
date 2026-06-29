@@ -53,32 +53,63 @@ App 第一次連線時會自動建立 `Users` 與 `Records` 兩個工作表，**
 4. 選 Storage 地區：**`asia-east1` (Taiwan)** ← 對台灣延遲最低
 5. 點 **Done / 完成**
 
-### 2.3 設定公開讀取權限
-1. 切到「**Rules / 規則**」頁籤
-2. 把內容整個取代成：
-   ```text
-   rules_version = '2';
-   service firebase.storage {
-     match /b/{bucket}/o {
-       match /food/{userId}/{filename} {
-         allow read: if true;
-         allow write: if false;
-       }
-     }
-   }
-   ```
+### 2.3 設定 Storage Rules
+
+1. 切到「Rules / 規則」頁籤
+2. 把內容整個取代成（**限定 /food/ 路徑下公開讀寫，其餘關閉**）：
+```text
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /food/{userId}/{filename} {
+      allow read, write: if true;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
 3. 點「**Publish / 發布**」
 
+驗證：上方「規則測試區」可選 `/food/test/abc.jpg` + `get`/`write`，執出 Allowed。
+
+---
 ### 2.4 取得 bucket 名稱
-1. 切到「**Files / 檔案**」頁籤
-2. 看上方路徑：`gs://calorie-tracker-xxxxx.appspot.com`
-3. 複製 `calorie-tracker-xxxxx.appspot.com`（不包含 `gs://`），貼到記事本：
-   ```
-   STORAGE_BUCKET = "calorie-tracker-xxxxx.appspot.com"
-   PUBLIC_URL_PREFIX = "https://storage.googleapis.com/calorie-tracker-xxxxx.appspot.com/"
-   ```
+1. 切到「Files / 檔案」頁籤
+2. 看上方路徑：
+   - 新版：`gs://calorie-tracker-xxxxx.firebasestorage.app`
+   - 舊版：`gs://calorie-tracker-xxxxx.appspot.com`
+3. 複製 `calorie-tracker-xxxxx.firebasestorage.app`（不包含 `gs://`），貼到記事本：
+```
+STORAGE_BUCKET = "calorie-tracker-xxxxx.firebasestorage.app"
+PUBLIC_URL_PREFIX = "https://storage.googleapis.com/calorie-tracker-xxxxx.firebasestorage.app/"
+```
 
 ✅ **驗證**：Storage Files 頁面空白但路徑顯示 bucket 名稱
+
+---
+
+### 2.5 跨帳號 IAM 設定（選用，僅當 Firebase 與 GCP 屬不同帳號）
+
+如果您的 Firebase project 與 GCP Service Account 在**不同的 Google 帳號**下，
+需要在 Firebase 這邊授予 Service Account 存取 bucket 的權限。
+
+1. 仍登入 **Firebase 帳號 A**，到 https://console.cloud.google.com/
+2. 右上角專業下拉 → 切到 Firebase 對應的 GCP project
+3. 搜尋 「Cloud Storage」 → 「Buckets」 → 點入 `calories-xxxxx.firebasestorage.app`
+4. 上方「Permissions」頁籤 → 「Grant access」
+5. **New principals** 貼上帳號 B 的 SA email：
+   ```
+   calorie-tracker-sa@<account-B-project-id>.iam.gserviceaccount.com
+   ```
+6. **Role** 選 **`Storage Object Admin`**（含讀、寫、刪除）
+7. 點 **Save**
+
+✅ **驗證**：GCP Cloud Storage 頁面看到 SA email 為 `Storage Object Admin`
+
+---
+
 
 ---
 
@@ -164,3 +195,5 @@ PUBLIC_URL_PREFIX = "https://storage.googleapis.com/calorie-tracker-xxxxx.appspo
 - **Service Account 沒出現在 Sheet 共用名單** → 重新邀請一次並檢查 email 拼字
 
 把每一關卡完成後的訊息或錯誤截圖丟給我，我幫您繼續。
+
+- **跨帳號上傳出現 403 Forbidden** → 可能是 Firebase 帳號未授予 SA `Storage Object Admin`，回關卡 2.5 加成員
