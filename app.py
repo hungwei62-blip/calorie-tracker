@@ -182,6 +182,10 @@ def page_log_meal() -> None:
         return
 
     # \u5206\u6790\u7d50\u679c\u4ee5\u53ca\u4efd\u6578\u7ba1\u7406
+    # 保護: 未選餐別亦無分析結果時 (如剛登入), 避免 KeyError
+    if not st.session_state.pending_meal_type or st.session_state.pending_analysis is None:
+        return
+
     meal = st.session_state.pending_meal_type
     pending = st.session_state.pending_analysis
     raw: dict = pending["raw"]
