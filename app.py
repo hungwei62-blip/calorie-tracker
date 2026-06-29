@@ -202,7 +202,7 @@ def page_log_meal() -> None:
     )
 
     final = {
-        "calories": float(raw.get("calories", 0) or 0) * portion,
+        "calorie": float(raw.get("calories", 0) or 0) * portion,
         "protein": float(raw.get("protein", 0) or 0) * portion,
         "carb": float(raw.get("carb", 0) or 0) * portion,
         "fat": float(raw.get("fat", 0) or 0) * portion,
