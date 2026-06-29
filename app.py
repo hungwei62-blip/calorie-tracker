@@ -279,7 +279,7 @@ def _render_review_section(meal) -> None:
                 _val = raw.get(key, 0)
                 base = float(_val) if _val is not None else 0.0
             final = base * portion if key != "water" else base
-            _line = "- {lab}: {v:.1f} {u}".replace("{lab}", label).replace("{v}", str(round(final, 2))).replace("{u}", unit)
+            _line = f"- {label}: {final:.1f} {unit}"
             final_rows.append(_line)
         st.markdown(chr(10).join(final_rows))
         col1, col2 = st.columns(2)
@@ -348,7 +348,7 @@ def page_today() -> None:
         return
     start, end = _today_range()
     today_records = metrics.filter_records(records, start, end)
-    totals = metrics.sum_totals(today_records)
+    totals = metrics.sum_totals(today_records).as_dict()
     for key, label, unit in metrics.METRIC_FIELDS:
         g = goals.get(key, 0.0)
         v = float(totals.get(key, 0.0))
@@ -376,7 +376,7 @@ def page_history() -> None:
     ws, we = _week_range()
     days = (we - ws).days + 1
     week_records = metrics.filter_records(records, ws, we)
-    totals = metrics.sum_totals(week_records)
+    totals = metrics.sum_totals(week_records).as_dict()
 
     st.subheader("本週累積 vs 目標")
     for key, label, unit in metrics.METRIC_FIELDS:
@@ -406,7 +406,7 @@ def page_history() -> None:
     for i in range(days):
         d = ws + timedelta(days=i)
         day_recs = metrics.filter_records(records, d, d)
-        day_totals = metrics.sum_totals(day_recs)
+        day_totals = metrics.sum_totals(day_recs).as_dict()
         chart["date"].append(d.isoformat())
         chart["熱量"].append(float(day_totals.get("calorie", 0.0)))
         chart["蛋白"].append(float(day_totals.get("protein", 0.0)))
