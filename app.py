@@ -67,7 +67,7 @@ def init_session() -> None:
     defaults = {
         "user_id": None,
         "username": None,
-        "page": "記一餐",
+        "page": "個人",
         "pending_meal_type": None,
         "input_mode": None,
         "pending_analysis": None,
@@ -186,6 +186,86 @@ def page_login() -> None:
             st.session_state.username = new_user
             st.success("註冊成功並已登入！")
             st.rerun()
+
+
+def page_personal() -> None:
+    """個人首頁：顯示 BMR、TDEE 目標、今日達成率。"""
+    st.header("👤 個人首頁")
+    uid = st.session_state.user_id
+    
+    try:
+        records = _fetch_records_cached(uid)
+        goals = _fetch_goals_cached(uid)
+    except Exception as exc:
+        st.error("讀取資料失敗: " + str(exc))
+        return
+    
+    # 檢查是否已設定 TDEE
+    bmr = goals.get("bmr", 0)
+    calorie_goal = goals.get("calorie", 0)
+    
+    if bmr <= 0 or calorie_goal <= 0:
+        # 尚未設定 TDEE，顯示引導訊息
+        st.warning("⚠️ 您尚未設定個人營養目標")
+        st.info("請先進行 TDEE 計算，以獲得個人化的營養建議。")
+        if st.button("➡️ 前往 TDEE 計算", use_container_width=True):
+            st.session_state.page = "TDEE 計算"
+            st.rerun()
+        return
+    
+    # 顯示 BMR 和建議攝取量
+    tdee = (bmr / 0.55) if bmr > 0 else 0  # 估算 TDEE（從 BMR 反推）
+    
+    st.subheader("📊 個人基礎資料")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("🔥 基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
+    with col2:
+        st.metric("⚡ 建議熱量攝取", f"{calorie_goal:.0f} 大卡")
+    with col3:
+        st.metric("💧 飲水目標", f"{goals.get('water', 0):.0f} ml")
+    
+    # 第二行：蛋白質、碳水、脂肪
+    col4, col5, col6 = st.columns(3)
+    with col4:
+        st.metric("🥩 蛋白質目標", f"{goals.get('protein', 0):.0f} g")
+    with col5:
+        st.metric("🍚 碳水目標", f"{goals.get('carb', 0):.0f} g")
+    with col6:
+        st.metric("🥑 脂肪目標", f"{goals.get('fat', 0):.0f} g")
+    
+    # 今日達成率
+    st.subheader("📅 今日達成率")
+    start, end = _today_range()
+    today_records = metrics.filter_records(records, start, end)
+    totals = metrics.sum_totals(today_records).as_dict()
+    
+    for key, label, unit in metrics.METRIC_FIELDS:
+        g = goals.get(key, 0.0)
+        v = float(totals.get(key, 0.0))
+        ratio = (v / g) if g > 0 else 0.0
+        ratio = max(0.0, min(ratio, 1.0))
+        pct = int(ratio * 100)
+        
+        # 根據達成率顯示不同顏色
+        if ratio >= 1.0:
+            color = "green"
+            status = "✅ 已達成"
+        elif ratio >= 0.7:
+            color = "blue"
+            status = "🔄 進行中"
+        elif ratio >= 0.3:
+            color = "orange"
+            status = "⚡ 努力中"
+        else:
+            color = "red"
+            status = "❌ 尚未開始"
+        
+        st.write(f"**{label}**: {v:.1f} / {g:.1f} {unit} ({pct}%) {status}")
+        st.progress(ratio, text=f"{pct}%")
+    
+    st.divider()
+    st.caption(f"🔥 基礎代謝率 (BMR): {bmr:.0f} 大卡")
 
 
 
@@ -408,9 +488,28 @@ def page_tdee() -> None:
     uid = st.session_state.user_id
     goals = _fetch_goals_cached(uid)
     
-    # 顯示當前 BMR（如果有的話）
+    # 檢查是否已設定 TDEE
     current_bmr = goals.get("bmr", 0)
-    if current_bmr > 0:
+    has_existing = current_bmr > 0
+    
+    if has_existing:
+        st.warning("⚠️ 您已經計算過 TDEE，重新計算會覆蓋之前的設定。")
+        col_confirm = st.columns([1, 1])
+        with col_confirm[0]:
+            confirm_recalc = st.button("✅ 確認重新計算", use_container_width=True)
+        with col_confirm[1]:
+            cancel_recalc = st.button("❌ 取消", use_container_width=True)
+        
+        if cancel_recalc:
+            st.session_state.page = "個人"
+            st.rerun()
+            return
+        
+        if not confirm_recalc:
+            return
+    
+    # 顯示當前 BMR（如果有的話）
+    if has_existing:
         st.info(f"📌 您目前設定的 BMR：{current_bmr:.0f} 大卡")
     
     with st.form("tdee_form"):
@@ -505,7 +604,7 @@ def _show_records_table(records, show_actions: bool = False) -> None:
     # 編輯/刪除操作
     for r in records:
         ts = r.get("timestamp", "")
-        col1, col2 = st.columns([1, 1, 4])
+        col1, col2 = st.columns(2)
         with col1:
             if st.button(f"✏️ 編輯", key=f"edit_{ts}"):
                 st.session_state[f"edit_mode_{ts}"] = True
@@ -674,10 +773,10 @@ def main() -> None:
         return
     with st.sidebar:
         st.write("👤 " + str(st.session_state.username or ""))
-        pages = ["記一餐", "今日", "歷史", "TDEE 計算"]
-        current = st.session_state.get("page", "記一餐")
+        pages = ["個人", "記錄", "歷史", "TDEE 計算"]
+        current = st.session_state.get("page", "個人")
         if current not in pages:
-            current = "記一餐"
+            current = "個人"
         page = st.radio("切換分頁", pages, index=pages.index(current))
         st.session_state.page = page
         if st.button("🚪 登出", use_container_width=True):
@@ -687,10 +786,10 @@ def main() -> None:
             st.session_state.user_id = None
             st.session_state.username = None
             st.rerun()
-    if st.session_state.page == "記一餐":
+    if st.session_state.page == "個人":
+        page_personal()
+    elif st.session_state.page == "記錄":
         page_log_meal()
-    elif st.session_state.page == "今日":
-        page_today()
     elif st.session_state.page == "歷史":
         page_history()
     else:
