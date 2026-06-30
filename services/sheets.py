@@ -162,14 +162,14 @@ def update_user_bmr(user_id: str, bmr: float) -> bool:
 
 
 def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
-    """更新使用者的所有目標值。"""
+    """更新使用者的所有目標值（不包含 BMR）。"""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     rows = get_users_rows()
     
-    # 欄位對應 (1-based index): bmr=5, calorie=6, protein=7, carb=8, fat=9, water=10
+    # 欄位對應 (1-based index): calorie=6, protein=7, carb=8, fat=9, water=10
+    # 注意：BMR 已經由 update_user_bmr 單獨處理
     field_map = {
-        "bmr": 5,
         "calorie": 6,
         "protein": 7,
         "carb": 8,
@@ -177,13 +177,19 @@ def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
         "water": 10,
     }
     
+    found = False
     for idx, row in enumerate(rows, start=2):
         if row.get("user_id") == user_id:
+            found = True
             for key, col in field_map.items():
                 if key in goals:
-                    ws.update_cell(idx, col, round(goals[key], 2))
-            return True
-    return False
+                    val = goals[key]
+                    if isinstance(val, float):
+                        val = round(val, 2)
+                    ws.update_cell(idx, col, val)
+            break
+    
+    return found
 
 
 def update_record(record_timestamp: str, user_id: str, updates: dict[str, Any]) -> bool:

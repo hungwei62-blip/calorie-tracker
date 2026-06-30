@@ -699,7 +699,7 @@ def page_today() -> None:
 
 
 def page_history() -> None:
-    """歷史分頁：週統計 + 評比標籤 + 折線圖。"""
+    """歷史分頁：每日達成率 + 趨勢圖。"""
     st.header("📊 歷史與週進度")
     uid = st.session_state.user_id
     try:
@@ -708,28 +708,89 @@ def page_history() -> None:
     except Exception as exc:
         st.error("讀取記錄失敗: " + str(exc))
         return
+    
+    # 檢查是否已設定 TDEE
+    bmr = goals.get("bmr", 0)
+    calorie_goal = goals.get("calorie", 0)
+    
+    if bmr <= 0 or calorie_goal <= 0:
+        st.warning("⚠️ 請先在「個人」頁面設定您的 TDEE 目標")
+        return
+    
     ws, we = _week_range()
     days = (we - ws).days + 1
-    week_records = metrics.filter_records(records, ws, we)
-    totals = metrics.sum_totals(week_records).as_dict()
+    
+    # 取得每日目標
+    daily_calorie = goals.get("calorie", 0.0)
+    daily_protein = goals.get("protein", 0.0)
+    
+    # 建立每日達成率表格
+    st.subheader("📅 本週每日達成率")
+    daily_data = []
+    for i in range(days):
+        d = ws + timedelta(days=i)
+        day_recs = metrics.filter_records(records, d, d)
+        day_totals = metrics.sum_totals(day_recs).as_dict()
+        
+        day_cal = float(day_totals.get("calorie", 0.0))
+        day_pro = float(day_totals.get("protein", 0.0))
+        
+        cal_ratio = (day_cal / daily_calorie) if daily_calorie > 0 else 0.0
+        pro_ratio = (day_pro / daily_protein) if daily_protein > 0 else 0.0
+        
+        # 格式化日期顯示
+        date_str = d.strftime("%m/%d")
+        weekday = ["一", "二", "三", "四", "五", "六", "日"][d.weekday()]
+        
+        daily_data.append({
+            "日期": f"{date_str}({weekday})",
+            "熱量": day_cal,
+            "熱量目標": daily_calorie,
+            "熱量達成率": f"{cal_ratio:.0%}",
+            "蛋白質": day_pro,
+            "蛋白質目標": daily_protein,
+            "蛋白質達成率": f"{pro_ratio:.0%}",
+        })
+    
+    # 顯示每日達成率表格
+    st.dataframe(daily_data, use_container_width=True, hide_index=True)
+    
+    # 視覺化：每日熱量達成率長條圖
+    st.subheader("📊 本週熱量達成率")
+    calorie_chart = {
+        "日期": [],
+        "達成率 (%)": [],
+    }
+    for i in range(days):
+        d = ws + timedelta(days=i)
+        day_recs = metrics.filter_records(records, d, d)
+        day_totals = metrics.sum_totals(day_recs).as_dict()
+        day_cal = float(day_totals.get("calorie", 0.0))
+        cal_ratio = (day_cal / daily_calorie * 100) if daily_calorie > 0 else 0.0
+        calorie_chart["日期"].append(d.strftime("%m/%d"))
+        calorie_chart["達成率 (%)"].append(min(cal_ratio, 100))  # 最多顯示 100%
+    
+    st.bar_chart(calorie_chart, x="日期", y="達成率 (%)")
+    
+    # 視覺化：每日蛋白質達成率長條圖
+    st.subheader("🥩 本週蛋白質達成率")
+    protein_chart = {
+        "日期": [],
+        "達成率 (%)": [],
+    }
+    for i in range(days):
+        d = ws + timedelta(days=i)
+        day_recs = metrics.filter_records(records, d, d)
+        day_totals = metrics.sum_totals(day_recs).as_dict()
+        day_pro = float(day_totals.get("protein", 0.0))
+        pro_ratio = (day_pro / daily_protein * 100) if daily_protein > 0 else 0.0
+        protein_chart["日期"].append(d.strftime("%m/%d"))
+        protein_chart["達成率 (%)"].append(min(pro_ratio, 100))
+    
+    st.bar_chart(protein_chart, x="日期", y="達成率 (%)")
 
-    st.subheader("本週累積 vs 目標")
-    for key, label, unit in metrics.METRIC_FIELDS:
-        g_day = goals.get(key, 0.0)
-        week_goal = g_day * days
-        v = float(totals.get(key, 0.0))
-        ratio = (v / week_goal) if week_goal > 0 else 0.0
-        status, pct = metrics.classify(ratio)
-        st.metric(label=label, value="{:.1f} {}".format(v, unit), delta="目標 {:.1f} {}（{} 天）".format(week_goal, unit, days), delta_color="off")
-        pct_str = "達成率 {:.0%}".format(ratio)
-        if status == "未達":
-            st.warning(f"本週 {label} 未達，{pct_str}")
-        elif status == "超標":
-            st.error(f"本週 {label} 超標，{pct_str}")
-        else:
-            st.success(f"本週 {label} 達成，{pct_str}")
-
-    st.subheader("本週每日趨勢")
+    # 本週營養攝取趨勢
+    st.subheader("📈 本週每日趨勢")
     chart = {
         "date": [],
         "熱量": [],
@@ -749,7 +810,10 @@ def page_history() -> None:
         chart["脂質"].append(float(day_totals.get("fat", 0.0)))
         chart["飲水"].append(float(day_totals.get("water", 0.0)))
     st.line_chart(chart, x="date")
-
+    
+    # 取得本週記錄用於顯示明細
+    week_records = metrics.filter_records(records, ws, we)
+    
     st.subheader("本週明細")
     if week_records:
         _show_records_table(week_records, show_actions=False)

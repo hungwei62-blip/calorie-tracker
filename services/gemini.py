@@ -95,9 +95,13 @@ def _parse_response(response: Any) -> dict[str, Any]:
         except (TypeError, ValueError):
             data[k] = 0.0
     # Atwater 公式: 蛋白 4 + 碳水 4 + 脂肪 9 (kcal/g)
-    # 模型有時會回 calories=0 但其他三項有值, 用公式重算保證一致
-    if data["calories"] <= 0 and (data["protein"] or data["carb"] or data["fat"]):
-        data["calories"] = round(data["protein"] * 4 + data["carb"] * 4 + data["fat"] * 9, 2)
+    # 始終計算 Atwater 熱量，確保準確性
+    atwater_calories = data["protein"] * 4 + data["carb"] * 4 + data["fat"] * 9
+    
+    # 如果原始熱量為 0 但巨量營養素有值，使用 Atwater 公式計算的熱量
+    if data["calories"] <= 0 and atwater_calories > 0:
+        data["calories"] = round(atwater_calories, 2)
+    
     return data
 
 
