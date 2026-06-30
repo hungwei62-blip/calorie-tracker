@@ -873,11 +873,14 @@ def main() -> None:
     # 自訂「清新燕麥減脂風」樣式
     st.markdown("""
     <style>
+        /* 引入 Line Seed 字體 */
+        @import url('https://fonts.googleapis.com/css2?family=Line+Seed+JP:wght@400;700&display=swap');
+        
         /* 1. 全域背景與文字優化 */
         .stApp {
             background-color: #F9F8F6 !important;
             color: #2F3E46 !important;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Line Seed JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         }
 
         /* 2. 標題與副標題顏色調和 */
@@ -969,6 +972,127 @@ def main() -> None:
             color: #4A7C59 !important;
             font-weight: 700 !important;
             border-bottom-color: #4A7C59 !important;
+        }
+
+        /* 9. 強制淺色模式（覆蓋深色設定） */
+        * {
+            background-color: #F9F8F6 !important;
+            color: #2F3E46 !important;
+        }
+
+        /* 10. 側邊欄樣式 */
+        [data-testid="stSidebar"] {
+            background-color: #FFFFFF !important;
+            border-right: 1px solid #EAE8E4 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+            background-color: #FFFFFF !important;
+        }
+
+        /* 11. 輸入框樣式 */
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stNumberInput"] input,
+        div[data-testid="stTextArea"] textarea {
+            background-color: #FFFFFF !important;
+            border: 1px solid #EAE8E4 !important;
+            border-radius: 8px !important;
+            color: #2F3E46 !important;
+        }
+        div[data-testid="stTextInput"] input:focus,
+        div[data-testid="stNumberInput"] input:focus,
+        div[data-testid="stTextArea"] textarea:focus {
+            border-color: #4A7C59 !important;
+            box-shadow: 0 0 0 2px rgba(74, 124, 89, 0.1) !important;
+        }
+
+        /* 12. Radio 按鈕樣式 */
+        div[data-testid="stRadio"] label {
+            color: #2F3E46 !important;
+        }
+
+        /* 13. Slider 樣式 */
+        div[data-testid="stSlider"] .stSlider > div > div > div[style*="background-color: rgb(74, 124, 89)"] {
+            background-color: #4A7C59 !important;
+        }
+
+        /* 14. Selectbox 下拉選單樣式 */
+        div[data-testid="stSelectbox"] {
+            background-color: #FFFFFF !important;
+        }
+        div[data-testid="stSelectbox"] select {
+            background-color: #FFFFFF !important;
+            border: 1px solid #EAE8E4 !important;
+            border-radius: 8px !important;
+            color: #2F3E46 !important;
+        }
+
+        /* 15. Dataframe 表格樣式 */
+        div[data-testid="stDataFrame"] {
+            background-color: #FFFFFF !important;
+            border-radius: 12px !important;
+            border: 1px solid #EAE8E4 !important;
+        }
+
+        /* 16. Expander 摺疊面板樣式 */
+        details[data-testid="stExpander"] {
+            background-color: #FFFFFF !important;
+            border-radius: 12px !important;
+            border: 1px solid #EAE8E4 !important;
+        }
+
+        /* 17. 成功/警告/錯誤提示樣式 */
+        div[data-testid="stSuccess"] {
+            background-color: #E8F5E9 !important;
+            color: #2E7D32 !important;
+            border-radius: 8px !important;
+        }
+        div[data-testid="stWarning"] {
+            background-color: #FFF3E0 !important;
+            color: #E65100 !important;
+            border-radius: 8px !important;
+        }
+        div[data-testid="stError"] {
+            background-color: #FFEBEE !important;
+            color: #C62828 !important;
+            border-radius: 8px !important;
+        }
+        div[data-testid="stInfo"] {
+            background-color: #E3F2FD !important;
+            color: #1565C0 !important;
+            border-radius: 8px !important;
+        }
+
+        /* 18. 修正文字可能被遮擋的問題 */
+        .main .block-container {
+            padding-bottom: 3rem !important;
+        }
+
+        /* 19. Camera input 拍照框 */
+        div[data-testid="stCameraInput"] {
+            background-color: #FFFFFF !important;
+            border-radius: 12px !important;
+            border: 1px solid #EAE8E4 !important;
+        }
+
+        /* 20. File uploader */
+        div[data-testid="stFileUploader"] {
+            background-color: #FFFFFF !important;
+            border-radius: 12px !important;
+            border: 2px dashed #EAE8E4 !important;
+        }
+
+        /* 21. Form submit button */
+        div[data-testid="stFormSubmitButton"] button {
+            background-color: #4A7C59 !important;
+            color: #FFFFFF !important;
+            border-radius: 12px !important;
+            border: none !important;
+            padding: 0.6rem 2rem !important;
+            font-weight: 600 !important;
+            width: 100%;
+        }
+        div[data-testid="stFormSubmitButton"] button:hover {
+            background-color: #385E43 !important;
         }
     </style>
     """, unsafe_allow_html=True)
