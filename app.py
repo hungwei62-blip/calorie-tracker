@@ -1,4 +1,4 @@
-"""
+"""  """"""
 AI 智能多人熱量與飲水紀錄 Web App。
 
 依照專案開發需求書：Streamlit + Gemini 2.5 Flash + Google Sheets + Firebase Storage。
@@ -1093,6 +1093,50 @@ def main() -> None:
         }
         div[data-testid="stFormSubmitButton"] button:hover {
             background-color: #385E43 !important;
+        }
+
+        /* 22. Metric 卡片所有內部元素統一白底 */
+        div[data-testid="stMetric"] * {
+            background-color: #FFFFFF !important;
+        }
+        div[data-testid="stMetric"] > div {
+            background-color: #FFFFFF !important;
+        }
+
+        /* 23. 手機響應式設計 */
+        @media (max-width: 768px) {
+            /* Metric 卡片手機適配 */
+            div[data-testid="stMetric"] {
+                margin-bottom: 12px !important;
+                padding: 16px !important;
+            }
+            
+            /* 側邊欄手機寬度 */
+            [data-testid="stSidebar"] {
+                width: 220px !important;
+                min-width: 220px !important;
+            }
+            
+            /* Columns 手機適配 */
+            .stColumns > div {
+                flex-wrap: wrap !important;
+            }
+            
+            /* 調整文字大小 */
+            h1 { font-size: 1.5rem !important; }
+            h2 { font-size: 1.3rem !important; }
+            h3 { font-size: 1.1rem !important; }
+            
+            /* 按鈕全寬 */
+            div.stButton > button,
+            div[data-testid="stFormSubmitButton"] button {
+                width: 100% !important;
+            }
+            
+            /* 表格水平滾動 */
+            div[data-testid="stDataFrame"] {
+                overflow-x: auto !important;
+            }
         }
     </style>
     """, unsafe_allow_html=True)
