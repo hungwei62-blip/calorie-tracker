@@ -869,6 +869,110 @@ def page_history() -> None:
 def main() -> None:
     """App 入口：未登入 → 登入頁；已登入 → 側邊欄切換分頁。"""
     st.set_page_config(page_title="熱量與飲水紀錄", page_icon="🍽️", layout="wide")
+    
+    # 自訂「清新燕麥減脂風」樣式
+    st.markdown("""
+    <style>
+        /* 1. 全域背景與文字優化 */
+        .stApp {
+            background-color: #F9F8F6 !important;
+            color: #2F3E46 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* 2. 標題與副標題顏色調和 */
+        h1, h2, h3, h4, h5, h6 {
+            color: #2F3E46 !important;
+            font-weight: 700 !important;
+        }
+
+        /* 3. 今日儀表板 st.metric 卡片化（暖白輕盈風格） */
+        div[data-testid="stMetric"] {
+            background-color: #FFFFFF !important;
+            padding: 20px 24px !important;
+            border-radius: 16px !important;
+            box-shadow: 0 8px 24px rgba(149, 157, 165, 0.06) !important;
+            border: 1px solid #EAE8E4 !important;
+            transition: transform 0.2s ease;
+        }
+        div[data-testid="stMetric"]:hover {
+            transform: translateY(-2px);
+        }
+        /* 微調 metric 裡面的標題與數字間距 */
+        div[data-testid="stMetricLabel"] {
+            color: #6C7A89 !important;
+            font-size: 0.9rem !important;
+        }
+        div[data-testid="stMetricValue"] {
+            color: #2F3E46 !important;
+            font-size: 1.8rem !important;
+            font-weight: 800 !important;
+        }
+
+        /* 4. 輸入區塊與食物內容的 Container 卡片化 */
+        div[data-testid="stElementContainer"] > div[class*="stVerticalBlock"] > div[style*="border"] {
+            background-color: #FFFFFF !important;
+            border-radius: 16px !important;
+            border: 1px solid #EAE8E4 !important;
+            padding: 20px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02) !important;
+        }
+
+        /* 5. 主要按鈕 (Primary Button) 樣式 - 森林薄荷綠 */
+        div.stButton > button[kind="primary"] {
+            background-color: #4A7C59 !important;
+            color: #FFFFFF !important;
+            border-radius: 12px !important;
+            border: none !important;
+            padding: 0.6rem 2rem !important;
+            font-weight: 600 !important;
+            width: 100%;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 4px 12px rgba(74, 124, 89, 0.2) !important;
+        }
+        div.stButton > button[kind="primary"]:hover {
+            background-color: #385E43 !important;
+            box-shadow: 0 6px 16px rgba(74, 124, 89, 0.3) !important;
+            transform: translateY(-1px);
+        }
+
+        /* 6. 次要按鈕 / 一般按鈕 樣式 */
+        div.stButton > button[kind="secondary"] {
+            background-color: #FFFFFF !important;
+            color: #4A7C59 !important;
+            border: 1px solid #4A7C59 !important;
+            border-radius: 12px !important;
+            padding: 0.6rem 2rem !important;
+            transition: all 0.2s ease !important;
+        }
+        div.stButton > button[kind="secondary"]:hover {
+            background-color: #F4F7F5 !important;
+            color: #385E43 !important;
+            border-color: #385E43 !important;
+        }
+
+        /* 7. 進度條 (st.progress) 變得更圓潤 */
+        div[data-testid="stProgress"] > div > div > div {
+            background-color: #4A7C59 !important; /* 已達成進度顏色 */
+        }
+        div[data-testid="stProgress"] {
+            height: 8px !important;
+            border-radius: 4px !important;
+        }
+
+        /* 8. 調整 Tab 標籤頁的樣式 */
+        button[data-baseweb="tab"] {
+            color: #6C7A89 !important;
+            font-size: 1rem !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] {
+            color: #4A7C59 !important;
+            font-weight: 700 !important;
+            border-bottom-color: #4A7C59 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
     init_session()
     if not st.session_state.user_id:
         page_login()
