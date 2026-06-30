@@ -234,39 +234,62 @@ def page_personal() -> None:
     with col6:
         st.metric("🥑 脂肪目標", f"{goals.get('fat', 0):.0f} g")
     
-    # 今日達成率
+    # 今日達成率 - Seattle Weather 風格改造
     st.subheader("📅 今日達成率")
     start, end = _today_range()
     today_records = metrics.filter_records(records, start, end)
     totals = metrics.sum_totals(today_records).as_dict()
     
-    for key, label, unit in metrics.METRIC_FIELDS:
-        g = goals.get(key, 0.0)
-        v = float(totals.get(key, 0.0))
-        ratio = (v / g) if g > 0 else 0.0
-        ratio = max(0.0, min(ratio, 1.0))
-        pct = int(ratio * 100)
-        
-        # 根據達成率顯示不同顏色
-        if ratio >= 1.0:
-            color = "green"
-            status = "✅ 已達成"
-        elif ratio >= 0.7:
-            color = "blue"
-            status = "🔄 進行中"
-        elif ratio >= 0.3:
-            color = "orange"
-            status = "⚡ 努力中"
-        else:
-            color = "red"
-            status = "❌ 尚未開始"
-        
-        st.write(f"**{label}**: {v:.1f} / {g:.1f} {unit} ({pct}%) {status}")
-        st.progress(ratio, text=f"{pct}%")
+    # 計算整體達成率（熱量為主）
+    total_cal = float(totals.get("calorie", 0.0))
+    total_pro = float(totals.get("protein", 0.0))
+    total_carb = float(totals.get("carb", 0.0))
+    total_fat = float(totals.get("fat", 0.0))
+    total_water = float(totals.get("water", 0.0))
     
-    # 今日記錄列表
+    cal_goal = goals.get("calorie", 0.0)
+    pro_goal = goals.get("protein", 0.0)
+    carb_goal = goals.get("carb", 0.0)
+    fat_goal = goals.get("fat", 0.0)
+    water_goal = goals.get("water", 0.0)
+    
+    # 整體達成率
+    cal_ratio = (total_cal / cal_goal) if cal_goal > 0 else 0.0
+    overall_pct = int(cal_ratio * 100)
+    
+    # 頂部：整體達成率總覽
+    col_overview, col_progress = st.columns([1, 2])
+    with col_overview:
+        st.metric(
+            "🔥 整體達成率",
+            f"{overall_pct}%",
+            delta=f"{total_cal - cal_goal:+.0f} kcal" if cal_goal > 0 else None,
+        )
+    with col_progress:
+        st.progress(min(cal_ratio, 1.0), text=f"熱量: {total_cal:.0f} / {cal_goal:.0f} kcal")
+    
+    st.markdown("---")
+    
+    # 主體：5 個 st.metric 網格（2行：3+2）
+    st.write("**📊 各項營養攝取**")
+    cols_row1 = st.columns(3)
+    with cols_row1[0]:
+        st.metric("🍽️ 熱量", f"{total_cal:.0f} kcal", delta=f"{total_cal - cal_goal:+.0f}")
+    with cols_row1[1]:
+        st.metric("🥩 蛋白質", f"{total_pro:.0f} g", delta=f"{total_pro - pro_goal:+.0f}")
+    with cols_row1[2]:
+        st.metric("🍚 碳水", f"{total_carb:.0f} g", delta=f"{total_carb - carb_goal:+.0f}")
+    
+    cols_row2 = st.columns(3)
+    with cols_row2[0]:
+        st.metric("🥑 脂肪", f"{total_fat:.0f} g", delta=f"{total_fat - fat_goal:+.0f}")
+    with cols_row2[1]:
+        st.metric("💧 飲水", f"{total_water:.0f} ml", delta=f"{total_water - water_goal:+.0f}")
+    
+    # 今日記錄列表 - Seattle Weather 風格卡片化
     st.subheader("🥗 今日記錄")
     if today_records:
+        # 使用 st.container 當卡片包覆每筆記錄
         for r in today_records:
             ts = r.get("timestamp", "")
             meal_type = r.get("meal_type", "")
@@ -285,21 +308,21 @@ def page_personal() -> None:
             except:
                 time_str = ts[11:16] if len(ts) > 16 else ts
             
-            # 顯示記錄卡片
-            col_rec, col_del = st.columns([4, 1])
-            with col_rec:
-                st.write(f"**{time_str}** {MEAL_EMOJI.get(meal_type, '')} {meal_type}: {summary}")
-                st.caption(f"熱量 {cal:.0f} | 蛋白 {pro:.0f}g | 碳水 {carb:.0f}g | 脂肪 {fat:.0f}g | 飲水 {water:.0f}ml")
-            with col_del:
-                if st.button("🗑️", key=f"del_today_{ts}"):
-                    try:
-                        sheets.delete_record(ts, uid)
-                        _clear_analysis_cache()
-                        st.success("記錄已刪除！")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error("刪除失敗: " + str(exc))
-            st.divider()
+            # 卡片化呈現
+            with st.container(border=True):
+                col_rec, col_del = st.columns([4, 1])
+                with col_rec:
+                    st.write(f"**{time_str}** {MEAL_EMOJI.get(meal_type, '')} {meal_type}: {summary}")
+                    st.caption(f"熱量 {cal:.0f} | 蛋白 {pro:.0f}g | 碳水 {carb:.0f}g | 脂肪 {fat:.0f}g | 飲水 {water:.0f}ml")
+                with col_del:
+                    if st.button("🗑️", key=f"del_today_{ts}"):
+                        try:
+                            sheets.delete_record(ts, uid)
+                            _clear_analysis_cache()
+                            st.success("記錄已刪除！")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error("刪除失敗: " + str(exc))
     else:
         st.info("今天還沒有任何記錄。")
     
@@ -896,10 +919,6 @@ def main() -> None:
             border-radius: 16px !important;
             box-shadow: 0 8px 24px rgba(149, 157, 165, 0.06) !important;
             border: 1px solid #EAE8E4 !important;
-            transition: transform 0.2s ease;
-        }
-        div[data-testid="stMetric"]:hover {
-            transform: translateY(-2px);
         }
         /* 微調 metric 裡面的標題與數字間距 */
         div[data-testid="stMetricLabel"] {
@@ -1137,6 +1156,27 @@ def main() -> None:
             div[data-testid="stDataFrame"] {
                 overflow-x: auto !important;
             }
+        }
+
+        /* 24. 統一全域背景為白色（覆蓋所有可能產生色差的元素） */
+        body, .stApp, .stApp > div, .main, .main > div,
+        .block-container, section.main > div,
+        [data-testid="stSidebar"], [data-testid="stSidebarContent"],
+        div[data-testid="stVerticalBlock"], div[data-testid="stHorizontalBlock"],
+        .stTabs, div[data-testid="stTabContent"],
+        .stForm, [data-testid="stFormSubmitButton"],
+        .streamlit-expanderHeader, details[data-testid="stExpander"] {
+            background-color: #FFFFFF !important;
+        }
+
+        /* 登入頁面特殊處理 */
+        [data-testid="stTabsContent"] {
+            background-color: #FFFFFF !important;
+        }
+
+        /* 移除 Tab 和 Form 內部所有子元素的預設背景 */
+        .stTabs * {
+            background-color: #FFFFFF !important;
         }
     </style>
     """, unsafe_allow_html=True)
