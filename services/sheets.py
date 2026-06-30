@@ -13,6 +13,7 @@ USERS_HEADERS = [
     "username",
     "password_hash",
     "created_at",
+    "bmr",
     "daily_calorie_goal",
     "daily_protein_goal",
     "daily_carb_goal",
@@ -113,6 +114,7 @@ def append_user(
         username,
         password_hash,
         created_at,
+        goals.get("bmr", 0),  # BMR 欄位
         goals.get("calorie", 0),
         goals.get("protein", 0),
         goals.get("carb", 0),
@@ -123,17 +125,18 @@ def append_user(
 
 
 def get_user_goals(user_id: str) -> dict[str, float]:
-    """\u8b80\u53d6\u4e00\u540d\u4f7f\u7528\u8005\u7684\u65e5\u76ee\u6a19\uff0c\u4e0a\u5c64\u8a2d\u5b9a\u5f8c\u53ef\u88dc\u5165\u4e0a\u5c64\u53ef\u4ee5\u5169\u500b\u3002"""
+    """讀取一名使用者的日目標，包含 BMR。"""
     for row in get_users_rows():
         if row.get("user_id") == user_id:
             return {
+                "bmr": _to_float(row.get("bmr"), 0.0),
                 "calorie": _to_float(row.get("daily_calorie_goal"), 2000.0),
                 "protein": _to_float(row.get("daily_protein_goal"), 60.0),
                 "carb": _to_float(row.get("daily_carb_goal"), 250.0),
                 "fat": _to_float(row.get("daily_fat_goal"), 65.0),
                 "water": _to_float(row.get("daily_water_goal"), 2000.0),
             }
-    return {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
+    return {"bmr": 0.0, "calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
 
 
 def _to_float(val: Any, default: float) -> float:
@@ -143,6 +146,88 @@ def _to_float(val: Any, default: float) -> float:
         return float(val)
     except (TypeError, ValueError):
         return default
+
+
+def update_user_bmr(user_id: str, bmr: float) -> bool:
+    """更新使用者的 BMR 值。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
+    rows = get_users_rows()
+    for idx, row in enumerate(rows, start=2):  # start=2 因為第1行是header
+        if row.get("user_id") == user_id:
+            # bmr 在第5欄 (index 4, 0-based)
+            ws.update_cell(idx, 5, round(bmr, 2))
+            return True
+    return False
+
+
+def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
+    """更新使用者的所有目標值。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
+    rows = get_users_rows()
+    
+    # 欄位對應 (1-based index): bmr=5, calorie=6, protein=7, carb=8, fat=9, water=10
+    field_map = {
+        "bmr": 5,
+        "calorie": 6,
+        "protein": 7,
+        "carb": 8,
+        "fat": 9,
+        "water": 10,
+    }
+    
+    for idx, row in enumerate(rows, start=2):
+        if row.get("user_id") == user_id:
+            for key, col in field_map.items():
+                if key in goals:
+                    ws.update_cell(idx, col, round(goals[key], 2))
+            return True
+    return False
+
+
+def update_record(record_timestamp: str, user_id: str, updates: dict[str, Any]) -> bool:
+    """更新指定記錄的內容。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+    records = get_records(user_id)
+    
+    # 欄位對應 (1-based index): food_summary=4, calories=5, protein=6, carb=7, fat=8, water_ml=9, portion=11
+    field_map = {
+        "food_summary": 4,
+        "calories": 5,
+        "protein": 6,
+        "carb": 7,
+        "fat": 8,
+        "water_ml": 9,
+        "portion": 11,
+    }
+    
+    # 找到該記錄在 worksheet 中的行號
+    raw_records = ws.get_all_values()
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):  # 跳過 header
+        if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
+            for key, col in field_map.items():
+                if key in updates:
+                    val = updates[key]
+                    if isinstance(val, float):
+                        val = round(val, 2)
+                    ws.update_cell(row_idx, col, val)
+            return True
+    return False
+
+
+def delete_record(record_timestamp: str, user_id: str) -> bool:
+    """刪除指定記錄。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+    raw_records = ws.get_all_values()
+    
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):  # 跳過 header
+        if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
+            ws.delete_rows(row_idx)
+            return True
+    return False
 
 
 # ---------- Records ----------

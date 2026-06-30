@@ -21,6 +21,46 @@ NUTRIENT_KEYS = ("calorie", "protein", "carb", "fat")
 CACHE_TTL = 60
 DEFAULT_GOALS = {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
 
+# ---------- TDEE 計算常數 ----------
+TDEE_MULTIPLIERS = {
+    "幾乎不運動": 1.2,
+    "每週運動 1-3 天": 1.375,
+    "每週運動 3-5 天": 1.55,
+    "每週運動 6-7 天": 1.72,
+}
+
+
+def _calculate_bmr(weight: float, height: float, age: int, gender: str) -> float:
+    """計算基礎代謝率 (BMR)。"""
+    if gender == "男":
+        return 66 + (13.7 * weight) + (5.0 * height) - (6.8 * age)
+    else:
+        return 655 + (9.6 * weight) + (1.8 * height) - (4.7 * age)
+
+
+def _calculate_tdee(bmr: float, exercise_level: str) -> float:
+    """計算每日總熱量消耗 (TDEE)。"""
+    multiplier = TDEE_MULTIPLIERS.get(exercise_level, 1.2)
+    return bmr * multiplier
+
+
+def _calculate_goals(weight: float, tdee: float) -> dict[str, float]:
+    """計算所有營養目標。"""
+    protein = weight * 2
+    fat = weight * 0.8
+    carb = ((tdee - 100) - (protein * 4) - (fat * 9)) / 4
+    calorie = tdee - 200  # 減重目標
+    water = weight * 40
+    
+    return {
+        "bmr": 0,  # BMR 單獨更新
+        "calorie": max(0, calorie),
+        "protein": protein,
+        "carb": max(0, carb),
+        "fat": fat,
+        "water": water,
+    }
+
 
 def init_session() -> None:
     """初始化所有 session_state key。"""
@@ -361,9 +401,173 @@ def _commit_record(meal, summary, raw, portion, water_ml, pending) -> None:
     _clear_analysis_cache()
 
 
+def page_tdee() -> None:
+    """TDEE 計算頁面：輸入基本資料計算 BMR 與營養目標。"""
+    st.header("📊 TDEE 與基礎代謝率計算")
+    
+    uid = st.session_state.user_id
+    goals = _fetch_goals_cached(uid)
+    
+    # 顯示當前 BMR（如果有的話）
+    current_bmr = goals.get("bmr", 0)
+    if current_bmr > 0:
+        st.info(f"📌 您目前設定的 BMR：{current_bmr:.0f} 大卡")
+    
+    with st.form("tdee_form"):
+        st.subheader("請填寫您的基本資料")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            gender = st.radio("性別", ["男", "女"], horizontal=True, index=0)
+            age = st.number_input("年齡（歲）", min_value=10, max_value=120, value=30, step=1)
+        with col2:
+            height = st.number_input("身高（cm）", min_value=100.0, max_value=250.0, value=170.0, step=1.0)
+            weight = st.number_input("體重（kg）", min_value=30.0, max_value=200.0, value=65.0, step=0.5)
+        
+        exercise_level = st.select_slider(
+            "每週運動頻率",
+            options=list(TDEE_MULTIPLIERS.keys()),
+            value="每週運動 1-3 天"
+        )
+        
+        submitted = st.form_submit_button("🔢 計算 BMR 與目標", use_container_width=True)
+    
+    if submitted:
+        # 計算 BMR
+        bmr = _calculate_bmr(weight, height, age, gender)
+        
+        # 計算 TDEE
+        tdee = _calculate_tdee(bmr, exercise_level)
+        
+        # 計算所有目標
+        calculated_goals = _calculate_goals(weight, tdee)
+        
+        # 顯示結果
+        st.success("計算完成！以下是您的個人化營養目標：")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("🔥 基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
+            st.metric("⚡ 每日總消耗 (TDEE)", f"{tdee:.0f} 大卡")
+            st.metric("🎯 建議熱量攝取", f"{calculated_goals['calorie']:.0f} 大卡（減重目標）")
+        with col2:
+            st.metric("💧 飲水量目標", f"{calculated_goals['water']:.0f} ml")
+            st.metric("🥩 蛋白質目標", f"{calculated_goals['protein']:.0f} g")
+            st.metric("🥑 脂質目標", f"{calculated_goals['fat']:.0f} g")
+            st.metric("🍚 碳水化合物目標", f"{calculated_goals['carb']:.0f} g")
+        
+        # 更新到 Google Sheets
+        try:
+            # 更新 BMR
+            sheets.update_user_bmr(uid, bmr)
+            
+            # 更新所有目標
+            sheets.update_user_goals(uid, calculated_goals)
+            
+            # 清除快取
+            _clear_analysis_cache()
+            
+            st.success("✅ 目標已同步更新到您的帳戶！")
+            st.rerun()
+        except Exception as exc:
+            st.error("更新失敗: " + str(exc))
+
+
+
+def _show_records_table(records, show_actions: bool = False) -> None:
+    """把 list[dict] 整理成 dataframe 給使用者看，支援編輯/刪除。"""
+    uid = st.session_state.user_id
+    
+    rows = []
+    for r in records:
+        row_data = {
+            "時間": r.get("timestamp", ""),
+            "餐別": r.get("meal_type", ""),
+            "摘要": r.get("food_summary", ""),
+            "熱量": r.get("calories", 0),
+            "蛋白": r.get("protein", 0),
+            "碳水": r.get("carb", 0),
+            "脂質": r.get("fat", 0),
+            "飲水": r.get("water_ml", 0),
+            "份數": r.get("portion", 1),
+        }
+        rows.append(row_data)
+    
+    rows.sort(key=lambda x: str(x.get("時間", "")), reverse=True)
+    
+    if not show_actions:
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+        return
+    
+    # 顯示可編輯的版本
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+    
+    # 編輯/刪除操作
+    for r in records:
+        ts = r.get("timestamp", "")
+        col1, col2 = st.columns([1, 1, 4])
+        with col1:
+            if st.button(f"✏️ 編輯", key=f"edit_{ts}"):
+                st.session_state[f"edit_mode_{ts}"] = True
+        with col2:
+            if st.button(f"🗑️ 刪除", key=f"delete_{ts}"):
+                try:
+                    sheets.delete_record(ts, uid)
+                    _clear_analysis_cache()
+                    st.success("記錄已刪除！")
+                    st.rerun()
+                except Exception as exc:
+                    st.error("刪除失敗: " + str(exc))
+        
+        # 編輯表單
+        if st.session_state.get(f"edit_mode_{ts}", False):
+            with st.expander(f"✏️ 編輯記錄 - {ts}"):
+                with st.form(f"edit_form_{ts}"):
+                    new_summary = st.text_input("食物摘要", value=r.get("food_summary", ""))
+                    new_portion = st.number_input("份數", min_value=0.0, value=float(r.get("portion", 1)), step=0.25, format="%.2f")
+                    
+                    # 營養數值（根據份數重新計算）
+                    base_cal = float(r.get("calories", 0)) / float(r.get("portion", 1)) if r.get("portion", 1) > 0 else 0
+                    base_pro = float(r.get("protein", 0)) / float(r.get("portion", 1)) if r.get("portion", 1) > 0 else 0
+                    base_carb = float(r.get("carb", 0)) / float(r.get("portion", 1)) if r.get("portion", 1) > 0 else 0
+                    base_fat = float(r.get("fat", 0)) / float(r.get("portion", 1)) if r.get("portion", 1) > 0 else 0
+                    
+                    new_cal = st.number_input("熱量", value=base_cal, step=1.0)
+                    new_pro = st.number_input("蛋白質 (g)", value=base_pro, step=1.0)
+                    new_carb = st.number_input("碳水化合物 (g)", value=base_carb, step=1.0)
+                    new_fat = st.number_input("脂質 (g)", value=base_fat, step=1.0)
+                    new_water = st.number_input("飲水量 (ml)", value=float(r.get("water_ml", 0)), step=10.0)
+                    
+                    col_save, col_cancel = st.columns(2)
+                    submitted = col_save.form_submit_button("💾 儲存", use_container_width=True)
+                    cancelled = col_cancel.form_submit_button("❌ 取消", use_container_width=True)
+                
+                if submitted:
+                    try:
+                        # 重新計算營養值（乘上新份數）
+                        sheets.update_record(ts, uid, {
+                            "food_summary": new_summary,
+                            "portion": new_portion,
+                            "calories": new_cal * new_portion,
+                            "protein": new_pro * new_portion,
+                            "carb": new_carb * new_portion,
+                            "fat": new_fat * new_portion,
+                            "water_ml": new_water,
+                        })
+                        _clear_analysis_cache()
+                        st.session_state[f"edit_mode_{ts}"] = False
+                        st.success("記錄已更新！")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error("更新失敗: " + str(exc))
+                
+                if cancelled:
+                    st.session_state[f"edit_mode_{ts}"] = False
+                    st.rerun()
+
 
 def page_today() -> None:
-    """今日分頁：5 條進度條 + 累積/目標數字，不做視覺警示。"""
+    """今日分頁：5 條進度條 + 累積/目標數字 + 編輯/刪除功能。"""
     st.header("📅 今日進度")
     uid = st.session_state.user_id
     try:
@@ -372,6 +576,12 @@ def page_today() -> None:
     except Exception as exc:
         st.error("讀取記錄失敗: " + str(exc))
         return
+    
+    # 顯示 BMR（如果有的話）
+    bmr = goals.get("bmr", 0)
+    if bmr > 0:
+        st.caption(f"🔥 基礎代謝率 (BMR): {bmr:.0f} 大卡")
+    
     start, end = _today_range()
     today_records = metrics.filter_records(records, start, end)
     totals = metrics.sum_totals(today_records).as_dict()
@@ -384,7 +594,7 @@ def page_today() -> None:
         st.progress(ratio)
     st.subheader("今日明細")
     if today_records:
-        _show_records_table(today_records)
+        _show_records_table(today_records, show_actions=True)
     else:
         st.info("今天還沒有任何紀錄。")
 
@@ -443,35 +653,16 @@ def page_history() -> None:
 
     st.subheader("本週明細")
     if week_records:
-        _show_records_table(week_records)
+        _show_records_table(week_records, show_actions=False)
     else:
         st.info("本週還沒有任何紀錄。")
 
     with st.expander("🔎 完整歷史"):
         all_recs = [r for r in records]
         if all_recs:
-            _show_records_table(all_recs)
+            _show_records_table(all_recs, show_actions=False)
         else:
             st.info("尚無任何紀錄。")
-
-
-def _show_records_table(records) -> None:
-    """把 list[dict] 整理成 dataframe 給使用者看。"""
-    rows = []
-    for r in records:
-        rows.append({
-            "時間": r.get("timestamp", ""),
-            "餐別": r.get("meal_type", ""),
-            "摘要": r.get("food_summary", ""),
-            "熱量": r.get("calories", 0),
-            "蛋白": r.get("protein", 0),
-            "碳水": r.get("carb", 0),
-            "脂質": r.get("fat", 0),
-            "飲水": r.get("water_ml", 0),
-            "份數": r.get("portion", 1),
-        })
-    rows.sort(key=lambda x: str(x.get("時間", "")), reverse=True)
-    st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
 def main() -> None:
@@ -483,7 +674,11 @@ def main() -> None:
         return
     with st.sidebar:
         st.write("👤 " + str(st.session_state.username or ""))
-        page = st.radio("切換分頁", ["記一餐", "今日", "歷史"], index=["記一餐", "今日", "歷史"].index(st.session_state.get("page", "記一餐")))
+        pages = ["記一餐", "今日", "歷史", "TDEE 計算"]
+        current = st.session_state.get("page", "記一餐")
+        if current not in pages:
+            current = "記一餐"
+        page = st.radio("切換分頁", pages, index=pages.index(current))
         st.session_state.page = page
         if st.button("🚪 登出", use_container_width=True):
             for k in list(st.session_state.keys()):
@@ -496,8 +691,10 @@ def main() -> None:
         page_log_meal()
     elif st.session_state.page == "今日":
         page_today()
-    else:
+    elif st.session_state.page == "歷史":
         page_history()
+    else:
+        page_tdee()
 
 
 if __name__ == "__main__":
