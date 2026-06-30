@@ -15,7 +15,7 @@ from typing import Any
 METRIC_FIELDS = [
     ("calories", "熱量", "kcal"),
     ("protein", "蛋白質", "g"),
-    ("carb", "糖類", "g"),
+    ("carb", "碳水化合物", "g"),
     ("fat", "脂肪", "g"),
     ("water", "飲水量", "ml"),
 ]

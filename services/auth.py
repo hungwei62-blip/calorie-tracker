@@ -1,4 +1,4 @@
-"""\u5e33\u5bc6\u8a8d\u8b49\u670d\u52d9\uff1a\u4f7f\u7528 bcrypt \u96dc\u6e96\uff0c\u8a8d\u8b49\u4ee5 Sheets Users \u8868\u70ba\u4f86\u6e90\u3002"""
+"""帳密認證服務：使用 bcrypt 雜湊，認證以 Sheets Users 表為來源。"""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def now_iso() -> str:
 
 
 def find_user(rows: list[dict[str, Any]], username: str) -> dict[str, Any] | None:
-    """\u5f9e Users \u8868\u7684\u5217\u8868\u4e2d\u5c0b\u627e\u6307\u5b9a username\uff08\u4ecd\u9700\u4e0a\u5c64\u9a57\u8b49\u5bc6\u78bc\uff09\u3002"""
+    """從 Users 表的列表中尋找指定 username（仍需上層驗證密碼）。"""
     target = (username or "").strip().lower()
     for row in rows:
         if str(row.get("username", "")).strip().lower() == target:

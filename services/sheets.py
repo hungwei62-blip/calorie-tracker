@@ -1,4 +1,15 @@
-"""Google Sheets \u8b80\u5beb\u670d\u52d9\u3002\n\n\u4f9d\u8cf4\u300a\u4eba\u5de5\u667a\u80fd\u4eba\u54e1\u591a\u4eba\u71b1\u91cf\u8a18\u9304 Web App \u4ee5\u53ca\u8b8a\u66f4\u4e2d\u7684 Google Sheets \u4f5c\u70ba\u500b\u4eba\u4ee5\u53ca\u8a18\u9304\u4e2d\u5fc3\u3002\n\u9019\u4e9b\u5b58\u5132\u5728\u4e0a\u5c64\u4ee5 .streamlit/secrets.toml \u4f86\u8b80\u53d6\uff0c\u6c92\u6709\u8a72\u4ed6\u9ed8\u8a8d\u503c\u3002\n\u8a18\u9304\u8868\u5169\u500b\u3002\n\n\u4f7f\u7528\u8aaa\u660e\uff1a\n- get_users_rows / append_user\n- get_records / append_record\n- get_user_goals\n- update_user_goals (admin \u4ee5\u53ca\u4e2d\u5167\u7de8\u8f2f\u4f7f\u7528)\n"""
+"""Google Sheets 讀寫服務。
+
+依賴《人工智慧人員多人熱量記錄 Web App 以及變更》中的 Google Sheets 作為個人以及記錄中心。
+這些存儲在上層以 .streamlit/secrets.toml 來讀取，沒有該他默認值。
+記錄表兩個。
+
+使用說明：
+- get_users_rows / append_user
+- get_records / append_record
+- get_user_goals
+- update_user_goals (admin 以及中內編輯使用)
+"""
 
 from __future__ import annotations
 
@@ -41,7 +52,7 @@ def _get_secrets() -> dict[str, Any]:
 
     if "gcp" not in st.secrets or "SPREADSHEET_ID" not in st.secrets:
         raise EnvironmentError(
-            "\u8acb\u5728 .streamlit/secrets.toml \u4e2d\u8a2d\u5b9a [gcp] (\u542b Service Account JSON) \u53ca SPREADSHEET_ID"
+            "請在 .streamlit/secrets.toml 中設定 [gcp] (含 Service Account JSON) 及 SPREADSHEET_ID"
         )
     gcp = dict(st.secrets["gcp"])
     gcp["SPREADSHEET_ID"] = st.secrets["SPREADSHEET_ID"]
@@ -107,6 +118,10 @@ def append_user(
     created_at: str,
     goals: dict[str, float],
 ) -> None:
+    """新增使用者到 Users 工作表。
+
+    註：BMR 不寫入，保留空白。BMR 之後由 update_user_bmr() 單獨設定。
+    """
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     row = [
@@ -114,7 +129,7 @@ def append_user(
         username,
         password_hash,
         created_at,
-        goals.get("bmr", 0),  # BMR 欄位
+        "",  # BMR 留空，由 update_user_bmr() 之後單獨更新
         goals.get("calorie", 0),
         goals.get("protein", 0),
         goals.get("carb", 0),
@@ -166,7 +181,7 @@ def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     rows = get_users_rows()
-    
+
     # 欄位對應 (1-based index): calorie=6, protein=7, carb=8, fat=9, water=10
     # 注意：BMR 已經由 update_user_bmr 單獨處理
     field_map = {
@@ -176,7 +191,7 @@ def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
         "fat": 9,
         "water": 10,
     }
-    
+
     found = False
     for idx, row in enumerate(rows, start=2):
         if row.get("user_id") == user_id:
@@ -188,7 +203,7 @@ def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
                         val = round(val, 2)
                     ws.update_cell(idx, col, val)
             break
-    
+
     return found
 
 
@@ -197,7 +212,7 @@ def update_record(record_timestamp: str, user_id: str, updates: dict[str, Any]) 
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
     records = get_records(user_id)
-    
+
     # 欄位對應 (1-based index): food_summary=4, calories=5, protein=6, carb=7, fat=8, water_ml=9, portion=11
     field_map = {
         "food_summary": 4,
@@ -208,7 +223,7 @@ def update_record(record_timestamp: str, user_id: str, updates: dict[str, Any]) 
         "water_ml": 9,
         "portion": 11,
     }
-    
+
     # 找到該記錄在 worksheet 中的行號
     raw_records = ws.get_all_values()
     for row_idx, raw_row in enumerate(raw_records[1:], start=2):  # 跳過 header
@@ -228,7 +243,7 @@ def delete_record(record_timestamp: str, user_id: str) -> bool:
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
     raw_records = ws.get_all_values()
-    
+
     for row_idx, raw_row in enumerate(raw_records[1:], start=2):  # 跳過 header
         if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
             ws.delete_rows(row_idx)
@@ -270,7 +285,7 @@ def append_record(
 
 
 def get_records(user_id: str | None = None) -> list[dict[str, Any]]:
-    """\u8b80\u53d6\u8a18\u9304\uff0c\u53ef\u9078\u64c7\u4f9d user_id \u7be9\u9078\u3002"""
+    """讀取記錄，可選擇依 user_id 篩選。"""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
     raw = _rows_to_dicts(ws, RECORDS_HEADERS)
@@ -278,7 +293,7 @@ def get_records(user_id: str | None = None) -> list[dict[str, Any]]:
     for r in raw:
         if user_id is not None and r.get("user_id") != user_id:
             continue
-        # \u8b6f\u8b80\u6578\u503c
+        # 譯讀數值
         r["calories"] = _to_float(r.get("calories"), 0.0)
         r["protein"] = _to_float(r.get("protein"), 0.0)
         r["carb"] = _to_float(r.get("carb"), 0.0)

@@ -1,5 +1,4 @@
-"""  """"""
-AI 智能多人熱量與飲水紀錄 Web App。
+"""AI 智能多人熱量與飲水紀錄 Web App。
 
 依照專案開發需求書：Streamlit + Gemini 2.5 Flash + Google Sheets + Firebase Storage。
 支援 5 個餐別、AI 文字/照片分析、份數微調、今日/週進度儀表板。
@@ -206,36 +205,33 @@ def page_personal() -> None:
     
     if bmr <= 0 or calorie_goal <= 0:
         # 尚未設定 TDEE，顯示引導訊息
-        st.warning("⚠️ 您尚未設定個人營養目標")
+        st.warning("您尚未設定個人營養目標")
         st.info("請先進行 TDEE 計算，以獲得個人化的營養建議。")
         if st.button("前往 TDEE 計算", use_container_width=True):
             st.session_state.page = "TDEE 計算"
             st.rerun()
         return
     
-    # 顯示 BMR 和建議攝取量
-    tdee = (bmr / 0.55) if bmr > 0 else 0  # 估算 TDEE（從 BMR 反推）
-    
-    st.subheader("📊 個人基礎資料")
+    st.subheader("個人基礎資料")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("🔥 基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
+        st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
     with col2:
-        st.metric("⚡ 建議熱量攝取", f"{calorie_goal:.0f} 大卡")
+        st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
     with col3:
-        st.metric("💧 飲水目標", f"{goals.get('water', 0):.0f} ml")
+        st.metric("飲水目標", f"{goals.get('water', 0):.0f} ml")
     
     # 第二行：蛋白質、碳水、脂肪
     col4, col5, col6 = st.columns(3)
     with col4:
-        st.metric("🥩 蛋白質目標", f"{goals.get('protein', 0):.0f} g")
+        st.metric("蛋白質目標", f"{goals.get('protein', 0):.0f} g")
     with col5:
-        st.metric("🍚 碳水目標", f"{goals.get('carb', 0):.0f} g")
+        st.metric("碳水目標", f"{goals.get('carb', 0):.0f} g")
     with col6:
-        st.metric("🥑 脂肪目標", f"{goals.get('fat', 0):.0f} g")
+        st.metric("脂肪目標", f"{goals.get('fat', 0):.0f} g")
     
     # 今日達成率 - Seattle Weather 風格改造
-    st.subheader("📅 今日達成率")
+    st.subheader("今日達成率")
     start, end = _today_range()
     today_records = metrics.filter_records(records, start, end)
     totals = metrics.sum_totals(today_records).as_dict()
@@ -261,7 +257,7 @@ def page_personal() -> None:
     col_overview, col_progress = st.columns([1, 2])
     with col_overview:
         st.metric(
-            "🔥 整體達成率",
+            "整體達成率",
             f"{overall_pct}%",
             delta=f"{total_cal - cal_goal:+.0f} kcal" if cal_goal > 0 else None,
         )
@@ -271,23 +267,23 @@ def page_personal() -> None:
     st.markdown("---")
     
     # 主體：5 個 st.metric 網格（2行：3+2）
-    st.write("**📊 各項營養攝取**")
+    st.write("各項營養攝取")
     cols_row1 = st.columns(3)
     with cols_row1[0]:
-        st.metric("🍽️ 熱量", f"{total_cal:.0f} kcal", delta=f"{total_cal - cal_goal:+.0f}")
+        st.metric("熱量", f"{total_cal:.0f} kcal", delta=f"{total_cal - cal_goal:+.0f}")
     with cols_row1[1]:
-        st.metric("🥩 蛋白質", f"{total_pro:.0f} g", delta=f"{total_pro - pro_goal:+.0f}")
+        st.metric("蛋白質", f"{total_pro:.0f} g", delta=f"{total_pro - pro_goal:+.0f}")
     with cols_row1[2]:
-        st.metric("🍚 碳水", f"{total_carb:.0f} g", delta=f"{total_carb - carb_goal:+.0f}")
+        st.metric("碳水", f"{total_carb:.0f} g", delta=f"{total_carb - carb_goal:+.0f}")
     
     cols_row2 = st.columns(3)
     with cols_row2[0]:
-        st.metric("🥑 脂肪", f"{total_fat:.0f} g", delta=f"{total_fat - fat_goal:+.0f}")
+        st.metric("脂肪", f"{total_fat:.0f} g", delta=f"{total_fat - fat_goal:+.0f}")
     with cols_row2[1]:
-        st.metric("💧 飲水", f"{total_water:.0f} ml", delta=f"{total_water - water_goal:+.0f}")
+        st.metric("飲水", f"{total_water:.0f} ml", delta=f"{total_water - water_goal:+.0f}")
     
     # 今日記錄列表 - Seattle Weather 風格卡片化
-    st.subheader("🥗 今日記錄")
+    st.subheader("今日記錄")
     if today_records:
         # 使用 st.container 當卡片包覆每筆記錄
         for r in today_records:
@@ -315,7 +311,7 @@ def page_personal() -> None:
                     st.write(f"**{time_str}** {MEAL_EMOJI.get(meal_type, '')} {meal_type}: {summary}")
                     st.caption(f"熱量 {cal:.0f} | 蛋白 {pro:.0f}g | 碳水 {carb:.0f}g | 脂肪 {fat:.0f}g | 飲水 {water:.0f}ml")
                 with col_del:
-                    if st.button("🗑️", key=f"del_today_{ts}"):
+                    if st.button("刪除", key=f"del_today_{ts}"):
                         try:
                             sheets.delete_record(ts, uid)
                             _clear_analysis_cache()
@@ -326,7 +322,7 @@ def page_personal() -> None:
     else:
         st.info("今天還沒有任何記錄。")
     
-    st.caption(f"🔥 基礎代謝率 (BMR): {bmr:.0f} 大卡")
+    st.caption(f"基礎代謝率 (BMR): {bmr:.0f} 大卡")
 
 
 
@@ -361,15 +357,25 @@ def page_log_meal() -> None:
 
 def _render_water_section(meal) -> None:
     """飲水簡化流程：單一 ml 輸入 + 確認鈕，直接寫入 Sheets，不送 Gemini。"""
-    st.subheader("💧 飲水")
+    st.subheader("飲水")
     with st.form("water_form"):
         water_ml = st.number_input("飲水量 (ml)", min_value=0.0, value=500.0, step=50.0, format="%.0f")
         confirm = st.form_submit_button("確認送出", use_container_width=True)
-    if not confirm:
+        if confirm:
+            # 使用 session_state 跨過 form 變數作用域的限制
+            st.session_state["_water_form_submitted"] = True
+            st.session_state["_water_form_ml"] = float(water_ml)
+            st.rerun()
+
+    if not st.session_state.get("_water_form_submitted", False):
         return
-    summary = ("飲水 " + str(int(water_ml)) + "ml")
+    # 取出後立刻清除，避免重複處理
+    st.session_state.pop("_water_form_submitted", None)
+    submitted_ml = float(st.session_state.pop("_water_form_ml", 0.0))
+
+    summary = "飲水 " + str(int(submitted_ml)) + "ml"
     try:
-        _commit_record(meal, summary, {}, 1.0, water_ml, {})
+        _commit_record(meal, summary, {}, 1.0, submitted_ml, {})
     except Exception as exc:
         st.error("寫入 Sheets 失敗: " + str(exc))
         return
@@ -492,15 +498,29 @@ def _render_review_section(meal) -> None:
         col1, col2 = st.columns(2)
         confirm = col1.form_submit_button("確認送出", use_container_width=True)
         reedit = col2.form_submit_button("重新編輯描述", use_container_width=True)
+        if confirm:
+            # 使用 session_state 跨過 form 變數作用域的限制
+            st.session_state["_review_form_action"] = "confirm"
+            st.session_state["_review_form_portion"] = float(portion)
+            st.session_state["_review_form_summary"] = edited_summary
+            st.session_state["_review_form_water_ml"] = float(water_ml)
+            st.rerun()
+        elif reedit:
+            st.session_state["_review_form_action"] = "reedit"
+            st.rerun()
 
-    if reedit:
+    action = st.session_state.pop("_review_form_action", None)
+    if action == "reedit":
         st.session_state.pending_analysis = None
         st.session_state.input_mode = "text"
         st.rerun()
         return
-    if confirm:
+    if action == "confirm":
+        submitted_portion = float(st.session_state.pop("_review_form_portion", 1.0))
+        submitted_summary = st.session_state.pop("_review_form_summary", summary)
+        submitted_water = float(st.session_state.pop("_review_form_water_ml", 0.0))
         try:
-            _commit_record(meal, edited_summary, raw, portion, water_ml, pending)
+            _commit_record(meal, submitted_summary, raw, submitted_portion, submitted_water, pending)
         except Exception as exc:
             st.error("寫入 Sheets 失敗: " + str(exc))
             return
@@ -544,38 +564,51 @@ def _commit_record(meal, summary, raw, portion, water_ml, pending) -> None:
 
 def page_tdee() -> None:
     """TDEE 計算頁面：輸入基本資料計算 BMR 與營養目標。"""
-    st.header("📊 TDEE 與基礎代謝率計算")
-    
+    st.header("TDEE 與基礎代謝率計算")
+
     uid = st.session_state.user_id
     goals = _fetch_goals_cached(uid)
-    
+
+    # 初始化 session_state 來記住「已確認重新計算」的狀態，
+    # 避免使用者每次重來都要重複點確認鈕
+    if "tdee_recalc_confirmed" not in st.session_state:
+        st.session_state.tdee_recalc_confirmed = False
+
     # 檢查是否已設定 TDEE
     current_bmr = goals.get("bmr", 0)
     has_existing = current_bmr > 0
-    
-    if has_existing:
-        st.warning("⚠️ 您已經計算過 TDEE，重新計算會覆蓋之前的設定。")
+    # 走過警告的條件 = 有舊值 且 使用者未確認要重算
+    show_recalc_warning = has_existing and not st.session_state.tdee_recalc_confirmed
+
+    if show_recalc_warning:
+        st.warning("您已經計算過 TDEE，重新計算會覆蓋之前的設定。")
         col_confirm = st.columns([1, 1])
         with col_confirm[0]:
-            confirm_recalc = st.button("確認重新計算", use_container_width=True)
+            confirm_recalc = st.button("確認重新計算", use_container_width=True, key="tdee_confirm_recalc")
         with col_confirm[1]:
-            cancel_recalc = st.button("取消", use_container_width=True)
-        
+            cancel_recalc = st.button("取消", use_container_width=True, key="tdee_cancel_recalc")
+
         if cancel_recalc:
+            st.session_state.tdee_recalc_confirmed = False
             st.session_state.page = "個人"
             st.rerun()
             return
-        
-        if not confirm_recalc:
+
+        if confirm_recalc:
+            st.session_state.tdee_recalc_confirmed = True
+            st.rerun()
             return
-    
+
+        # 使用者未確認、也未取消 → 停在警告畫面
+        return
+
     # 顯示當前 BMR（如果有的話）
     if has_existing:
-        st.info(f"📌 您目前設定的 BMR：{current_bmr:.0f} 大卡")
-    
+        st.info(f"您目前設定的 BMR：{current_bmr:.0f} 大卡")
+
     with st.form("tdee_form"):
         st.subheader("請填寫您的基本資料")
-        
+
         col1, col2 = st.columns(2)
         with col1:
             gender = st.radio("性別", ["男", "女"], horizontal=True, index=0)
@@ -583,54 +616,73 @@ def page_tdee() -> None:
         with col2:
             height = st.number_input("身高（cm）", min_value=100.0, max_value=250.0, value=170.0, step=1.0)
             weight = st.number_input("體重（kg）", min_value=30.0, max_value=200.0, value=65.0, step=0.5)
-        
+
         exercise_level = st.select_slider(
             "每週運動頻率",
             options=list(TDEE_MULTIPLIERS.keys()),
             value="每週運動 1-3 天"
         )
-        
+
         submitted = st.form_submit_button("計算 BMR 與目標", use_container_width=True)
-    
-    if submitted:
-        # 計算 BMR
-        bmr = _calculate_bmr(weight, height, age, gender)
-        
-        # 計算 TDEE
-        tdee = _calculate_tdee(bmr, exercise_level)
-        
-        # 計算所有目標
-        calculated_goals = _calculate_goals(weight, tdee)
-        
-        # 顯示結果
-        st.success("計算完成！以下是您的個人化營養目標：")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("🔥 基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
-            st.metric("⚡ 每日總消耗 (TDEE)", f"{tdee:.0f} 大卡")
-            st.metric("🎯 建議熱量攝取", f"{calculated_goals['calorie']:.0f} 大卡（減重目標）")
-        with col2:
-            st.metric("💧 飲水量目標", f"{calculated_goals['water']:.0f} ml")
-            st.metric("🥩 蛋白質目標", f"{calculated_goals['protein']:.0f} g")
-            st.metric("🥑 脂質目標", f"{calculated_goals['fat']:.0f} g")
-            st.metric("🍚 碳水化合物目標", f"{calculated_goals['carb']:.0f} g")
-        
-        # 更新到 Google Sheets
-        try:
-            # 更新 BMR
-            sheets.update_user_bmr(uid, bmr)
-            
-            # 更新所有目標
-            sheets.update_user_goals(uid, calculated_goals)
-            
-            # 清除快取
-            _clear_analysis_cache()
-            
-            st.success("目標已同步更新到您的帳戶！")
+        if submitted:
+            # 用 session_state 跨過 form 變數作用域的限制
+            st.session_state["_tdee_form_submitted"] = True
+            st.session_state["_tdee_form_data"] = {
+                "gender": gender,
+                "age": int(age),
+                "height": float(height),
+                "weight": float(weight),
+                "exercise_level": exercise_level,
+            }
             st.rerun()
-        except Exception as exc:
-            st.error("更新失敗: " + str(exc))
+
+    if not st.session_state.pop("_tdee_form_submitted", False):
+        return
+    tdee_data = st.session_state.pop("_tdee_form_data", None)
+    if not tdee_data:
+        return
+
+    # 計算 BMR
+    bmr = _calculate_bmr(tdee_data["weight"], tdee_data["height"], tdee_data["age"], tdee_data["gender"])
+
+    # 計算 TDEE
+    tdee = _calculate_tdee(bmr, tdee_data["exercise_level"])
+
+    # 計算所有目標
+    calculated_goals = _calculate_goals(tdee_data["weight"], tdee)
+
+    # 顯示結果
+    st.success("計算完成！以下是您的個人化營養目標：")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
+        st.metric("每日總消耗 (TDEE)", f"{tdee:.0f} 大卡")
+        st.metric("建議熱量攝取", f"{calculated_goals['calorie']:.0f} 大卡（減重目標）")
+    with col2:
+        st.metric("飲水量目標", f"{calculated_goals['water']:.0f} ml")
+        st.metric("蛋白質目標", f"{calculated_goals['protein']:.0f} g")
+        st.metric("脂質目標", f"{calculated_goals['fat']:.0f} g")
+        st.metric("碳水化合物目標", f"{calculated_goals['carb']:.0f} g")
+
+    # 更新到 Google Sheets
+    try:
+        # 更新 BMR
+        sheets.update_user_bmr(uid, bmr)
+
+        # 更新所有目標
+        sheets.update_user_goals(uid, calculated_goals)
+
+        # 清除快取
+        _clear_analysis_cache()
+
+        # 計算完成，重置重新計算確認狀態
+        st.session_state.tdee_recalc_confirmed = False
+
+        st.success("目標已同步更新到您的帳戶！")
+        st.rerun()
+    except Exception as exc:
+        st.error("更新失敗: " + str(exc))
 
 
 
@@ -699,8 +751,8 @@ def _show_records_table(records, show_actions: bool = False) -> None:
                     new_water = st.number_input("飲水量 (ml)", value=float(r.get("water_ml", 0)), step=10.0)
                     
                     col_save, col_cancel = st.columns(2)
-                    submitted = col_save.form_submit_button("💾 儲存", use_container_width=True)
-                    cancelled = col_cancel.form_submit_button("❌ 取消", use_container_width=True)
+                    submitted = col_save.form_submit_button("儲存", use_container_width=True)
+                    cancelled = col_cancel.form_submit_button("取消", use_container_width=True)
                 
                 if submitted:
                     try:
@@ -726,42 +778,10 @@ def _show_records_table(records, show_actions: bool = False) -> None:
                     st.rerun()
 
 
-def page_today() -> None:
-    """今日分頁：5 條進度條 + 累積/目標數字 + 編輯/刪除功能。"""
-    st.header("📅 今日進度")
-    uid = st.session_state.user_id
-    try:
-        records = _fetch_records_cached(uid)
-        goals = _fetch_goals_cached(uid)
-    except Exception as exc:
-        st.error("讀取記錄失敗: " + str(exc))
-        return
-    
-    # 顯示 BMR（如果有的話）
-    bmr = goals.get("bmr", 0)
-    if bmr > 0:
-        st.caption(f"🔥 基礎代謝率 (BMR): {bmr:.0f} 大卡")
-    
-    start, end = _today_range()
-    today_records = metrics.filter_records(records, start, end)
-    totals = metrics.sum_totals(today_records).as_dict()
-    for key, label, unit in metrics.METRIC_FIELDS:
-        g = goals.get(key, 0.0)
-        v = float(totals.get(key, 0.0))
-        ratio = (v / g) if g > 0 else 0.0
-        ratio = max(0.0, min(ratio, 1.0))
-        st.metric(label=label, value="{:.1f} {}".format(v, unit), delta="目標 {:.1f} {}".format(g, unit), delta_color="off")
-        st.progress(ratio)
-    st.subheader("今日明細")
-    if today_records:
-        _show_records_table(today_records, show_actions=True)
-    else:
-        st.info("今天還沒有任何紀錄。")
-
 
 def page_history() -> None:
     """歷史分頁：每日達成率 + 趨勢圖。"""
-    st.header("📊 歷史與週進度")
+    st.header("歷史與週進度")
     uid = st.session_state.user_id
     try:
         records = _fetch_records_cached(uid)
@@ -775,7 +795,7 @@ def page_history() -> None:
     calorie_goal = goals.get("calorie", 0)
     
     if bmr <= 0 or calorie_goal <= 0:
-        st.warning("⚠️ 請先在「個人」頁面設定您的 TDEE 目標")
+        st.warning("請先在「個人」頁面設定您的 TDEE 目標")
         return
     
     ws, we = _week_range()
@@ -786,7 +806,7 @@ def page_history() -> None:
     daily_protein = goals.get("protein", 0.0)
     
     # 建立每日達成率表格
-    st.subheader("📅 本週每日達成率")
+    st.subheader("本週每日達成率")
     daily_data = []
     for i in range(days):
         d = ws + timedelta(days=i)
@@ -817,7 +837,7 @@ def page_history() -> None:
     st.dataframe(daily_data, use_container_width=True, hide_index=True)
     
     # 視覺化：每日熱量達成率長條圖
-    st.subheader("📊 本週熱量達成率")
+    st.subheader("本週熱量達成率")
     calorie_chart = {
         "日期": [],
         "達成率 (%)": [],
@@ -834,7 +854,7 @@ def page_history() -> None:
     st.bar_chart(calorie_chart, x="日期", y="達成率 (%)")
     
     # 視覺化：每日蛋白質達成率長條圖
-    st.subheader("🥩 本週蛋白質達成率")
+    st.subheader("本週蛋白質達成率")
     protein_chart = {
         "日期": [],
         "達成率 (%)": [],
@@ -851,7 +871,7 @@ def page_history() -> None:
     st.bar_chart(protein_chart, x="日期", y="達成率 (%)")
 
     # 本週營養攝取趨勢
-    st.subheader("📈 本週每日趨勢")
+    st.subheader("本週每日趨勢")
     chart = {
         "date": [],
         "熱量": [],
@@ -881,7 +901,7 @@ def page_history() -> None:
     else:
         st.info("本週還沒有任何紀錄。")
 
-    with st.expander("🔎 完整歷史"):
+    with st.expander("完整歷史"):
         all_recs = [r for r in records]
         if all_recs:
             _show_records_table(all_recs, show_actions=False)
@@ -891,13 +911,13 @@ def page_history() -> None:
 
 def main() -> None:
     """App 入口：未登入 → 登入頁；已登入 → 側邊欄切換分頁。"""
-    st.set_page_config(page_title="熱量與飲水紀錄", page_icon="🍽️", layout="wide")
+    st.set_page_config(page_title="熱量與飲水紀錄", layout="wide")
     
     # 自訂「清新燕麥減脂風」樣式
     st.markdown("""
     <style>
         /* 引入 Line Seed 字體 */
-        @import url('https://fonts.googleapis.com/css2?family=Line+Seed+JP:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Line+Seed+JP:wght@400&display=swap');
         
         /* 1. 全域背景與文字優化 */
         .stApp {
@@ -947,7 +967,7 @@ def main() -> None:
             border-radius: 12px !important;
             border: none !important;
             padding: 0.6rem 2rem !important;
-            font-weight: 600 !important;
+            font-weight: 400 !important;
             width: 100%;
             transition: all 0.2s ease !important;
             box-shadow: 0 4px 12px rgba(74, 124, 89, 0.2) !important;
@@ -989,7 +1009,7 @@ def main() -> None:
         }
         button[data-baseweb="tab"][aria-selected="true"] {
             color: #4A7C59 !important;
-            font-weight: 700 !important;
+            font-weight: 400 !important;
             border-bottom-color: #4A7C59 !important;
         }
 
@@ -1106,7 +1126,7 @@ def main() -> None:
             border-radius: 12px !important;
             border: none !important;
             padding: 0.6rem 2rem !important;
-            font-weight: 600 !important;
+            font-weight: 400 !important;
             width: 100%;
         }
         div[data-testid="stFormSubmitButton"] button:hover {
@@ -1185,14 +1205,14 @@ def main() -> None:
         page_login()
         return
     with st.sidebar:
-        st.write("👤 " + str(st.session_state.username or ""))
+        st.write(str(st.session_state.username or ""))
         pages = ["個人", "記錄", "歷史", "TDEE 計算"]
         current = st.session_state.get("page", "個人")
         if current not in pages:
             current = "個人"
         page = st.radio("切換分頁", pages, index=pages.index(current))
         st.session_state.page = page
-        if st.button("🚪 登出", use_container_width=True):
+        if st.button("登出", use_container_width=True):
             for k in list(st.session_state.keys()):
                 if k != "page":
                     del st.session_state[k]
@@ -1211,4 +1231,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
