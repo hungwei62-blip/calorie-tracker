@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import bcrypt
 
+# 台灣時區 (GMT+8)
+TAIPEI_TZ = timezone(timedelta(hours=8))
+
 
 def hash_password(plain: str) -> str:
-    """\u5c07\u660e\u78bc\u78bc\u6e96\u70ba bcrypt \u5b57\u4e32\u3002"""
+    """將明碼密碼哈希為 bcrypt 字串。"""
     if not plain:
-        raise ValueError("\u5bc6\u78bc\u4e0d\u53ef\u4ee5\u662f\u7a7a\u5b57\u4e32")
+        raise ValueError("密碼不可以是空字串")
     return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """\u9a57\u8b49\u660e\u78bc\u8207\u5b57\u4e32\u662f\u5426\u4e00\u81f4\u3002\u8b8a\u6578\u7121\u6548 (\u4f8b\u5982\u820a\u8cc7\u6599\u9055\u5f02) \u4e3b\u52d5\u8fd4\u56de False\u3002"""
+    """驗證明碼與字串是否一致。變數無效（例如舊資料錯誤）主動返回 False。"""
     if not plain or not hashed:
         return False
     try:
@@ -27,12 +30,13 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def make_user_id() -> str:
-    """\u7522\u751f\u552f\u4e00 user_id (\u4ee5\u6642\u9593\u6233 + 8 \u4f4d\u96a8\u6a5f\u78bc)\u3002"""
-    return f"u_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(4)}"
+    """產生唯一 user_id (以時間戳 + 8位隨機字元)。"""
+    return f"u_{datetime.now(TAIPEI_TZ).strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(4)}"
 
 
 def now_iso() -> str:
-    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    """產生台北時區 (GMT+8) 的 ISO 格式時間戳。"""
+    return datetime.now(TAIPEI_TZ).isoformat(timespec="seconds")
 
 
 def find_user(rows: list[dict[str, Any]], username: str) -> dict[str, Any] | None:

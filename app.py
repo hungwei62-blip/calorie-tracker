@@ -264,7 +264,45 @@ def page_personal() -> None:
         st.write(f"**{label}**: {v:.1f} / {g:.1f} {unit} ({pct}%) {status}")
         st.progress(ratio, text=f"{pct}%")
     
-    st.divider()
+    # 今日記錄列表
+    st.subheader("🥗 今日記錄")
+    if today_records:
+        for r in today_records:
+            ts = r.get("timestamp", "")
+            meal_type = r.get("meal_type", "")
+            summary = r.get("food_summary", "")
+            cal = r.get("calories", 0)
+            pro = r.get("protein", 0)
+            carb = r.get("carb", 0)
+            fat = r.get("fat", 0)
+            water = r.get("water_ml", 0)
+            
+            # 格式化時間
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                time_str = dt.strftime("%H:%M")
+            except:
+                time_str = ts[11:16] if len(ts) > 16 else ts
+            
+            # 顯示記錄卡片
+            col_rec, col_del = st.columns([4, 1])
+            with col_rec:
+                st.write(f"**{time_str}** {MEAL_EMOJI.get(meal_type, '')} {meal_type}: {summary}")
+                st.caption(f"熱量 {cal:.0f} | 蛋白 {pro:.0f}g | 碳水 {carb:.0f}g | 脂肪 {fat:.0f}g | 飲水 {water:.0f}ml")
+            with col_del:
+                if st.button("🗑️", key=f"del_today_{ts}"):
+                    try:
+                        sheets.delete_record(ts, uid)
+                        _clear_analysis_cache()
+                        st.success("記錄已刪除！")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error("刪除失敗: " + str(exc))
+            st.divider()
+    else:
+        st.info("今天還沒有任何記錄。")
+    
     st.caption(f"🔥 基礎代謝率 (BMR): {bmr:.0f} 大卡")
 
 
