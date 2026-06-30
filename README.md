@@ -181,6 +181,24 @@ python gemini_nutrition.py
 - [ ] **歷史日期區間篩選**：週儀表板加日期選擇器，可看任意 7 天
 - [ ] **每日目標可由使用者調整**（目前由管理員在 Sheet 改）
 
+### 🐛 Phase 2.1 — Bug 修復（已完成，2026-06-30）
+
+共修復 **10 個 bug**（P0 嚴重 4 個 + P1 中度 3 個 + P2 輕微 3 個）。
+
+**P0 嚴重 Bug（會導致執行錯誤）**
+- [x] **Form 變數作用域修復**：`_render_water_section` 與 `_render_review_section` 改用 session_state 跨過 form 變數作用域，避免 `StreamlitAPIException`
+- [x] **page_tdee 變數未定義**：性別/年齡/身高/體重等 form 內變數改用 session_state 傳遞，避免 `UnboundLocalError`
+- [x] **page_tdee 重新計算流程**：用 `st.session_state.tdee_recalc_confirmed` 記住確認狀態，避免每次 rerun 都要重複點「確認重新計算」
+
+**P1 中度 Bug**
+- [x] **UI 一致性**：`metrics.py` carb 顯示從「糖類」改為「碳水化合物」
+- [x] **刪除 dead code**：移除未使用的 `page_today` 函式（-33 行）與 `page_personal` 中計算後未使用的 `tdee` dead code
+
+**P2 輕微問題**
+- [x] **API 棄用**：`firebase.py` 將 `datetime.utcnow()` 改為 `datetime.now(timezone.utc)`（Python 3.12+ 相容）
+- [x] **註解可讀性**：將 `services/{auth,firebase,sheets}.py` 的 Unicode escape 註解（`\u8b80\u5beb...`）轉為中文實際字元
+- [x] **邏輯清理**：`sheets.append_user` 改用空字串預留 BMR 欄位（由 `update_user_bmr` 單獨處理）
+
 ### 🔮 Phase 3 — 進階功能（中期，3-6 個月）
 
 - [ ] **PDF 週報匯出**：本週累積 + 趨勢圖，給營養師看
@@ -241,6 +259,7 @@ TL;DR：
 
 | 日期 | Commit | 變更 |
 |---|---|---|
+| 2026-06-30 | xxxxxxx | **Bug 修復 10 個**：P0 Form 變數作用域 + page_tdee 變數 + 重新計算流程（4 個）；P1 UI 一致性 + dead code 清理（3 個）；P2 datetime.utcnow() 棄用 + Unicode escape 註解 + append_user BMR 邏輯清理（3 個） |
 | 2026-07-01 | xxxxxxx | Phase 2 完成：歷史頁面每日達成率、個人頁面顯示今日記錄、GMT+8 時區修正、Gemini Prompt 優化、預覽顯示 Bug 修復 |
 | 2026-07-01 | xxxxxxx | Phase 2：TDEE 計算頁面、記錄編輯/刪除功能、BMR 存入 Users 工作表 |
 | 2026-06-30 | 41f9adb | 飲水簡化流程（直接輸入 ml，不送 Gemini） |
@@ -251,4 +270,22 @@ TL;DR：
 | 2026-06-30 | 726bc08 | 移除 Gemini 水分欄位（改由使用者手填） |
 | 2026-06-30 | 215de30 | GCP / Firebase 教學 + JSON→TOML 工具 |
 | 2026-06-30 | 1e51cff | Initial commit (Streamlit MVP) |
+
+---
+
+## 📋 TODO（下次修正）
+
+下次連線時需要調查並修正以下問題：
+
+- [ ] **🔥 熱量無法寫入 Google Sheet**（高優先）
+  - **問題描述**：使用者回報 Gemini 分析後的熱量數值沒寫入 Records 工作表
+  - **可能原因排查點**：
+    1. `services/sheets.py` 的 `append_record` 函式是否有正確傳入 calories 參數
+    2. `app.py` 的 `_commit_record` 中 `cal = float(_get("calories", 0) or 0) * portion` 是否正確計算
+    3. Gemini 回傳的 JSON 中 `calories` key 是否與 Sheet header 一致
+    4. Google Sheets 是否有設為「文字格式」導致數字被視為字串
+    5. Streamlit 快取（`_fetch_records_cached`）是否需要清除才能看到新資料
+  - **修正方式**（待查）：重現 bug → 追察 `pending_analysis → _commit_record → sheets.append_record` 資料流 → 修正傳參或類型問題
+  - **驗證**：在 App 中記錄一餐後，到 Google Sheet 查看 Records 該筆的 calories 欄位是否正確填入數值
+
 
