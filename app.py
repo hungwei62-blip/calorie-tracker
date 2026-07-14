@@ -149,14 +149,8 @@ def page_login() -> None:
                 return
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
-            try:
-                from services import sheets as _sheets_dbg
-                _raw_role = _sheets_dbg.get_user_role(str(user.get("user_id") or ""))
-                st.session_state.role = _raw_role
-                st.session_state._dbg_raw = _raw_role
-            except Exception as _e2:
-                st.session_state.role = False
-                st.session_state._dbg_raw = f"EXC:{_e2}"
+            from services import sheets as _sheets_dbg
+            st.session_state.role = _sheets_dbg.get_user_role(str(user.get("user_id") or ""))
             st.success("登入成功！")
             st.rerun()
 
@@ -1229,26 +1223,6 @@ def main() -> None:
         _role = st.session_state.get("role", None)
         _role_label = "教練" if _role == "coach" else "學員"
         st.write("👤 " + _uname + " (" + _role_label + ")")
-        st.caption("_raw=" + str(st.session_state.get("_dbg_raw")))
-        if st.session_state.get("user_id"):
-            try:
-                _dbg_uid = str(st.session_state.user_id)
-                from services import sheets as _dbg_sheets
-                _dbg_rows = [r for r in _dbg_sheets.get_users_rows() if r.get("user_id") == _dbg_uid]
-                _dbg_match = _dbg_rows[0] if _dbg_rows else None
-                st.caption(f"debug: uid={_dbg_uid} | row_found={bool(_dbg_match)} | role_in_sheet={(_dbg_match.get('role') if _dbg_match else None)!r}")
-            except Exception as _e:
-                st.caption(f"debug-err: {_e}")
-        if _role == "coach":
-            _pages = ["學員總覽", "加備註", "設定學生目標"]
-            _default = "學員總覽"
-        else:
-            _pages = ["個人", "記錄", "歷史", "TDEE 計算"]
-            _default = "個人"
-        try:
-            _idx = _pages.index(st.session_state.get("page", _default))
-        except ValueError:
-            _idx = 0
         page = st.radio("切換分頁", _pages, index=_idx)
         st.session_state.page = page
         if st.button("登出", use_container_width=True):
