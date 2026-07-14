@@ -150,10 +150,9 @@ def page_login() -> None:
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
             try:
-                _role_value = auth.is_coach(str(user.get("user_id") or ""))
                 from services import sheets as _sheets_dbg
                 _raw_role = _sheets_dbg.get_user_role(str(user.get("user_id") or ""))
-                st.session_state.role = _role_value
+                st.session_state.role = _raw_role
                 st.session_state._dbg_raw = _raw_role
             except Exception as _e2:
                 st.session_state.role = False
