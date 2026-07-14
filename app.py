@@ -1222,6 +1222,15 @@ def main() -> None:
         _role = st.session_state.get("role", None)
         _role_label = "教練" if _role == "coach" else "學員"
         st.write("👤 " + _uname + " (" + _role_label + ")")
+        if st.session_state.get("user_id"):
+            try:
+                _dbg_uid = str(st.session_state.user_id)
+                from services import sheets as _dbg_sheets
+                _dbg_rows = [r for r in _dbg_sheets.get_users_rows() if r.get("user_id") == _dbg_uid]
+                _dbg_match = _dbg_rows[0] if _dbg_rows else None
+                st.caption(f"debug: uid={_dbg_uid} | row_found={bool(_dbg_match)} | role_in_sheet={(_dbg_match.get('role') if _dbg_match else None)!r}")
+            except Exception as _e:
+                st.caption(f"debug-err: {_e}")
         if _role == "coach":
             _pages = ["學員總覽", "加備註", "設定學生目標"]
             _default = "學員總覽"
