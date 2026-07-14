@@ -66,6 +66,7 @@ def init_session() -> None:
     defaults = {
         "user_id": None,
         "username": None,
+        "role": None,
         "page": "個人",
         "pending_meal_type": None,
         "input_mode": None,
@@ -148,6 +149,7 @@ def page_login() -> None:
                 return
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
+            st.session_state.role = auth.is_coach(str(user.get("user_id") or ""))
             st.success("登入成功！")
             st.rerun()
 
@@ -183,6 +185,7 @@ def page_login() -> None:
                 return
             st.session_state.user_id = uid
             st.session_state.username = new_user
+            st.session_state.role = "student"
             st.success("註冊成功並已登入！")
             st.rerun()
 
@@ -909,6 +912,16 @@ def page_history() -> None:
             st.info("尚無任何紀錄。")
 
 
+
+def _coach_overview_stub() -> None:
+    st.info("學員總覽（Phase 2 待實作）")
+
+def _coach_notes_stub() -> None:
+    st.info("加備註（Phase 2 待實作）")
+
+def _coach_goals_stub() -> None:
+    st.info("設定學生目標（Phase 2 待實作）")
+
 def main() -> None:
     """App 入口：未登入 → 登入頁；已登入 → 側邊欄切換分頁。"""
     st.set_page_config(page_title="熱量與飲水紀錄", layout="wide")
@@ -1205,12 +1218,21 @@ def main() -> None:
         page_login()
         return
     with st.sidebar:
-        st.write(str(st.session_state.username or ""))
-        pages = ["個人", "記錄", "歷史", "TDEE 計算"]
-        current = st.session_state.get("page", "個人")
-        if current not in pages:
-            current = "個人"
-        page = st.radio("切換分頁", pages, index=pages.index(current))
+        _uname = str(st.session_state.username or "")
+        _role = st.session_state.get("role", None)
+        _role_label = "教練" if _role == "coach" else "學員"
+        st.write("👤 " + _uname + " (" + _role_label + ")")
+        if _role == "coach":
+            _pages = ["學員總覽", "加備註", "設定學生目標"]
+            _default = "學員總覽"
+        else:
+            _pages = ["個人", "記錄", "歷史", "TDEE 計算"]
+            _default = "個人"
+        try:
+            _idx = _pages.index(st.session_state.get("page", _default))
+        except ValueError:
+            _idx = 0
+        page = st.radio("切換分頁", _pages, index=_idx)
         st.session_state.page = page
         if st.button("登出", use_container_width=True):
             for k in list(st.session_state.keys()):
@@ -1219,7 +1241,15 @@ def main() -> None:
             st.session_state.user_id = None
             st.session_state.username = None
             st.rerun()
-    if st.session_state.page == "個人":
+    _is_coach_now = st.session_state.get("role") == "coach"
+    if _is_coach_now:
+        if st.session_state.page == "學員總覽":
+            _coach_overview_stub()
+        elif st.session_state.page == "加備註":
+            _coach_notes_stub()
+        elif st.session_state.page == "設定學生目標":
+            _coach_goals_stub()
+    elif st.session_state.page == "個人":
         page_personal()
     elif st.session_state.page == "記錄":
         page_log_meal()
