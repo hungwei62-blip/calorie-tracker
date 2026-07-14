@@ -46,3 +46,11 @@ def find_user(rows: list[dict[str, Any]], username: str) -> dict[str, Any] | Non
         if str(row.get("username", "")).strip().lower() == target:
             return row
     return None
+
+def is_coach(user_id: str) -> bool:
+    """判斷該使用者是否為教練 (role == coach)。"""
+    try:
+        from services import sheets
+        return sheets.get_user_role(user_id) == "coach"
+    except Exception:
+        return False

@@ -30,6 +30,8 @@ USERS_HEADERS = [
     "daily_carb_goal",
     "daily_fat_goal",
     "daily_water_goal",
+    "role",
+    "weekly_training_goal",
 ]
 
 RECORDS_HEADERS = [
@@ -135,8 +137,33 @@ def append_user(
         goals.get("carb", 0),
         goals.get("fat", 0),
         goals.get("water", 0),
+        "student",
+        int(goals.get("weekly_training", 4)),
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+
+
+def get_user_role(user_id: str) -> str:
+    """讀該使用者的 role，預設 student (舊資料沒寫時)。"""
+    for row in get_users_rows():
+        if row.get("user_id") == user_id:
+            val = str(row.get("role", "student") or "student")
+            return val.strip().lower()
+    return "student"
+
+
+def set_user_role(user_id: str, role: str) -> None:
+    """管理員在指定 user_id 的 Users row 寫入 role。"""
+    role = (role or "student").strip().lower()
+    if role not in ("student", "coach"):
+        raise ValueError("role 只能是 student 或 coach")
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
+    cell = ws.find(user_id)
+    if cell is None:
+        raise LookupError("找不到此 user_id")
+    role_col = USERS_HEADERS.index("role") + 1
+    ws.update_cell(cell.row, role_col, role)
 
 
 def get_user_goals(user_id: str) -> dict[str, float]:
