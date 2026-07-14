@@ -149,7 +149,15 @@ def page_login() -> None:
                 return
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
-            st.session_state.role = auth.is_coach(str(user.get("user_id") or ""))
+            try:
+                _role_value = auth.is_coach(str(user.get("user_id") or ""))
+                from services import sheets as _sheets_dbg
+                _raw_role = _sheets_dbg.get_user_role(str(user.get("user_id") or ""))
+                st.session_state.role = _role_value
+                st.session_state._dbg_raw = _raw_role
+            except Exception as _e2:
+                st.session_state.role = False
+                st.session_state._dbg_raw = f"EXC:{_e2}"
             st.success("登入成功！")
             st.rerun()
 
@@ -1222,6 +1230,7 @@ def main() -> None:
         _role = st.session_state.get("role", None)
         _role_label = "教練" if _role == "coach" else "學員"
         st.write("👤 " + _uname + " (" + _role_label + ")")
+        st.caption("_raw=" + str(st.session_state.get("_dbg_raw")))
         if st.session_state.get("user_id"):
             try:
                 _dbg_uid = str(st.session_state.user_id)
