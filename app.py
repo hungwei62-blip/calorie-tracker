@@ -205,17 +205,15 @@ def _week_range() -> tuple:
 # =============================================================================
 
 def page_coach_overview() -> None:
-    """教練首頁：所有學員總覽 - Real-Time Dashboard 風格"""
-    st.header("📊 教練總覽")
+    """教練首頁：所有學員狀態 - 緊湊表格風格"""
+    st.header("📊 學員狀態")
     
-    # 即時更新狀態指示
+    # 即時更新指示
     col_status, col_time = st.columns([1, 3])
     with col_status:
         st.markdown("🟢 **即時更新中**")
     with col_time:
         st.caption(f"今日日期：{date.today().strftime('%Y/%m/%d')}")
-    
-    st.markdown("---")
     
     try:
         students = sheets.get_all_students()
@@ -230,10 +228,7 @@ def page_coach_overview() -> None:
     today = date.today()
     
     # 統計概覽
-    st.subheader("📈 今日概覽")
     total_students = len(students)
-    
-    # 計算達成率
     completed_diet = 0
     completed_water = 0
     completed_training = 0
@@ -246,8 +241,8 @@ def page_coach_overview() -> None:
         training_today = sheets.get_training_by_date(uid, today)
         
         cal_goal = goals.get("calorie", 0)
-        water_goal = goals.get("water", 0)
         cal_actual = totals.get("calorie", 0)
+        water_goal = goals.get("water", 0)
         water_actual = totals.get("water", 0)
         
         if cal_goal > 0 and cal_actual >= cal_goal * 0.8:
@@ -260,7 +255,7 @@ def page_coach_overview() -> None:
     # 概覽卡片
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("學員總數", total_students)
+        st.metric("👥 學員", total_students)
     with col2:
         st.metric("✅ 飲食達標", f"{completed_diet}/{total_students}")
     with col3:
@@ -269,9 +264,10 @@ def page_coach_overview() -> None:
         st.metric("🏋️ 已訓練", f"{completed_training}/{total_students}")
     
     st.markdown("---")
-    st.subheader("👥 學員詳細狀態")
+    st.subheader("👥 學員狀態一覽")
     
-    # 學員卡片式展示
+    # 建立學員狀態表格
+    table_data = []
     for student in students:
         uid = student.get("user_id", "")
         name = student.get("name", student.get("username", "未知"))
@@ -294,45 +290,32 @@ def page_coach_overview() -> None:
         pro_pct = min((protein_actual / protein_goal) * 100, 100) if protein_goal > 0 else 0
         water_pct = min((water_actual / water_goal) * 100, 100) if water_goal > 0 else 0
         
-        # 判斷狀態顏色
-        def get_status_color(pct):
-            if pct >= 80:
-                return "🟢"
-            elif pct >= 50:
-                return "🟡"
-            else:
-                return "🔴"
+        # 狀態emoji
+        def status_emoji(pct):
+            if pct >= 80: return "🟢"
+            elif pct >= 50: return "🟡"
+            else: return "🔴"
         
-        training_status = "🟢 已訓練" if has_training else "⚪ 未訓練"
+        training_emoji = "🏋️" if has_training else "⚪"
         
-        with st.container():
-            col_left, col_right = st.columns([3, 1])
-            
-            with col_left:
-                st.markdown(f"### {name}")
-                st.caption(f"體重：{f'{latest_weight:.1f}kg' if latest_weight else '未記錄'}")
-                
-                # 數據進度條
-                st.markdown(f"**蛋白質** {get_status_color(pro_pct)} {protein_actual:.0f}/{protein_goal:.0f}g ({pro_pct:.0f}%)")
-                st.progress(pro_pct / 100, text=f"{pro_pct:.0f}%")
-                
-                st.markdown(f"**熱量** {get_status_color(cal_pct)} {calorie_actual:.0f}/{calorie_goal:.0f} ({cal_pct:.0f}%)")
-                st.progress(cal_pct / 100, text=f"{cal_pct:.0f}%")
-                
-                st.markdown(f"**水量** {get_status_color(water_pct)} {water_actual:.0f}/{water_goal:.0f}ml ({water_pct:.0f}%)")
-                st.progress(water_pct / 100, text=f"{water_pct:.0f}%")
-                
-                st.markdown(f"**訓練** {training_status}")
-            
-            with col_right:
-                st.write("")
-                st.write("")
-                if st.button(f"管理 {name}", key=f"manage_{uid}", use_container_width=True):
-                    st.session_state["view_student_id"] = uid
-                    st.session_state.page = "學員資料"
-                    st.rerun()
-            
-            st.markdown("---")
+        table_data.append({
+            "姓名": name,
+            "體重": f"{latest_weight:.1f}kg" if latest_weight else "-",
+            "蛋白質": status_emoji(pro_pct),
+            "蛋白質 g": f"{protein_actual:.0f}/{protein_goal:.0f}g",
+            "蛋白質%": f"{pro_pct:.0f}%",
+            "熱量": status_emoji(cal_pct),
+            "熱量 kcal": f"{calorie_actual:.0f}/{calorie_goal:.0f}",
+            "熱量%": f"{cal_pct:.0f}%",
+            "水量": status_emoji(water_pct),
+            "水量 ml": f"{water_actual:.0f}/{water_goal:.0f}ml",
+            "水量%": f"{water_pct:.0f}%",
+            "訓練": training_emoji,
+        })
+    
+    st.dataframe(table_data, use_container_width=True, hide_index=True)
+
+
 
 def page_coach_student_detail() -> None:
 
@@ -356,7 +339,7 @@ def page_coach_student_detail() -> None:
 
     if st.button("← 返回總覽"):
 
-        st.session_state.page = "教練總覽"
+        st.session_state.page = "學員狀態"
 
         st.session_state.pop("view_student_id", None)
 
@@ -1640,7 +1623,7 @@ def main() -> None:
 
     is_coach = (role == "coach")
 
-    coach_pages = ["教練總覽", "學員資料"]
+    coach_pages = ["學員狀態"]
 
     student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
 
@@ -1684,7 +1667,7 @@ def main() -> None:
 
     if is_coach:
 
-        if page == "教練總覽":
+        if page == "學員狀態":
 
             page_coach_overview()
 
