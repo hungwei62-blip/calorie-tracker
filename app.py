@@ -1720,10 +1720,11 @@ def page_log_meal() -> None:
                 return
 
             try:
-
-                # Debug: 顯示即將寫入的數值
-                print(f"[DEBUG] 寫入記錄: calories={cal * portion}, protein={pro * portion}, portion={portion}")
-                st.info(f"DEBUG: 熱量={cal * portion:.1f}, 蛋白={pro * portion:.1f}g")
+                # ===== DEBUG: 確認數值 =====
+                debug_msg = f"[DEBUG] 即將寫入: calories={cal * portion}, protein={pro * portion}, portion={portion}"
+                print(debug_msg)
+                st.warning(debug_msg)
+                # ===== END DEBUG =====
 
                 sheets.append_record(
 
