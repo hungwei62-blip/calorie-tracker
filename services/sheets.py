@@ -699,7 +699,7 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
         
         def find_column(headers, target_key):
             for col_idx, header in enumerate(headers):
-                header_str = str(header).strip().lower()
+                header_str = str(header).strip().lower() if header else ""
                 keywords = column_keywords.get(target_key, [])
                 for keyword in keywords:
                     if keyword.lower() in header_str or header_str in keyword.lower():
@@ -718,8 +718,12 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
             calories_col = find_column(headers, "calories")
             water_col = find_column(headers, "water")
             
+            # Debug: 顯示找到的欄位
+            import streamlit as st_debug
+            st_debug.info(f"工作表「{sheet_name}」找到的欄位：日期={date_col}, 熱量={calories_col}, 蛋白質={protein_col}, 喝水={water_col}，標題列：{headers}")
+            
             if date_col == -1 or (calories_col == -1 and protein_col == -1):
-                result["errors"].append(f"工作表「{sheet_name}」找不到必要欄位，跳過")
+                result["errors"].append(f"工作表「{sheet_name}」找不到必要欄位，跳過（headers={headers}）")
                 continue
             
             for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
