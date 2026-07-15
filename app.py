@@ -388,11 +388,11 @@ def page_coach_student_detail() -> None:
             # 顯示分析結果
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("可新增", f"{analysis_result["imported"]} 筆")
+                st.metric("可新增", f"{analysis_result['imported']} 筆")
             with col2:
-                st.metric("將覆寫", f"{analysis_result["overwritten"]} 筆")
+                st.metric("將覆寫", f"{analysis_result['overwritten']} 筆")
             with col3:
-                st.metric("將跳過", f"{analysis_result["skipped"]} 筆")
+                st.metric("將跳過", f"{analysis_result['skipped']} 筆")
 
             # 如果有錯誤，顯示警告
             if analysis_result["errors"]:
@@ -402,9 +402,9 @@ def page_coach_student_detail() -> None:
 
             # 如果有重複，顯示並讓使用者選擇
             if analysis_result["duplicates"]:
-                with st.expander(f"⚠️ 發現 {len(analysis_result["duplicates"])} 筆重複資料（點擊查看）"):
+                with st.expander(f"⚠️ 發現 {len(analysis_result['duplicates'])} 筆重複資料（點擊查看）"):
                     for dup in analysis_result["duplicates"][:20]:
-                        st.write(f"📅 {dup["date"]}｜現有熱量：{dup["existing"].get("calories", 0)} kcal")
+                        st.write(f"📅 {dup['date']}｜現有熱量：{dup['existing'].get('calories', 0)} kcal")
 
             # 選擇匯入模式
             if analysis_result["imported"] > 0 or analysis_result["skipped"] > 0:
@@ -422,11 +422,11 @@ def page_coach_student_detail() -> None:
                         final_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=do_overwrite)
                         _clear_analysis_cache()
                         
-                        msg = f"匯入完成！新增 {final_result["imported"]} 筆"
+                        msg = f"匯入完成！新增 {final_result['imported']} 筆"
                         if final_result["overwritten"] > 0:
-                            msg += f"，覆寫 {final_result["overwritten"]} 筆"
+                            msg += f"，覆寫 {final_result['overwritten']} 筆"
                         if final_result["skipped"] > 0:
-                            msg += f"，跳過 {final_result["skipped"]} 筆"
+                            msg += f"，跳過 {final_result['skipped']} 筆"
                         st.success(msg)
                         
                         st.session_state.excel_import_file = None
