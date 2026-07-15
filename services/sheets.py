@@ -648,3 +648,197 @@ def delete_note(timestamp: str, user_id: str, coach_id: str) -> bool:
             ws.delete_rows(row_idx)
             return True
     return False
+
+
+def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_duplicates: bool = False) -> dict[str, Any]:
+    """從 Excel 檔案匯入飲食記錄。
+    
+    自動識別欄位：日期、蛋白質(g)、總熱量(kcal)、喝水(ml)
+    
+    參數：
+    - excel_file_bytes: Excel 檔案位元組
+    - user_id: 學員 ID
+    - overwrite_duplicates: 是否覆寫已存在的日期記錄（預設 False，表示跳過）
+    
+    回傳：{
+        "imported": 新增數量, 
+        "overwritten": 覆寫數量, 
+        "skipped": 跳過數量,
+        "duplicates": [{"date": 日期, "existing": 現有資料}]（僅當 overwrite_duplicates=False 時）,
+        "errors": [錯誤訊息]
+    }
+    """
+    import openpyxl
+    from io import BytesIO
+    from datetime import datetime
+    
+    result = {
+        "imported": 0,
+        "overwritten": 0,
+        "skipped": 0,
+        "duplicates": [],
+        "errors": []
+    }
+    
+    try:
+        wb = openpyxl.load_workbook(BytesIO(excel_file_bytes))
+        
+        existing_records = get_records(user_id)
+        existing_dates = {}
+        for r in existing_records:
+            ts = r.get("timestamp", "")
+            if ts:
+                existing_dates[ts[:10]] = r
+        
+        column_keywords = {
+            "date": ["日期", "date", "日期欄"],
+            "protein": ["蛋白質", "蛋白質(g)", "蛋白", "protein", "蛋白 (g)"],
+            "calories": ["熱量", "總熱量", "總熱量(kcal)", "calories", "calorie", "kcal", "能量"],
+            "water": ["喝水", "飲水量", "水量", "water", "ml", "水"],
+        }
+        
+        def find_column(headers, target_key):
+            for col_idx, header in enumerate(headers):
+                header_str = str(header).strip().lower()
+                keywords = column_keywords.get(target_key, [])
+                for keyword in keywords:
+                    if keyword.lower() in header_str or header_str in keyword.lower():
+                        return col_idx
+            return -1
+        
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            
+            headers = []
+            for cell in ws[1]:
+                headers.append(cell.value)
+            
+            date_col = find_column(headers, "date")
+            protein_col = find_column(headers, "protein")
+            calories_col = find_column(headers, "calories")
+            water_col = find_column(headers, "water")
+            
+            if date_col == -1 or (calories_col == -1 and protein_col == -1):
+                result["errors"].append(f"工作表「{sheet_name}」找不到必要欄位，跳過")
+                continue
+            
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    date_val = row[date_col] if date_col < len(row) else None
+                    if date_val is None:
+                        continue
+                    
+                    if isinstance(date_val, datetime):
+                        date_str = date_val.strftime("%Y-%m-%d")
+                    elif isinstance(date_val, str):
+                        for fmt in ["%Y/%m/%d", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d %H:%M:%S"]:
+                            try:
+                                date_str = datetime.strptime(date_val, fmt).strftime("%Y-%m-%d")
+                                break
+                            except ValueError:
+                                continue
+                        else:
+                            result["errors"].append(f"工作表「{sheet_name}」第{row_idx}列：日期格式無法解析")
+                            continue
+                    else:
+                        continue
+                    
+                    protein = 0.0
+                    calories = 0.0
+                    water = 0.0
+                    
+                    if protein_col != -1 and protein_col < len(row):
+                        val = row[protein_col]
+                        if val is not None:
+                            try:
+                                protein = float(val)
+                            except (ValueError, TypeError):
+                                pass
+                    
+                    if calories_col != -1 and calories_col < len(row):
+                        val = row[calories_col]
+                        if val is not None:
+                            try:
+                                calories = float(val)
+                            except (ValueError, TypeError):
+                                pass
+                    
+                    if water_col != -1 and water_col < len(row):
+                        val = row[water_col]
+                        if val is not None:
+                            try:
+                                water = float(val)
+                            except (ValueError, TypeError):
+                                pass
+                    
+                    timestamp = f"{date_str}T12:00:00"
+                    
+                    if date_str in existing_dates:
+                        if overwrite_duplicates:
+                            delete_record(timestamp, user_id)
+                            append_record(
+                                timestamp=timestamp,
+                                user_id=user_id,
+                                meal_type="午餐",
+                                food_summary="從 Excel 匯入（覆寫）",
+                                calories=calories,
+                                protein=protein,
+                                carb=0,
+                                fat=0,
+                                water_ml=water,
+                                image_url="",
+                                portion=1.0,
+                            )
+                            result["overwritten"] += 1
+                        else:
+                            result["duplicates"].append({
+                                "date": date_str,
+                                "existing": existing_dates[date_str]
+                            })
+                            result["skipped"] += 1
+                    else:
+                        append_record(
+                            timestamp=timestamp,
+                            user_id=user_id,
+                            meal_type="午餐",
+                            food_summary="從 Excel 匯入",
+                            calories=calories,
+                            protein=protein,
+                            carb=0,
+                            fat=0,
+                            water_ml=water,
+                            image_url="",
+                            portion=1.0,
+                        )
+                        existing_dates[date_str] = True
+                        result["imported"] += 1
+                    
+                except Exception as e:
+                    result["errors"].append(f"工作表「{sheet_name}」第{row_idx}列：{str(e)}")
+        
+    except Exception as e:
+        result["errors"].append(f"開啟 Excel 檔案失敗：{str(e)}")
+    
+    return result
+
+
+def overwrite_record_by_date(user_id: str, date_str: str, calories: float, protein: float, water: float) -> bool:
+    """根據日期覆寫飲食記錄（用於匯入時覆蓋）。"""
+    timestamp = f"{date_str}T12:00:00"
+    # 先刪除現有記錄
+    delete_record(timestamp, user_id)
+    # 重新寫入
+    append_record(
+        timestamp=timestamp,
+        user_id=user_id,
+        meal_type="午餐",
+        food_summary="從 Excel 匯入（覆寫）",
+        calories=calories,
+        protein=protein,
+        carb=0,
+        fat=0,
+        water_ml=water,
+        image_url="",
+        portion=1.0,
+    )
+    return True
