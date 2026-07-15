@@ -1,4 +1,4 @@
-﻿"""
+"""
 
 Google Sheets 存取層。
 
@@ -709,24 +709,34 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
         for sheet_name in wb.sheetnames:
             ws = wb[sheet_name]
             
-            headers = []
-            for cell in ws[1]:
-                headers.append(cell.value)
+            # 掃描前 10 列找出包含關鍵字的標題列
+            headers = None
+            header_row = 1
+            for row_idx in range(1, min(11, ws.max_row + 1)):
+                row_values = [cell.value for cell in ws[row_idx]]
+                row_str = " ".join([str(v).lower() if v else "" for v in row_values])
+                # 檢查這列是否包含必要的關鍵字
+                has_date = any(kw in row_str for kw in ["日期", "date"])
+                has_nutrient = any(kw in row_str for kw in ["熱量", "蛋白質", "calorie", "protein", "kcal", "能量"])
+                if has_date and has_nutrient:
+                    headers = row_values
+                    header_row = row_idx
+                    break
+            
+            if headers is None:
+                result["errors"].append(f"工作表「{sheet_name}」找不到包含日期和營養素的標題列，跳過")
+                continue
             
             date_col = find_column(headers, "date")
             protein_col = find_column(headers, "protein")
             calories_col = find_column(headers, "calories")
             water_col = find_column(headers, "water")
             
-            # Debug: 顯示找到的欄位
-            import streamlit as st_debug
-            st_debug.info(f"工作表「{sheet_name}」找到的欄位：日期={date_col}, 熱量={calories_col}, 蛋白質={protein_col}, 喝水={water_col}，標題列：{headers}")
-            
             if date_col == -1 or (calories_col == -1 and protein_col == -1):
                 result["errors"].append(f"工作表「{sheet_name}」找不到必要欄位，跳過（headers={headers}）")
                 continue
             
-            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            for row_idx, row in enumerate(ws.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1):
                 try:
                     date_val = row[date_col] if date_col < len(row) else None
                     if date_val is None:
