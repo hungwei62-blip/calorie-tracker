@@ -776,6 +776,9 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
                                 calories = float(val)
                             except (ValueError, TypeError):
                                 pass
+                        else:
+                            import streamlit as st_tmp
+                            st_tmp.warning(f"工作表{sheet_name}第{row_idx}列熱量為None")
                     
                     if water_col != -1 and water_col < len(row):
                         val = row[water_col]
@@ -832,6 +835,10 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
         
     except Exception as e:
         result["errors"].append(f"開啟 Excel 檔案失敗：{str(e)}")
+    
+    # Debug: 顯示最終結果摘要
+    import streamlit as st_final
+    st_final.info(f"匯入結果：新增={result['imported']}, 覆寫={result['overwritten']}, 跳過={result['skipped']}, 錯誤={len(result['errors'])}")
     
     return result
 

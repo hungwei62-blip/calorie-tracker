@@ -632,7 +632,26 @@ def _build_history_csv(student, daily, weights, trainings, notes, start_date, en
 
 def _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date):
     # 中文字型設定
-    _plt.rcParams["font.sans-serif"] = ["Noto Sans CJK TC", "Microsoft JhengHei", "SimHei"]
+    # 中文字型設定
+    import matplotlib.font_manager as fm
+    # 嘗試使用系統中文字型
+    font_paths = [
+        "C:/Windows/Fonts/msjh.ttc",  # Microsoft JhengHei
+        "C:/Windows/Fonts/NotoSansCJKtc-Regular.otf",
+        "C:/Windows/Fonts/simhei.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    ]
+    font_found = False
+    for fp in font_paths:
+        if os.path.exists(fp):
+            prop = fm.FontProperties(fname=fp)
+            _plt.rcParams["font.sans-serif"] = [fp]
+            _plt.rcParams["font.family"] = ["sans-serif"]
+            font_found = True
+            break
+    if not font_found:
+        # 如果找不到中文字型，使用預設但避免顯示問題
+        _plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
     _plt.rcParams["axes.unicode_minus"] = False
     name = student.get("name", student.get("username", "未知"))
     buf = _io.BytesIO()
@@ -864,7 +883,6 @@ def page_coach_student_history():
                                 msg += f"，跳過 {final_result['skipped']} 筆"
                             st.success(msg)
                             
-                            st.session_state.excel_import_file_hist = None
                             st.rerun()
                 else:
                     st.info("沒有找到可匯入的資料")
