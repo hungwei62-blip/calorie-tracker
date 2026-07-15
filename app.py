@@ -231,7 +231,7 @@ def page_coach_overview() -> None:
 
         uid = student.get("user_id", "")
 
-        name = student.get("username", "未知")
+        name = student.get("name", student.get("username", "未知"))
 
         goals = sheets.get_user_goals(uid)
 
@@ -585,6 +585,7 @@ def page_login() -> None:
             col1, col2 = st.columns(2)
             with col1:
                 new_user = st.text_input("帳號", placeholder="輸入帳號")
+                new_name = st.text_input("姓名", placeholder="輸入真實姓名")
                 new_pwd = st.text_input("密碼", type="password")
                 new_pwd2 = st.text_input("確認密碼", type="password")
             with col2:
@@ -595,8 +596,8 @@ def page_login() -> None:
             submitted = st.form_submit_button("註冊並登入", use_container_width=True)
         
         if submitted:
-            if not new_user or not new_pwd:
-                st.error("帳號和密碼不能為空")
+            if not new_user or not new_name or not new_pwd:
+                st.error("帳號、姓名和密碼都不能為空")
                 return
             if new_pwd != new_pwd2:
                 st.error("兩次密碼不一致")
@@ -638,7 +639,7 @@ def page_login() -> None:
                 }
                 
                 sheets.append_user(
-                    uid, new_user, pwd_hash, auth.now_iso(),
+                    uid, new_user, new_name, pwd_hash, auth.now_iso(),
                     goals=goals,
                     record_mode="simple" if "簡易" in record_mode else "full",
                     weekly_training=4,

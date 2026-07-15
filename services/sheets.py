@@ -32,6 +32,7 @@ from google.oauth2.service_account import Credentials
 USERS_HEADERS = [
     "user_id",
     "username",
+    "name",           # 學員真實姓名
     "password_hash",
     "created_at",
     "bmr",
@@ -171,6 +172,7 @@ def get_users_rows() -> list[dict[str, Any]]:
 def append_user(
     user_id: str,
     username: str,
+    name: str,
     password_hash: str,
     created_at: str,
     goals: dict[str, float],
@@ -193,6 +195,7 @@ def append_user(
     row = [
         user_id,
         username,
+        name,
         password_hash,
         created_at,
         "",  # BMR 留空，後續由 update_user_bmr 更新
