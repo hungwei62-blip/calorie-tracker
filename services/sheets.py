@@ -1,23 +1,33 @@
-"""Google Sheets 讀寫服務。
+﻿"""
 
-依賴《人工智慧人員多人熱量記錄 Web App 以及變更》中的 Google Sheets 作為個人以及記錄中心。
-這些存儲在上層以 .streamlit/secrets.toml 來讀取，沒有該他默認值。
-記錄表兩個。
+Google Sheets 存取層。
 
-使用說明：
-- get_users_rows / append_user
+本模組專為《健身教練管理系統》設計，提供以下工作表的 CRUD：
+- Users        ：教練與學員帳號資訊
+- Records      ：學員每日飲食記錄
+- Weight       ：學員體重記錄
+- Training     ：學員訓練記錄（背/胸/腿/核心/有氧）
+
+這些存取全走 .streamlit/secrets.toml 簡寫，沒有其他設定。
+學員工作表在本系統中由 sheets._ensure_worksheet 自動建立。
+
+使用範例：
+- get_users_rows / append_user / set_user_role
 - get_records / append_record
-- get_user_goals
-- update_user_goals (admin 以及中內編輯使用)
+- get_user_goals / update_user_goals
+- get_weight_records / append_weight
+- get_training_records / append_training
 """
 
 from __future__ import annotations
 
-import json
+from datetime import date
 from typing import Any
 
 import gspread
 from google.oauth2.service_account import Credentials
+
+# ---------- Headers ----------
 
 USERS_HEADERS = [
     "user_id",
@@ -32,6 +42,7 @@ USERS_HEADERS = [
     "daily_water_goal",
     "role",
     "weekly_training_goal",
+    "record_mode",          # "simple" 或 "full"，學員的飲食記錄模式
 ]
 
 RECORDS_HEADERS = [
@@ -48,13 +59,33 @@ RECORDS_HEADERS = [
     "portion",
 ]
 
+# 體重記錄工作表
+WEIGHT_HEADERS = [
+    "timestamp",
+    "user_id",
+    "weight_kg",
+]
+
+# 訓練記錄工作表
+TRAINING_HEADERS = [
+    "timestamp",
+    "user_id",
+    "training_back",     # 背：1 或 0
+    "training_chest",   # 胸：1 或 0
+    "training_legs",    # 腿：1 或 0
+    "training_core",    # 核心：1 或 0
+    "training_cardio",  # 有氧：1 或 0
+]
+
+
+# ---------- 內部工具 ----------
 
 def _get_secrets() -> dict[str, Any]:
     import streamlit as st
 
     if "gcp" not in st.secrets or "SPREADSHEET_ID" not in st.secrets:
         raise EnvironmentError(
-            "請在 .streamlit/secrets.toml 中設定 [gcp] (含 Service Account JSON) 及 SPREADSHEET_ID"
+            "請先在 .streamlit/secrets.toml 中設定 [gcp] (含 Service Account JSON) 與 SPREADSHEET_ID"
         )
     gcp = dict(st.secrets["gcp"])
     gcp["SPREADSHEET_ID"] = st.secrets["SPREADSHEET_ID"]
@@ -80,6 +111,7 @@ def _get_sheet() -> gspread.Spreadsheet:
 
 
 def _ensure_worksheet(sh: gspread.Spreadsheet, title: str, headers: list[str]) -> gspread.Worksheet:
+    """確保工作表存在，若不存在則自動建立並寫入 header。"""
     try:
         ws = sh.worksheet(title)
     except gspread.WorksheetNotFound:
@@ -89,10 +121,10 @@ def _ensure_worksheet(sh: gspread.Spreadsheet, title: str, headers: list[str]) -
 
 
 def _rows_to_dicts(ws: gspread.Worksheet, headers: list[str]) -> list[dict[str, Any]]:
+    """將工作表列（第一列為 header）轉為 dict 列表。"""
     values = ws.get_all_values()
     if not values:
         return []
-    head = values[0]
     out: list[dict[str, Any]] = []
     for row in values[1:]:
         record = {}
@@ -105,9 +137,32 @@ def _rows_to_dicts(ws: gspread.Worksheet, headers: list[str]) -> list[dict[str, 
     return out
 
 
-# ---------- Users ----------
+def _to_float(val: Any, default: float) -> float:
+    """安全轉為 float，失敗時回傳預設值。"""
+    try:
+        if val in (None, ""):
+            return default
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_int(val: Any, default: int) -> int:
+    """安全轉為 int，失敗時回傳預設值。"""
+    try:
+        if val in (None, ""):
+            return default
+        return int(float(val))
+    except (TypeError, ValueError):
+        return default
+
+
+# =============================================================================
+# Users
+# =============================================================================
 
 def get_users_rows() -> list[dict[str, Any]]:
+    """取得所有使用者列（教練與學員）。"""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     return _rows_to_dicts(ws, USERS_HEADERS)
@@ -119,10 +174,19 @@ def append_user(
     password_hash: str,
     created_at: str,
     goals: dict[str, float],
+    record_mode: str = "simple",
+    weekly_training: int = 4,
 ) -> None:
-    """新增使用者到 Users 工作表。
+    """新增學員到 Users 工作表。
 
-    註：BMR 不寫入，保留空白。BMR 之後由 update_user_bmr() 單獨設定。
+    Args:
+        user_id: 學員唯一 ID
+        username: 帳號名稱
+        password_hash: bcrypt 密碼雜湊
+        created_at: 創建時間（ISO 字串）
+        goals: 營養目標字典，含 calorie/protein/carb/fat/water
+        record_mode: "simple" 或 "full"，飲食記錄模式
+        weekly_training: 每週訓練目標次數，預設 4
     """
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
@@ -131,20 +195,21 @@ def append_user(
         username,
         password_hash,
         created_at,
-        "",  # BMR 留空，由 update_user_bmr() 之後單獨更新
+        "",  # BMR 留空，後續由 update_user_bmr 更新
         goals.get("calorie", 0),
         goals.get("protein", 0),
         goals.get("carb", 0),
         goals.get("fat", 0),
         goals.get("water", 0),
         "student",
-        int(goals.get("weekly_training", 4)),
+        weekly_training,
+        record_mode,
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
 
 
 def get_user_role(user_id: str) -> str:
-    """讀該使用者的 role，預設 student (舊資料沒寫時)。"""
+    """查詢使用者的 role，回傳 "coach" 或 "student"（預設）。"""
     for row in get_users_rows():
         if row.get("user_id") == user_id:
             val = str(row.get("role", "student") or "student")
@@ -153,7 +218,7 @@ def get_user_role(user_id: str) -> str:
 
 
 def set_user_role(user_id: str, role: str) -> None:
-    """管理員在指定 user_id 的 Users row 寫入 role。"""
+    """將指定 user_id 的 role 設為 "coach" 或 "student"。"""
     role = (role or "student").strip().lower()
     if role not in ("student", "coach"):
         raise ValueError("role 只能是 student 或 coach")
@@ -166,8 +231,31 @@ def set_user_role(user_id: str, role: str) -> None:
     ws.update_cell(cell.row, role_col, role)
 
 
+def get_user_record_mode(user_id: str) -> str:
+    """取得使用者的飲食記錄模式，回傳 "simple" 或 "full"。"""
+    for row in get_users_rows():
+        if row.get("user_id") == user_id:
+            mode = str(row.get("record_mode", "simple") or "simple")
+            return mode.strip().lower()
+    return "simple"
+
+
+def set_user_record_mode(user_id: str, mode: str) -> None:
+    """設定使用者的飲食記錄模式。mode 只能是 "simple" 或 "full"。"""
+    mode = (mode or "simple").strip().lower()
+    if mode not in ("simple", "full"):
+        raise ValueError("record_mode 只能是 simple 或 full")
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
+    cell = ws.find(user_id)
+    if cell is None:
+        raise LookupError("找不到此 user_id")
+    col = USERS_HEADERS.index("record_mode") + 1
+    ws.update_cell(cell.row, col, mode)
+
+
 def get_user_goals(user_id: str) -> dict[str, float]:
-    """讀取一名使用者的日目標，包含 BMR。"""
+    """取得使用者的每日營養目標。"""
     for row in get_users_rows():
         if row.get("user_id") == user_id:
             return {
@@ -177,40 +265,30 @@ def get_user_goals(user_id: str) -> dict[str, float]:
                 "carb": _to_float(row.get("daily_carb_goal"), 250.0),
                 "fat": _to_float(row.get("daily_fat_goal"), 65.0),
                 "water": _to_float(row.get("daily_water_goal"), 2000.0),
+                "weekly_training": float(row.get("weekly_training_goal", 4)),
             }
-    return {"bmr": 0.0, "calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
-
-
-def _to_float(val: Any, default: float) -> float:
-    try:
-        if val in (None, ""):
-            return default
-        return float(val)
-    except (TypeError, ValueError):
-        return default
+    return {"bmr": 0.0, "calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0, "weekly_training": 4.0}
 
 
 def update_user_bmr(user_id: str, bmr: float) -> bool:
-    """更新使用者的 BMR 值。"""
+    """更新使用者的 BMR 值。成功回傳 True。"""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     rows = get_users_rows()
-    for idx, row in enumerate(rows, start=2):  # start=2 因為第1行是header
+    for idx, row in enumerate(rows, start=2):
         if row.get("user_id") == user_id:
-            # bmr 在第5欄 (index 4, 0-based)
-            ws.update_cell(idx, 5, round(bmr, 2))
+            ws.update_cell(idx, 5, round(bmr, 2))  # BMR 在第 5 欄
             return True
     return False
 
 
 def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
-    """更新使用者的所有目標值（不包含 BMR）。"""
+    """更新使用者的營養目標（不含 BMR）。成功回傳 True。"""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     rows = get_users_rows()
 
-    # 欄位對應 (1-based index): calorie=6, protein=7, carb=8, fat=9, water=10
-    # 注意：BMR 已經由 update_user_bmr 單獨處理
+    # 欄位對應 (1-based)：calorie=6, protein=7, carb=8, fat=9, water=10
     field_map = {
         "calorie": 6,
         "protein": 7,
@@ -234,51 +312,22 @@ def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
     return found
 
 
-def update_record(record_timestamp: str, user_id: str, updates: dict[str, Any]) -> bool:
-    """更新指定記錄的內容。"""
-    sh = _get_sheet()
-    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
-    records = get_records(user_id)
-
-    # 欄位對應 (1-based index): food_summary=4, calories=5, protein=6, carb=7, fat=8, water_ml=9, portion=11
-    field_map = {
-        "food_summary": 4,
-        "calories": 5,
-        "protein": 6,
-        "carb": 7,
-        "fat": 8,
-        "water_ml": 9,
-        "portion": 11,
-    }
-
-    # 找到該記錄在 worksheet 中的行號
-    raw_records = ws.get_all_values()
-    for row_idx, raw_row in enumerate(raw_records[1:], start=2):  # 跳過 header
-        if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
-            for key, col in field_map.items():
-                if key in updates:
-                    val = updates[key]
-                    if isinstance(val, float):
-                        val = round(val, 2)
-                    ws.update_cell(row_idx, col, val)
-            return True
-    return False
+def get_all_students() -> list[dict[str, Any]]:
+    """取得所有學員（role=student）的資料。"""
+    return [row for row in get_users_rows() if row.get("role", "").strip().lower() == "student"]
 
 
-def delete_record(record_timestamp: str, user_id: str) -> bool:
-    """刪除指定記錄。"""
-    sh = _get_sheet()
-    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
-    raw_records = ws.get_all_values()
-
-    for row_idx, raw_row in enumerate(raw_records[1:], start=2):  # 跳過 header
-        if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
-            ws.delete_rows(row_idx)
-            return True
-    return False
+def get_student_by_id(user_id: str) -> dict[str, Any] | None:
+    """依 user_id 取得學員資料，找不到回傳 None。"""
+    for row in get_users_rows():
+        if row.get("user_id") == user_id:
+            return row
+    return None
 
 
-# ---------- Records ----------
+# =============================================================================
+# Records（飲食記錄）
+# =============================================================================
 
 def append_record(
     timestamp: str,
@@ -293,6 +342,7 @@ def append_record(
     image_url: str,
     portion: float,
 ) -> None:
+    """新增一筆飲食記錄到 Records 工作表。"""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
     row = [
@@ -312,7 +362,7 @@ def append_record(
 
 
 def get_records(user_id: str | None = None) -> list[dict[str, Any]]:
-    """讀取記錄，可選擇依 user_id 篩選。"""
+    """取得飲食記錄，可依 user_id 篩選。"""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
     raw = _rows_to_dicts(ws, RECORDS_HEADERS)
@@ -320,7 +370,6 @@ def get_records(user_id: str | None = None) -> list[dict[str, Any]]:
     for r in raw:
         if user_id is not None and r.get("user_id") != user_id:
             continue
-        # 譯讀數值
         r["calories"] = _to_float(r.get("calories"), 0.0)
         r["protein"] = _to_float(r.get("protein"), 0.0)
         r["carb"] = _to_float(r.get("carb"), 0.0)
@@ -329,3 +378,194 @@ def get_records(user_id: str | None = None) -> list[dict[str, Any]]:
         r["portion"] = _to_float(r.get("portion"), 1.0)
         out.append(r)
     return out
+
+
+def get_records_by_date(user_id: str, target_date: date) -> list[dict[str, Any]]:
+    """取得指定日期的飲食記錄。target_date 會比對 timestamp 的日期部分（前 10 字）。"""
+    date_str = target_date.isoformat()[:10]
+    all_records = get_records(user_id)
+    return [r for r in all_records if r.get("timestamp", "")[:10] == date_str]
+
+
+def update_record(record_timestamp: str, user_id: str, updates: dict[str, Any]) -> bool:
+    """更新指定飲食記錄的欄位。成功回傳 True。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+    raw_records = ws.get_all_values()
+
+    field_map = {
+        "food_summary": 4,
+        "calories": 5,
+        "protein": 6,
+        "carb": 7,
+        "fat": 8,
+        "water_ml": 9,
+        "portion": 11,
+    }
+
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):
+        if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
+            for key, col in field_map.items():
+                if key in updates:
+                    val = updates[key]
+                    if isinstance(val, float):
+                        val = round(val, 2)
+                    ws.update_cell(row_idx, col, val)
+            return True
+    return False
+
+
+def delete_record(record_timestamp: str, user_id: str) -> bool:
+    """刪除指定飲食記錄。成功回傳 True。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+    raw_records = ws.get_all_values()
+
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):
+        if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
+            ws.delete_rows(row_idx)
+            return True
+    return False
+
+
+# =============================================================================
+# Weight（體重記錄）
+# =============================================================================
+
+def append_weight(timestamp: str, user_id: str, weight_kg: float) -> None:
+    """新增一筆體重記錄到 Weight 工作表。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
+    row = [
+        timestamp,
+        user_id,
+        round(weight_kg, 1),
+    ]
+    ws.append_row(row, value_input_option="USER_ENTERED")
+
+
+def get_weight_records(user_id: str | None = None) -> list[dict[str, Any]]:
+    """取得體重記錄，可依 user_id 篩選。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
+    raw = _rows_to_dicts(ws, WEIGHT_HEADERS)
+    out: list[dict[str, Any]] = []
+    for r in raw:
+        if user_id is not None and r.get("user_id") != user_id:
+            continue
+        r["weight_kg"] = _to_float(r.get("weight_kg"), 0.0)
+        out.append(r)
+    return out
+
+
+def get_latest_weight(user_id: str) -> float | None:
+    """取得學員最新一筆體重記錄，回傳 kg 值，無記錄時回傳 None。"""
+    records = get_weight_records(user_id)
+    if not records:
+        return None
+    return records[-1].get("weight_kg")
+
+
+def get_weight_by_date(user_id: str, target_date: date) -> float | None:
+    """取得指定日期的體重記錄，無記錄時回傳 None。"""
+    date_str = target_date.isoformat()[:10]
+    for r in get_weight_records(user_id):
+        if r.get("timestamp", "")[:10] == date_str:
+            return r.get("weight_kg")
+    return None
+
+
+# =============================================================================
+# Training（訓練記錄）
+# =============================================================================
+
+def append_training(
+    timestamp: str,
+    user_id: str,
+    training_back: int = 0,
+    training_chest: int = 0,
+    training_legs: int = 0,
+    training_core: int = 0,
+    training_cardio: int = 0,
+) -> None:
+    """新增一筆訓練記錄到 Training 工作表。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
+    row = [
+        timestamp,
+        user_id,
+        training_back,
+        training_chest,
+        training_legs,
+        training_core,
+        training_cardio,
+    ]
+    ws.append_row(row, value_input_option="USER_ENTERED")
+
+
+def get_training_records(user_id: str | None = None) -> list[dict[str, Any]]:
+    """取得訓練記錄，可依 user_id 篩選。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
+    raw = _rows_to_dicts(ws, TRAINING_HEADERS)
+    out: list[dict[str, Any]] = []
+    for r in raw:
+        if user_id is not None and r.get("user_id") != user_id:
+            continue
+        r["training_back"] = _to_int(r.get("training_back"), 0)
+        r["training_chest"] = _to_int(r.get("training_chest"), 0)
+        r["training_legs"] = _to_int(r.get("training_legs"), 0)
+        r["training_core"] = _to_int(r.get("training_core"), 0)
+        r["training_cardio"] = _to_int(r.get("training_cardio"), 0)
+        out.append(r)
+    return out
+
+
+def get_training_by_date(user_id: str, target_date: date) -> dict[str, int] | None:
+    """取得指定日期的訓練記錄，回傳 dict（無記錄回傳 None）。"""
+    date_str = target_date.isoformat()[:10]
+    for r in get_training_records(user_id):
+        if r.get("timestamp", "")[:10] == date_str:
+            return {
+                "back": r.get("training_back", 0),
+                "chest": r.get("training_chest", 0),
+                "legs": r.get("training_legs", 0),
+                "core": r.get("training_core", 0),
+                "cardio": r.get("training_cardio", 0),
+            }
+    return None
+
+
+def has_training_today(user_id: str, target_date: date) -> bool:
+    """檢查指定日期是否有任何訓練記錄。"""
+    record = get_training_by_date(user_id, target_date)
+    if record is None:
+        return False
+    return any(v == 1 for v in record.values())
+
+
+def update_training(
+    timestamp: str,
+    user_id: str,
+    training_back: int = 0,
+    training_chest: int = 0,
+    training_legs: int = 0,
+    training_core: int = 0,
+    training_cardio: int = 0,
+) -> bool:
+    """更新指定日期的訓練記錄，若該日記錄不存在則新增。成功回傳 True。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
+    raw_records = ws.get_all_values()
+
+    # 先找看看有沒有該日期的記錄
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):
+        if raw_row and raw_row[0] == timestamp and raw_row[1] == user_id:
+            # 更新現有列
+            for col, val in enumerate([training_back, training_chest, training_legs, training_core, training_cardio], start=3):
+                ws.update_cell(row_idx, col, val)
+            return True
+
+    # 沒找到就新增
+    append_training(timestamp, user_id, training_back, training_chest, training_legs, training_core, training_cardio)
+    return True
