@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+import os
 from io import BytesIO
 import io as _io
 import matplotlib
