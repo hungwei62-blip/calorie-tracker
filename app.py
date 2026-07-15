@@ -1662,11 +1662,6 @@ def page_log_meal() -> None:
 
     if st.session_state.get("pending_analysis"):
         analysis_result = st.session_state.pending_analysis
-        # ===== DEBUG: 顯示 AI 原始回傳 =====
-        import json
-        st.error(f"[AI 原始資料] {json.dumps(analysis_result, ensure_ascii=False)}")
-        # ===== END DEBUG =====
-
 
         st.divider()
 
@@ -1720,23 +1715,10 @@ def page_log_meal() -> None:
 
         water_ml = st.number_input("飲水量 (ml)", value=0, step=50, min_value=0)
 
-        st.error("🔍 DEBUG: 按鈕被點擊了！")
         if st.button("✅ 存入今日記錄", use_container_width=True):
 
-            # 驗證即將寫入的數值
-            final_calories = cal * portion
-            final_protein = pro * portion
-            if final_calories <= 0 and final_protein <= 0:
-                st.warning("熱量和蛋白質都為 0，請確認 AI 分析結果是否正確")
-                return
 
             try:
-                # ===== DEBUG: 確認數值 =====
-                debug_msg = f"[DEBUG] 即將寫入: calories={cal * portion}, protein={pro * portion}, portion={portion}"
-                print(debug_msg)
-                st.warning(debug_msg)
-                # ===== END DEBUG =====
-
                 sheets.append_record(
 
                     timestamp=datetime.now().isoformat(),
@@ -1765,7 +1747,11 @@ def page_log_meal() -> None:
 
                 _clear_analysis_cache()
 
-                st.success("已存入今日記錄！")
+                # 清除 pending_analysis，讓錊單回到初始狀態
+                st.session_state.pending_analysis = None
+
+                # 顯示短暫的成功標記
+                st.success("已存入！")
 
                 st.rerun()
 
