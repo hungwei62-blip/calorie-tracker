@@ -1710,6 +1710,7 @@ def page_log_meal() -> None:
 
         water_ml = st.number_input("飲水量 (ml)", value=0, step=50, min_value=0)
 
+        st.error("🔍 DEBUG: 按鈕被點擊了！")
         if st.button("✅ 存入今日記錄", use_container_width=True):
 
             # 驗證即將寫入的數值
