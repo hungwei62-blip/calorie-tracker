@@ -808,6 +808,72 @@ def page_coach_student_history():
         st.header("📚 " + str(name) + " 的歷史記錄")
     st.divider()
     st.subheader("⏱️ 時間範圍")
+
+    # ============================================================
+    # Excel 匯入功能
+    # ============================================================
+    with st.expander("📥 匯入 Excel 資料"):
+        uploaded_file = st.file_uploader(
+            "選擇 Excel 檔案（每個工作表代表一個月份）",
+            type=["xlsx", "xls"],
+            key="excel_import_file_hist"
+        )
+
+        if uploaded_file is not None:
+            try:
+                file_bytes = uploaded_file.getvalue()
+                
+                with st.spinner("分析 Excel 檔案中..."):
+                    analysis_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=False)
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("可新增", f"{analysis_result['imported']} 筆")
+                with col2:
+                    st.metric("將覆寫", f"{analysis_result['overwritten']} 筆")
+                with col3:
+                    st.metric("將跳過", f"{analysis_result['skipped']} 筆")
+
+                if analysis_result["errors"]:
+                    with st.expander("⚠️ 匯入時的錯誤"):
+                        for err in analysis_result["errors"]:
+                            st.warning(err)
+
+                if analysis_result["duplicates"]:
+                    with st.expander(f"⚠️ 發現 {len(analysis_result['duplicates'])} 筆重複"):
+                        for dup in analysis_result["duplicates"][:10]:
+                            st.write(f"📅 {dup['date']}")
+
+                if analysis_result["imported"] > 0 or analysis_result["skipped"] > 0:
+                    overwrite_mode = st.radio(
+                        "遇到重複日期：",
+                        ["跳過", "覆寫"],
+                        horizontal=True,
+                    )
+                    do_overwrite = (overwrite_mode == "覆寫")
+
+                    if st.button("確認匯入", type="primary", use_container_width=True):
+                        with st.spinner("匯入資料中..."):
+                            final_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=do_overwrite)
+                            _clear_analysis_cache()
+                            
+                            msg = f"匯入完成！新增 {final_result['imported']} 筆"
+                            if final_result["overwritten"] > 0:
+                                msg += f"，覆寫 {final_result['overwritten']} 筆"
+                            if final_result["skipped"] > 0:
+                                msg += f"，跳過 {final_result['skipped']} 筆"
+                            st.success(msg)
+                            
+                            st.session_state.excel_import_file_hist = None
+                            st.rerun()
+                else:
+                    st.info("沒有找到可匯入的資料")
+
+            except Exception as exc:
+                st.error(f"讀取 Excel 失敗：{str(exc)}")
+
+    st.divider()
+
     range_mode = st.radio(
         "範圍",
         ["7 天", "30 天", "自訂日期"],
