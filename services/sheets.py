@@ -692,9 +692,9 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
         
         column_keywords = {
             "date": ["日期", "date", "日期欄"],
-            "protein": ["蛋白質", "蛋白質(g)", "蛋白", "protein", "蛋白 (g)"],
-            "calories": ["熱量", "總熱量", "總熱量(kcal)", "calories", "calorie", "kcal", "能量"],
-            "water": ["喝水", "飲水量", "水量", "water", "ml", "水"],
+            "protein": ["蛋白質", "蛋白質(g)", "蛋白", "protein", "蛋白 (g)", "蛋白(g)"],
+            "calories": ["熱量", "總熱量", "總熱量(kcal)", "calories", "calorie", "kcal", "能量", "總熱量(kcal)"],
+            "water": ["喝水", "喝水(ml)", "飲水量", "水量", "water", "ml", "水"],
         }
         
         def find_column(headers, target_key):
