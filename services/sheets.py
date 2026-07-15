@@ -78,6 +78,14 @@ TRAINING_HEADERS = [
     "training_cardio",  # 有氧：1 或 0
 ]
 
+# 教練備註工作表
+NOTES_HEADERS = [
+    "timestamp",       # 備註時間
+    "user_id",       # 學員 ID
+    "coach_id",      # 教練 ID
+    "note",          # 備註內容
+]
+
 
 # ---------- 內部工具 ----------
 
@@ -572,3 +580,41 @@ def update_training(
     # 沒找到就新增
     append_training(timestamp, user_id, training_back, training_chest, training_legs, training_core, training_cardio)
     return True
+
+
+# =============================================================================
+# Notes（教練備註）
+# =============================================================================
+
+def append_note(timestamp: str, user_id: str, coach_id: str, note: str) -> None:
+    """新增一筆教練備註到 Notes 工作表。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Notes", NOTES_HEADERS)
+    row = [
+        timestamp,
+        user_id,
+        coach_id,
+        note,
+    ]
+    ws.append_row(row, value_input_option="USER_ENTERED")
+
+
+def get_notes(user_id: str | None = None) -> list[dict[str, Any]]:
+    """取得教練備註，可依 user_id 篩選。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Notes", NOTES_HEADERS)
+    raw = _rows_to_dicts(ws, NOTES_HEADERS)
+    out: list[dict[str, Any]] = []
+    for r in raw:
+        if user_id is not None and r.get("user_id") != user_id:
+            continue
+        out.append(r)
+    return out
+
+
+def get_latest_note(user_id: str) -> dict[str, Any] | None:
+    """取得指定學員的最新一筆備註。"""
+    notes = get_notes(user_id)
+    if not notes:
+        return None
+    return notes[-1]  # 因為是時間排序，最後一筆是最新的

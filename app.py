@@ -11,6 +11,12 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from io import BytesIO
+import io as _io
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as _plt
+from matplotlib.backends.backend_pdf import PdfPages as _PdfPages
+import pandas as _pd
 
 import streamlit as st
 
@@ -315,6 +321,16 @@ def page_coach_overview() -> None:
     
     st.dataframe(table_data, use_container_width=True, hide_index=True)
 
+    st.markdown("---")
+    st.caption("點選學員後按下方按鈕查看其歷史記錄：")
+    _opts = {s.get("user_id", ""): s.get("name", s.get("username", "未知")) for s in students}
+    _hist_pick = st.selectbox("選擇學員查看歷史", options=list(_opts.keys()),
+                             format_func=lambda x: _opts.get(x, x), key="coach_hist_pick")
+    if st.button("📚 開啟歷史頁面", key="open_history_btn"):
+        st.session_state.view_student_id = _hist_pick
+        st.session_state.page = "學員歷史"
+        st.rerun()
+
 
 
 def page_coach_student_detail() -> None:
@@ -452,6 +468,483 @@ def page_coach_student_detail() -> None:
     else:
 
         st.info("尚無體重記錄")
+
+# =============================================================================
+# 教練端：學員歷史頁面（圖表 / 教練備註 / 匯出 PDF + CSV）
+
+# =============================================================================
+# 教練端：學員歷史頁面（圖表 / 教練備註 / 匯出 PDF + CSV）
+# =============================================================================
+
+def _parse_record_date(ts):
+    from datetime import date as _date
+    try:
+        return _date.fromisoformat(str(ts)[:10])
+    except Exception:
+        return _date.min
+
+
+def _history_aggregate_daily(records, start_date, end_date):
+    days = {}
+    cur = start_date
+    while cur <= end_date:
+        days[cur] = {"calorie": 0.0, "protein": 0.0, "carb": 0.0, "fat": 0.0, "water": 0.0}
+        cur = cur + timedelta(days=1)
+    for r in records:
+        d = _parse_record_date(r.get("timestamp", ""))
+        if d in days:
+            t = days[d]
+            t["calorie"] += float(r.get("calorie", 0) or 0)
+            t["protein"] += float(r.get("protein", 0) or 0)
+            t["carb"]    += float(r.get("carb", 0) or 0)
+            t["fat"]     += float(r.get("fat", 0) or 0)
+            t["water"]   += float(r.get("water_ml", r.get("water", 0)) or 0)
+    return days
+
+
+def _build_history_csv(student, daily, weights, trainings, notes, start_date, end_date):
+    import csv
+    buf = _io.StringIO()
+    w = csv.writer(buf)
+    name = student.get("name", student.get("username", "未知"))
+    w.writerow(["學員：" + str(name)])
+    w.writerow(["區間：" + str(start_date.isoformat()) + " ~ " + str(end_date.isoformat())])
+    w.writerow([])
+    w.writerow(["日期", "熱量 (kcal)", "蛋白質 (g)", "醣類 (g)", "脂質 (g)", "水量 (ml)", "體重 (kg)", "訓練項目"])
+    weight_by_day = {}
+    for r in weights:
+        d = _parse_record_date(r.get("timestamp", ""))
+        if d >= start_date:
+            weight_by_day[d] = r.get("weight_kg", "")
+    training_by_day = {}
+    for r in trainings:
+        d = _parse_record_date(r.get("timestamp", ""))
+        if start_date <= d <= end_date:
+            items = []
+            if r.get("training_back"):   items.append("背")
+            if r.get("training_chest"):  items.append("胸")
+            if r.get("training_legs"):   items.append("腿")
+            if r.get("training_core"):   items.append("核心")
+            if r.get("training_cardio"): items.append("有氧")
+            training_by_day[d] = "、".join(items) if items else ""
+    for d in sorted(daily.keys()):
+        v = daily[d]
+        wd = weight_by_day.get(d, "")
+        wd_str = (("%.1f" % wd) if isinstance(wd, (int, float)) else (wd if wd else ""))
+        w.writerow([
+            d.isoformat(),
+            "%.0f" % v["calorie"],
+            "%.0f" % v["protein"],
+            "%.0f" % v["carb"],
+            "%.0f" % v["fat"],
+            "%.0f" % v["water"],
+            wd_str,
+            training_by_day.get(d, ""),
+        ])
+    if notes:
+        w.writerow([])
+        w.writerow(["教練備註"])
+        w.writerow(["時間", "教練", "內容"])
+        for n in notes:
+            w.writerow([
+                n.get("timestamp", "")[:19],
+                n.get("coach_id", ""),
+                n.get("note", "").replace("\n", " "),
+            ])
+    return ("\ufeff" + buf.getvalue()).encode("utf-8")
+
+def _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date):
+    name = student.get("name", student.get("username", "未知"))
+    buf = _io.BytesIO()
+    with _PdfPages(buf) as pdf:
+        # Page 1: 摘要
+        fig = _plt.figure(figsize=(8.27, 11.69))
+        fig.suptitle(str(name) + " 歷史紀錄", fontsize=18, fontweight="bold")
+        ax = fig.add_subplot(111)
+        ax.axis("off")
+        days_count = (end_date - start_date).days + 1
+        total_cal = sum(v["calorie"] for v in daily.values())
+        total_pro = sum(v["protein"] for v in daily.values())
+        total_water = sum(v["water"] for v in daily.values())
+        avg_cal = total_cal / max(days_count, 1)
+        avg_pro = total_pro / max(days_count, 1)
+        sorted_weights = sorted(
+            [r for r in weights if start_date <= _parse_record_date(r.get("timestamp", "")) <= end_date],
+            key=lambda r: r.get("timestamp", ""),
+        )
+        first_w = sorted_weights[0].get("weight_kg") if sorted_weights else None
+        last_w  = sorted_weights[-1].get("weight_kg") if sorted_weights else None
+        weight_delta = (last_w - first_w) if (first_w is not None and last_w is not None) else None
+        first_s = ("%.1f kg" % first_w) if first_w is not None else "-"
+        last_s  = ("%.1f kg" % last_w)  if last_w  is not None else "-"
+        delta_s = ""
+        if weight_delta is not None:
+            delta_s = "（%+.1f kg）" % weight_delta
+        lines = [
+            "區間：" + start_date.isoformat() + " ~ " + end_date.isoformat() + "（" + str(days_count) + " 天）",
+            "",
+            "平均熱量：%.0f kcal / 天" % avg_cal,
+            "平均蛋白質：%.0f g / 天" % avg_pro,
+            "總飲水量：%.0f ml" % total_water,
+            "體重：" + first_s + " -> " + last_s + delta_s,
+            "備註數：" + str(len(notes)) + " 筆",
+        ]
+        ax.text(0.05, 0.95, "\n".join(lines), va="top", ha="left", fontsize=12)
+        pdf.savefig(fig, bbox_inches="tight")
+        _plt.close(fig)
+
+        # Page 2: 飲食組成圓餅
+        total_pro2 = sum(v["protein"] for v in daily.values())
+        total_carb = sum(v["carb"] for v in daily.values())
+        total_fat = sum(v["fat"] for v in daily.values())
+        if total_pro2 + total_carb + total_fat > 0:
+            fig, ax = _plt.subplots(figsize=(8.27, 11.69))
+            fig.suptitle("飲食組成（區間總和）", fontsize=16, fontweight="bold")
+            ax.pie(
+                [total_carb, total_pro2, total_fat],
+                labels=[
+                    "醣類\n%.0fg" % total_carb,
+                    "蛋白質\n%.0fg" % total_pro2,
+                    "脂質\n%.0fg" % total_fat,
+                ],
+                autopct="%1.1f%%",
+                startangle=90,
+                colors=["#FFD166", "#06D6A0", "#EF476F"],
+            )
+            ax.axis("equal")
+            pdf.savefig(fig, bbox_inches="tight")
+            _plt.close(fig)
+
+        # Page 3: 熱量 / 蛋白質 / 水量
+        if daily:
+            xs = [d.strftime("%m/%d") for d in sorted(daily.keys())]
+            cals = [daily[d]["calorie"] for d in sorted(daily.keys())]
+            pros = [daily[d]["protein"] for d in sorted(daily.keys())]
+            wats = [daily[d]["water"] for d in sorted(daily.keys())]
+            fig, axes = _plt.subplots(3, 1, figsize=(8.27, 11.69))
+            fig.suptitle("每日攝取趨勢", fontsize=16, fontweight="bold")
+            axes[0].plot(xs, cals, marker="o", color="#118AB2")
+            axes[0].set_title("熱量 (kcal)")
+            axes[0].grid(True, alpha=0.3)
+            axes[1].plot(xs, pros, marker="o", color="#06D6A0")
+            axes[1].set_title("蛋白質 (g)")
+            axes[1].grid(True, alpha=0.3)
+            axes[2].bar(xs, wats, color="#073B4C")
+            axes[2].set_title("水量 (ml)")
+            axes[2].grid(True, alpha=0.3, axis="y")
+            for a in axes:
+                a.tick_params(axis="x", rotation=45)
+            fig.tight_layout(rect=[0, 0, 1, 0.96])
+            pdf.savefig(fig, bbox_inches="tight")
+            _plt.close(fig)
+
+        # Page 4: 體重
+        if sorted_weights:
+            fig, ax = _plt.subplots(figsize=(8.27, 11.69))
+            fig.suptitle("體重變化", fontsize=16, fontweight="bold")
+            xs = [r.get("timestamp", "")[:10] for r in sorted_weights]
+            ys = [r.get("weight_kg", 0) for r in sorted_weights]
+            ax.plot(xs, ys, marker="o", color="#EF476F")
+            ax.set_ylabel("kg")
+            ax.grid(True, alpha=0.3)
+            ax.tick_params(axis="x", rotation=45)
+            fig.tight_layout(rect=[0, 0, 1, 0.96])
+            pdf.savefig(fig, bbox_inches="tight")
+            _plt.close(fig)
+
+        # Page 5: 訓練 + 備註
+        fig, ax = _plt.subplots(figsize=(8.27, 11.69))
+        ax.axis("off")
+        fig.suptitle("訓練記錄與教練備註", fontsize=16, fontweight="bold")
+        text_lines = ["【訓練記錄】"]
+        if trainings:
+            for r in sorted(trainings, key=lambda x: x.get("timestamp", ""))[-20:]:
+                items = []
+                if r.get("training_back"):   items.append("背")
+                if r.get("training_chest"):  items.append("胸")
+                if r.get("training_legs"):   items.append("腿")
+                if r.get("training_core"):   items.append("核心")
+                if r.get("training_cardio"): items.append("有氧")
+                text_lines.append("  " + r.get("timestamp", "")[:10] + "  " + ("、".join(items) if items else "-"))
+        else:
+            text_lines.append("  （無）")
+        text_lines += ["", "【教練備註】"]
+        if notes:
+            for n in notes[-20:]:
+                text_lines.append("  " + n.get("timestamp", "")[:19] + "  " + str(n.get("coach_id", "")) + "：" + str(n.get("note", "")))
+        else:
+            text_lines.append("  （無）")
+        ax.text(0.05, 0.95, "\n".join(text_lines), va="top", ha="left", fontsize=10)
+        pdf.savefig(fig, bbox_inches="tight")
+        _plt.close(fig)
+    return buf.getvalue()
+
+def page_coach_student_history():
+    """教練端：檢視單一學員的歷史記錄（圖表 / 備註 / 匯出）。"""
+    uid = st.session_state.get("view_student_id")
+
+    if not uid:
+        try:
+            students = sheets.get_all_students()
+        except Exception as exc:
+            st.error("取得學員列表失敗：" + str(exc))
+            return
+        st.header("📚 學員歷史")
+        if not students:
+            st.info("目前沒有學員。")
+            return
+        st.caption("從總覽點選學員，或在此手動選擇：")
+        labels = {}
+        for s in students:
+            labels[s.get("user_id", "")] = s.get("name", s.get("username", "未知"))
+        picked = st.selectbox(
+            "選擇學員",
+            options=list(labels.keys()),
+            format_func=lambda x: labels.get(x, x),
+            key="hist_picker",
+        )
+        if st.button("查看歷史", type="primary", key="hist_picker_btn"):
+            st.session_state.view_student_id = picked
+            st.rerun()
+        return
+
+    student = sheets.get_student_by_id(uid)
+    if not student:
+        st.error("找不到學員，請返回總覽重新選擇。")
+        if st.button("← 返回學員狀態", key="back_err"):
+            st.session_state.page = "學員狀態"
+            st.session_state.pop("view_student_id", None)
+            st.rerun()
+        return
+
+    name = student.get("name", student.get("username", "未知"))
+    col_back, col_title = st.columns([1, 5])
+    with col_back:
+        if st.button("← 返回總覽", key="back_top"):
+            st.session_state.page = "學員狀態"
+            st.session_state.pop("view_student_id", None)
+            st.rerun()
+    with col_title:
+        st.header("📚 " + str(name) + " 的歷史記錄")
+    st.divider()
+    st.subheader("⏱️ 時間範圍")
+    range_mode = st.radio(
+        "範圍",
+        ["7 天", "30 天", "自訂日期"],
+        horizontal=True,
+        index=0,
+        label_visibility="collapsed",
+        key="hist_range_mode",
+    )
+    today = date.today()
+    if range_mode == "7 天":
+        start_date = today - timedelta(days=6)
+        end_date = today
+    elif range_mode == "30 天":
+        start_date = today - timedelta(days=29)
+        end_date = today
+    else:
+        c1, c2 = st.columns(2)
+        with c1:
+            start_date = st.date_input(
+                "開始日期",
+                today - timedelta(days=6),
+                max_value=today,
+                key="hist_start",
+            )
+        with c2:
+            end_date = st.date_input(
+                "結束日期",
+                today,
+                max_value=today,
+                key="hist_end",
+            )
+        if start_date > end_date:
+            st.warning("開始日期不能晚於結束日期，已自動交換。")
+            start_date, end_date = end_date, start_date
+    days_count = (end_date - start_date).days + 1
+    st.caption(
+        "顯示區間："
+        + start_date.strftime("%Y/%m/%d")
+        + " ~ "
+        + end_date.strftime("%Y/%m/%d")
+        + "（共 "
+        + str(days_count)
+        + " 天）"
+    )
+
+    try:
+        all_records = sheets.get_records(uid)
+        all_weights = sheets.get_weight_records(uid)
+        all_trainings = sheets.get_training_records(uid)
+        all_notes = sheets.get_notes(uid)
+        goals = sheets.get_user_goals(uid)
+    except Exception as exc:
+        st.error("取得資料失敗：" + str(exc))
+        return
+
+    daily = _history_aggregate_daily(all_records, start_date, end_date)
+    weights = []
+    for r in all_weights:
+        d = _parse_record_date(r.get("timestamp", ""))
+        if start_date <= d <= end_date:
+            weights.append(r)
+    trainings = []
+    for r in all_trainings:
+        d = _parse_record_date(r.get("timestamp", ""))
+        if start_date <= d <= end_date:
+            trainings.append(r)
+    notes = []
+    for r in all_notes:
+        d = _parse_record_date(r.get("timestamp", ""))
+        if start_date <= d <= end_date:
+            notes.append(r)
+    st.subheader("📌 摘要")
+    avg_cal = sum(v["calorie"] for v in daily.values()) / max(days_count, 1)
+    avg_pro = sum(v["protein"] for v in daily.values()) / max(days_count, 1)
+    avg_water = sum(v["water"] for v in daily.values()) / max(days_count, 1)
+    sorted_w = sorted(weights, key=lambda r: r.get("timestamp", ""))
+    first_w = None
+    last_w = None
+    weight_delta = None
+    if sorted_w:
+        first_w = sorted_w[0].get("weight_kg")
+        last_w = sorted_w[-1].get("weight_kg")
+        if first_w is not None and last_w is not None:
+            weight_delta = last_w - first_w
+    mc1, mc2, mc3, mc4 = st.columns(4)
+    with mc1:
+        st.metric("平均熱量", "%.0f kcal" % avg_cal, "目標 %.0f" % goals.get("calorie", 0))
+    with mc2:
+        st.metric("平均蛋白質", "%.0f g" % avg_pro, "目標 %.0f" % goals.get("protein", 0))
+    with mc3:
+        st.metric("平均水量", "%.0f ml" % avg_water, "目標 %.0f" % goals.get("water", 0))
+    with mc4:
+        if last_w is not None:
+            d_str = ("%+.1f kg" % weight_delta) if weight_delta is not None else None
+            st.metric("目前體重", "%.1f kg" % last_w, d_str)
+        else:
+            st.metric("目前體重", "-")
+    st.subheader("⚖️ 體重變化")
+    if weights:
+        wchart = {
+            "日期": [r.get("timestamp", "")[:10] for r in sorted_w],
+            "體重 (kg)": [r.get("weight_kg", 0) for r in sorted_w],
+        }
+        st.line_chart(wchart, x="日期", y="體重 (kg)")
+    else:
+        st.info("此區間沒有體重記錄。")
+
+    st.subheader("🥧 飲食組成（區間平均）")
+    total_carb = sum(v["carb"] for v in daily.values()) / max(days_count, 1)
+    total_pro_avg = sum(v["protein"] for v in daily.values()) / max(days_count, 1)
+    total_fat_avg = sum(v["fat"] for v in daily.values()) / max(days_count, 1)
+    if total_carb + total_pro_avg + total_fat_avg > 0:
+        fig, ax = _plt.subplots(figsize=(4, 4))
+        ax.pie(
+            [total_carb, total_pro_avg, total_fat_avg],
+            labels=[
+                "醣類\n%.0fg" % total_carb,
+                "蛋白質\n%.0fg" % total_pro_avg,
+                "脂質\n%.0fg" % total_fat_avg,
+            ],
+            autopct="%1.1f%%",
+            startangle=90,
+            colors=["#FFD166", "#06D6A0", "#EF476F"],
+        )
+        ax.axis("equal")
+        st.pyplot(fig)
+        _plt.close(fig)
+    else:
+        st.info("此區間沒有飲食記錄。")
+
+    st.subheader("📈 每日攝取趨勢")
+    if daily:
+        sorted_days = sorted(daily.keys())
+        xs = [d.strftime("%m/%d") for d in sorted_days]
+        line_data = {
+            "日期": xs,
+            "熱量 (kcal)": [daily[d]["calorie"] for d in sorted_days],
+            "蛋白質 (g)": [daily[d]["protein"] for d in sorted_days],
+        }
+        st.line_chart(line_data, x="日期", y=["熱量 (kcal)", "蛋白質 (g)"])
+        bar_data = {"日期": xs, "水量 (ml)": [daily[d]["water"] for d in sorted_days]}
+        st.bar_chart(bar_data, x="日期", y="水量 (ml)")
+    else:
+        st.info("此區間沒有飲食記錄。")
+    st.subheader("🏋️ 訓練記錄")
+    if trainings:
+        rows = []
+        for r in sorted(trainings, key=lambda x: x.get("timestamp", "")):
+            items = []
+            if r.get("training_back"):   items.append("背")
+            if r.get("training_chest"):  items.append("胸")
+            if r.get("training_legs"):   items.append("腿")
+            if r.get("training_core"):   items.append("核心")
+            if r.get("training_cardio"): items.append("有氧")
+            rows.append({
+                "日期": r.get("timestamp", "")[:10],
+                "訓練項目": "、".join(items) if items else "無",
+            })
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("此區間沒有訓練記錄。")
+
+    st.subheader("📝 教練備註")
+    if notes:
+        sorted_notes = sorted(notes, key=lambda x: x.get("timestamp", ""), reverse=True)
+        for n in sorted_notes[:10]:
+            ts = n.get("timestamp", "")[:19]
+            cid = n.get("coach_id", "")
+            note = n.get("note", "")
+            st.markdown("**" + ts + "** _" + cid + "_：" + note)
+    else:
+        st.caption("此區間尚無備註。")
+
+    with st.form("coach_note_form", clear_on_submit=True):
+        new_note = st.text_area(
+            "新增備註", placeholder="輸入觀察意見...", key="coach_note_input"
+        )
+        if st.form_submit_button("💾 儲存備註") and new_note and new_note.strip():
+            try:
+                sheets.append_note(
+                    timestamp=datetime.now().isoformat(timespec="seconds"),
+                    user_id=uid,
+                    coach_id=str(st.session_state.get("user_id", "")),
+                    note=new_note.strip(),
+                )
+                st.success("備註已儲存！")
+                st.rerun()
+            except Exception as exc:
+                st.error("儲存失敗：" + str(exc))
+
+    st.subheader("📤 匯出")
+    csv_bytes = _build_history_csv(student, daily, weights, trainings, notes, start_date, end_date)
+    pdf_bytes = _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date)
+    ec1, ec2 = st.columns(2)
+    with ec1:
+        st.download_button(
+            "📊 下載 CSV",
+            data=csv_bytes,
+            file_name=str(name) + "_歷史_" + start_date.isoformat() + "_" + end_date.isoformat() + ".csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="dl_csv",
+        )
+    with ec2:
+        st.download_button(
+            "📄 下載 PDF",
+            data=pdf_bytes,
+            file_name=str(name) + "_歷史_" + start_date.isoformat() + "_" + end_date.isoformat() + ".pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="dl_pdf",
+        )
+
+
+# =============================================================================
+
+# END_HISTORY_BLOCK
 
 # =============================================================================
 
@@ -1623,7 +2116,7 @@ def main() -> None:
 
     is_coach = (role == "coach")
 
-    coach_pages = ["學員狀態"]
+    coach_pages = ["學員狀態", "學員歷史"]
 
     student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
 
@@ -1675,6 +2168,8 @@ def main() -> None:
 
             page_coach_student_detail()
 
+        elif page == "學員歷史":
+            page_coach_student_history()
     else:
 
         if page not in ["TDEE 問卷", "個人"]:
