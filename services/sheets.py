@@ -26,6 +26,9 @@ from typing import Any
 
 import gspread
 from google.oauth2.service_account import Credentials
+import streamlit as st
+
+CACHE_TTL = 60  # 快取 TTL（秒）
 
 # ---------- Headers ----------
 
@@ -90,7 +93,6 @@ NOTES_HEADERS = [
 # ---------- 內部工具 ----------
 
 def _get_secrets() -> dict[str, Any]:
-    import streamlit as st
 
     if "gcp" not in st.secrets or "SPREADSHEET_ID" not in st.secrets:
         raise EnvironmentError(
@@ -372,6 +374,7 @@ def append_record(
     ws.append_row(row, value_input_option="USER_ENTERED")
 
 
+@st.cache_data(ttl=CACHE_TTL)
 def get_records(user_id: str | None = None) -> list[dict[str, Any]]:
     """取得飲食記錄，可依 user_id 篩選。"""
     sh = _get_sheet()
@@ -455,6 +458,7 @@ def append_weight(timestamp: str, user_id: str, weight_kg: float) -> None:
     ws.append_row(row, value_input_option="USER_ENTERED")
 
 
+@st.cache_data(ttl=CACHE_TTL)
 def get_weight_records(user_id: str | None = None) -> list[dict[str, Any]]:
     """取得體重記錄，可依 user_id 篩選。"""
     sh = _get_sheet()
@@ -469,6 +473,7 @@ def get_weight_records(user_id: str | None = None) -> list[dict[str, Any]]:
     return out
 
 
+@st.cache_data(ttl=CACHE_TTL)
 def get_latest_weight(user_id: str) -> float | None:
     """取得學員最新一筆體重記錄，回傳 kg 值，無記錄時回傳 None。"""
     records = get_weight_records(user_id)
@@ -514,6 +519,7 @@ def append_training(
     ws.append_row(row, value_input_option="USER_ENTERED")
 
 
+@st.cache_data(ttl=CACHE_TTL)
 def get_training_records(user_id: str | None = None) -> list[dict[str, Any]]:
     """取得訓練記錄，可依 user_id 篩選。"""
     sh = _get_sheet()
@@ -599,6 +605,7 @@ def append_note(timestamp: str, user_id: str, coach_id: str, note: str) -> None:
     ws.append_row(row, value_input_option="USER_ENTERED")
 
 
+@st.cache_data(ttl=CACHE_TTL)
 def get_notes(user_id: str | None = None) -> list[dict[str, Any]]:
     """取得教練備註，可依 user_id 篩選。"""
     sh = _get_sheet()

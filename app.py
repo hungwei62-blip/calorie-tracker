@@ -174,6 +174,16 @@ def _clear_analysis_cache() -> None:
     except Exception:
 
         pass
+    # 清掉 services/sheets.py 內被快取的讀取函式
+    for fn_name in ("get_records", "get_weight_records", "get_training_records", "get_notes", "get_latest_weight"):
+        fn = getattr(sheets, fn_name, None)
+        if fn is None:
+            continue
+        try:
+            fn.clear()
+        except Exception:
+            pass
+
 
 def _run_analysis(image_bytes, content_type, text):
 
