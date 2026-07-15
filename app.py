@@ -1,1139 +1,1650 @@
-"""AI 健身教練管理系統 Web App
-
-健身教練管理學員的飲食、訓練、體重記錄系統。
-使用 Streamlit + Gemini 2.5 Flash + Google Sheets + Firebase Storage。
-"""
-
-from __future__ import annotations
-
-from datetime import date, datetime, timedelta
-from io import BytesIO
-
-import streamlit as st
-from PIL import Image
-
-from services import auth, firebase, gemini, metrics, sheets
-
-# ---------- 常數 ----------
-MEAL_TYPES = ["早餐", "午餐", "晚餐", "宵夜", "喝水"]
-MEAL_EMOJI = {"早餐": "🌅", "午餐": "☀️", "晚餐": "🌙", "宵夜": "🌛", "喝水": "💧"}
-NUTRIENT_KEYS = ("calorie", "protein", "carb", "fat")
-CACHE_TTL = 60
-DEFAULT_GOALS = {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
-
-# TDEE 活動係數
-TDEE_MULTIPLIERS = {
-    "幾乎不動": 1.2,
-    "每週運動 1-3 天": 1.375,
-    "每週運動 3-5 天": 1.55,
-    "每週運動 6-7 天": 1.72,
-    "每天激烈運動": 1.9,
-}
-
-# 訓練項目
-TRAINING_TYPES = ["背", "胸", "腿", "核心", "有氧"]
-TRAINING_EMOJI = {"背": "🏋️", "胸": "🏋️", "腿": "🦵", "核心": "🎯", "有氧": "🏃"}
-
-
-# ---------- TDEE 計算 ----------
-def _calculate_bmr(weight: float, height: float, age: int, gender: str) -> float:
-    if gender == "男":
-        return 66 + (13.7 * weight) + (5.0 * height) - (6.8 * age)
-    else:
-        return 655 + (9.6 * weight) + (1.8 * height) - (4.7 * age)
-
-
-def _calculate_tdee(bmr: float, exercise_level: str) -> float:
-    multiplier = TDEE_MULTIPLIERS.get(exercise_level, 1.2)
-    return bmr * multiplier
-
-
-def _calculate_goals(weight: float, tdee: float, goal_type: str = "維持") -> dict[str, float]:
-    protein = weight * 2
-    fat = weight * 0.8
-    carb = ((tdee - 100) - (protein * 4) - (fat * 9)) / 4
-    water = weight * 40
-    
-    if goal_type == "減脂":
-        calorie = tdee - 300
-    elif goal_type == "增肌":
-        calorie = tdee + 300
-    else:
-        calorie = tdee
-    
-    return {
-        "bmr": 0,
-        "calorie": max(0, calorie),
-        "protein": protein,
-        "carb": max(0, carb),
-        "fat": fat,
-        "water": water,
-    }
-
-
-# ---------- Session 初始化 ----------
-def init_session() -> None:
-    defaults = {
-        "user_id": None,
-        "username": None,
-        "role": None,
-        "page": "個人",
-        "pending_meal_type": None,
-        "input_mode": None,
-        "pending_analysis": None,
-        "pending_student_id": None,
-        "is_coach_adding": False,
-    }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
-
-
-@st.cache_data(ttl=CACHE_TTL)
-def _fetch_records_cached(user_id: str) -> list:
-    return sheets.get_records(user_id=user_id)
-
-
-@st.cache_data(ttl=CACHE_TTL)
-def _fetch_goals_cached(user_id: str) -> dict:
-    return sheets.get_user_goals(user_id)
-
-
-def _clear_analysis_cache() -> None:
-    try:
-        _fetch_records_cached.clear()
-    except Exception:
-        pass
-    try:
-        _fetch_goals_cached.clear()
-    except Exception:
-        pass
-
-
-def _run_analysis(image_bytes, content_type, text):
-    if image_bytes is not None:
-        image = Image.open(BytesIO(image_bytes))
-        if image.mode != "RGB":
-            image = image.convert("RGB")
-        return gemini.analyze_image(image)
-    return gemini.analyze_text(text)
-
-
-def _today_range() -> tuple:
-    today = date.today()
-    return today, today
-
-
-def _week_range() -> tuple:
-    today = date.today()
-    start = metrics.week_start(today)
-    return start, today
-
-# =============================================================================
-# 教練端頁面
-# =============================================================================
-
-def page_coach_overview() -> None:
-    st.header("👥 所有學員總覽")
-    
-    try:
-        students = sheets.get_all_students()
-    except Exception as exc:
-        st.error("取得學員列表失敗: " + str(exc))
-        return
-    
-    if not students:
-        st.info("目前沒有學員，請點擊左側「新增學員」建立第一位學員！")
-        return
-    
-    today = date.today()
-    overview_data = []
-    
-    for student in students:
-        uid = student.get("user_id", "")
-        name = student.get("username", "未知")
-        goals = sheets.get_user_goals(uid)
-        today_records = sheets.get_records_by_date(uid, today)
-        totals = metrics.sum_totals(today_records).as_dict()
-        training_today = sheets.get_training_by_date(uid, today)
-        has_training = training_today is not None and any(v == 1 for v in training_today.values()) if training_today else False
-        latest_weight = sheets.get_latest_weight(uid)
-        
-        calorie_goal = goals.get("calorie", 0)
-        protein_goal = goals.get("protein", 0)
-        water_goal = goals.get("water", 0)
-        
-        calorie_actual = totals.get("calorie", 0)
-        protein_actual = totals.get("protein", 0)
-        water_actual = totals.get("water", 0)
-        
-        cal_pct = (calorie_actual / calorie_goal * 100) if calorie_goal > 0 else 0
-        pro_pct = (protein_actual / protein_goal * 100) if protein_goal > 0 else 0
-        water_pct = (water_actual / water_goal * 100) if water_goal > 0 else 0
-        
-        overview_data.append({
-            "姓名": name,
-            "蛋白質": f"{protein_actual:.0f}/{protein_goal:.0f}g",
-            "蛋白質%": pro_pct,
-            "熱量": f"{calorie_actual:.0f}/{calorie_goal:.0f}",
-            "熱量%": cal_pct,
-            "水量": f"{water_actual:.0f}/{water_goal:.0f}ml",
-            "水量%": water_pct,
-            "訓練": "✅" if has_training else "❌",
-            "體重": f"{latest_weight:.1f}kg" if latest_weight else "-",
-            "user_id": uid,
-        })
-    
-    if overview_data:
-        display_data = [{k: v for k, v in row.items() if k != "user_id"} for row in overview_data]
-        st.dataframe(display_data, use_container_width=True, hide_index=True)
-        
-        st.divider()
-        st.subheader("📋 學員詳細操作")
-        
-        cols = st.columns(3)
-        for idx, row in enumerate(overview_data):
-            with cols[idx % 3]:
-                uid = row["user_id"]
-                name = row["姓名"]
-                if st.button(f"管理 {name}", key=f"manage_{uid}", use_container_width=True):
-                    st.session_state["view_student_id"] = uid
-                    st.session_state.page = "學員資料"
-                    st.rerun()
-
-
-def page_coach_student_detail() -> None:
-    uid = st.session_state.get("view_student_id")
-    if not uid:
-        st.error("未指定學員")
-        return
-    
-    student = sheets.get_student_by_id(uid)
-    if not student:
-        st.error("找不到學員")
-        return
-    
-    st.header(f"📋 學員：{student.get('username', '未知')}")
-    
-    if st.button("← 返回總覽"):
-        st.session_state.page = "教練總覽"
-        st.session_state.pop("view_student_id", None)
-        st.rerun()
-    
-    st.divider()
-    
-    goals = sheets.get_user_goals(uid)
-    today = date.today()
-    today_records = sheets.get_records_by_date(uid, today)
-    totals = metrics.sum_totals(today_records).as_dict()
-    
-    st.subheader("📊 今日摘要")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        cal = totals.get("calorie", 0)
-        st.metric("熱量", f"{cal:.0f}", f"{goals.get('calorie', 0) - cal:.0f}")
-    with col2:
-        pro = totals.get("protein", 0)
-        st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
-    with col3:
-        water = totals.get("water", 0)
-        st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
-    with col4:
-        weight = sheets.get_latest_weight(uid)
-        st.metric("體重", f"{weight:.1f}kg" if weight else "-", delta=None)
-    
-    st.divider()
-    
-    st.subheader("⚙️ 修改營養目標")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        new_calorie = st.number_input("每日熱量目標 (kcal)", value=float(goals.get("calorie", 2000)), step=50.0)
-        new_protein = st.number_input("每日蛋白質目標 (g)", value=float(goals.get("protein", 60)), step=5.0)
-    with col2:
-        new_carb = st.number_input("每日碳水目標 (g)", value=float(goals.get("carb", 250)), step=10.0)
-        new_fat = st.number_input("每日脂肪目標 (g)", value=float(goals.get("fat", 65)), step=5.0)
-        new_water = st.number_input("每日水量目標 (ml)", value=float(goals.get("water", 2000)), step=100.0)
-    
-    if st.button("儲存目標修改"):
-        try:
-            sheets.update_user_goals(uid, {
-                "calorie": new_calorie,
-                "protein": new_protein,
-                "carb": new_carb,
-                "fat": new_fat,
-                "water": new_water,
-            })
-            _clear_analysis_cache()
-            st.success("目標已更新！")
-            st.rerun()
-        except Exception as exc:
-            st.error("更新失敗: " + str(exc))
-    
-    st.divider()
-    
-    st.subheader("📈 體重趨勢")
-    weight_records = sheets.get_weight_records(uid)
-    if weight_records:
-        weight_data = {"日期": [], "體重 (kg)": []}
-        for r in weight_records[-14:]:
-            weight_data["日期"].append(r.get("timestamp", "")[:10])
-            weight_data["體重 (kg)"].append(r.get("weight_kg", 0))
-        st.line_chart(weight_data, x="日期", y="體重 (kg)")
-    else:
-        st.info("尚無體重記錄")
-
-
-def page_coach_register_student() -> None:
-    st.header("➕ 新增學員")
-    
-    if not st.session_state.get("is_coach_adding", False):
-        st.info("請先驗證教練身份")
-        with st.form("verify_coach"):
-            coach_user = st.text_input("教練帳號")
-            coach_pwd = st.text_input("教練密碼", type="password")
-            verified = st.form_submit_button("驗證")
-        
-        if verified:
-            try:
-                rows = sheets.get_users_rows()
-                coach = auth.find_user(rows, coach_user)
-                if not coach:
-                    st.error("找不到教練帳號")
-                    return
-                if not auth.verify_password(coach_pwd, coach.get("password_hash", "")):
-                    st.error("教練密碼錯誤")
-                    return
-                coach_role = sheets.get_user_role(str(coach.get("user_id") or ""))
-                if coach_role != "coach":
-                    st.error("此帳號不是教練")
-                    return
-                st.session_state.is_coach_adding = True
-                st.success("驗證成功！")
-                st.rerun()
-            except Exception as exc:
-                st.error("驗證失敗: " + str(exc))
-        return
-    
-    with st.form("student_register"):
-        st.subheader("學員資料")
-        new_user = st.text_input("學員帳號", placeholder="輸入學員帳號")
-        new_pwd = st.text_input("初始密碼", type="password")
-        new_pwd2 = st.text_input("確認密碼", type="password")
-        
-        st.subheader("營養目標")
-        col1, col2 = st.columns(2)
-        with col1:
-            calorie = st.number_input("熱量 (kcal)", value=1800.0, step=50.0)
-            protein = st.number_input("蛋白質 (g)", value=120.0, step=5.0)
-        with col2:
-            carb = st.number_input("碳水 (g)", value=200.0, step=10.0)
-            fat = st.number_input("脂肪 (g)", value=60.0, step=5.0)
-        water = st.number_input("水量 (ml)", value=2500.0, step=100.0)
-        weekly = st.number_input("每週訓練次數", value=4, min_value=1, max_value=7)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            submitted = st.form_submit_button("建立學員", use_container_width=True)
-        with col2:
-            if st.button("取消", use_container_width=True):
-                st.session_state.is_coach_adding = False
-                st.rerun()
-    
-    if submitted:
-        if not new_user or not new_pwd:
-            st.error("帳號和密碼不能為空")
-            return
-        if new_pwd != new_pwd2:
-            st.error("兩次密碼不一致")
-            return
-        
-        try:
-            rows = sheets.get_users_rows()
-            if auth.find_user(rows, new_user):
-                st.error("帳號已被使用")
-                return
-            
-            uid = auth.make_user_id()
-            pwd_hash = auth.hash_password(new_pwd)
-            goals = {"calorie": calorie, "protein": protein, "carb": carb, "fat": fat, "water": water}
-            sheets.append_user(uid, new_user, pwd_hash, auth.now_iso(), goals, "simple", weekly)
-            st.success(f"學員「{new_user}」已建立！")
-            st.session_state.is_coach_adding = False
-        except Exception as exc:
-            st.error("建立失敗: " + str(exc))
-# =============================================================================
-# 學員端：TDEE 問卷
-# =============================================================================
-
-def page_tdee_questionnaire() -> None:
-    st.header("📋 設定你的營養目標")
-    st.caption("回答以下問題，讓系統為你計算個人化的營養目標")
-    
-    with st.form("tdee_form"):
-        st.subheader("基本資料")
-        col1, col2 = st.columns(2)
-        with col1:
-            weight = st.number_input("體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=200.0)
-            height = st.number_input("身高 (cm)", value=165.0, step=0.1, min_value=100.0, max_value=250.0)
-        with col2:
-            age = st.number_input("年齡", value=25, step=1, min_value=10, max_value=100)
-            gender = st.radio("性別", ["男", "女"], horizontal=True)
-        
-        st.subheader("運動習慣")
-        exercise_level = st.selectbox("每週運動頻率", list(TDEE_MULTIPLIERS.keys()), index=1)
-        
-        st.subheader("飲食目標")
-        goal_type = st.radio("你的目標是？", ["減脂", "維持", "增肌"], horizontal=True, index=1)
-        
-        st.subheader("記錄模式")
-        record_mode = st.radio(
-            "選擇飲食記錄模式",
-            ["簡易模式（蛋白質/熱量/水量）", "完整模式（蛋白質/碳水/脂肪/熱量/水量）"],
-            horizontal=False,
-        )
-        mode = "simple" if "簡易" in record_mode else "full"
-        
-        submitted = st.form_submit_button("計算並儲存目標", use_container_width=True)
-    
-    if submitted:
-        bmr = _calculate_bmr(weight, height, age, gender)
-        tdee = _calculate_tdee(bmr, exercise_level)
-        goals = _calculate_goals(weight, tdee, goal_type)
-        goals["bmr"] = bmr
-        
-        try:
-            uid = st.session_state.user_id
-            sheets.update_user_bmr(uid, bmr)
-            sheets.update_user_goals(uid, goals)
-            sheets.set_user_record_mode(uid, mode)
-            
-            if mode == "simple":
-                sheets.update_user_goals(uid, {"carb": 0.0, "fat": 0.0})
-            
-            _clear_analysis_cache()
-            st.success("目標設定完成！")
-            st.balloons()
-            st.session_state.page = "個人"
-            st.rerun()
-        except Exception as exc:
-            st.error("儲存失敗: " + str(exc))
-
-
-# =============================================================================
-# 登入頁面
-# =============================================================================
-
-def page_login() -> None:
-    st.title("💪 健身教練管理系統")
-    st.caption("教練管理學員的飲食、訓練、體重記錄")
-    
-    tab_login, tab_coach = st.tabs(["登入", "教練新增學員"])
-    
-    with tab_login:
-        with st.form("login_form"):
-            username = st.text_input("帳號", key="login_user")
-            password = st.text_input("密碼", type="password", key="login_pwd")
-            submit = st.form_submit_button("登入", use_container_width=True)
-        
-        if submit:
-            try:
-                rows = sheets.get_users_rows()
-            except Exception as exc:
-                st.error("取得使用者失敗: " + str(exc))
-                return
-            user = auth.find_user(rows, username)
-            if not user:
-                st.error("找不到此帳號")
-                return
-            if not auth.verify_password(password, user.get("password_hash", "")):
-                st.error("密碼錯誤")
-                return
-            
-            st.session_state.user_id = user.get("user_id")
-            st.session_state.username = user.get("username")
-            st.session_state.role = sheets.get_user_role(str(user.get("user_id") or ""))
-            st.success("登入成功！")
-            st.rerun()
-    
-    with tab_coach:
-        st.info("教練請在此建立新學員帳號")
-        
-        with st.form("coach_add_form"):
-            st.subheader("教練驗證")
-            coach_user = st.text_input("教練帳號", key="coach_user")
-            coach_pwd = st.text_input("教練密碼", type="password", key="coach_pwd")
-            add_submitted = st.form_submit_button("驗證並新增學員", use_container_width=True)
-        
-        if add_submitted:
-            try:
-                rows = sheets.get_users_rows()
-            except Exception as exc:
-                st.error("取得使用者失敗: " + str(exc))
-                return
-            
-            coach = auth.find_user(rows, coach_user)
-            if not coach:
-                st.error("找不到教練帳號")
-                return
-            if not auth.verify_password(coach_pwd, coach.get("password_hash", "")):
-                st.error("教練密碼錯誤")
-                return
-            
-            coach_role = sheets.get_user_role(str(coach.get("user_id") or ""))
-            if coach_role != "coach":
-                st.error("此帳號不是教練帳號")
-                return
-            
-            st.session_state.is_coach_adding = True
-            st.success("驗證成功！請填寫下方學員資料")
-            st.rerun()
-        
-        if st.session_state.get("is_coach_adding", False):
-            st.divider()
-            st.subheader("📝 新學員資料")
-            
-            with st.form("new_student_form"):
-                new_user = st.text_input("學員帳號", placeholder="輸入學員帳號")
-                new_pwd = st.text_input("初始密碼", type="password")
-                new_pwd2 = st.text_input("確認密碼", type="password")
-                
-                st.subheader("營養目標")
-                col1, col2 = st.columns(2)
-                with col1:
-                    calorie = st.number_input("熱量 (kcal)", value=1800.0, step=50.0)
-                    protein = st.number_input("蛋白質 (g)", value=120.0, step=5.0)
-                with col2:
-                    carb = st.number_input("碳水 (g)", value=200.0, step=10.0)
-                    fat = st.number_input("脂肪 (g)", value=60.0, step=5.0)
-                water = st.number_input("水量 (ml)", value=2500.0, step=100.0)
-                weekly = st.number_input("每週訓練次數", value=4, min_value=1, max_value=7)
-                
-                student_submitted = st.form_submit_button("建立學員", use_container_width=True)
-            
-            if student_submitted:
-                if not new_user or not new_pwd:
-                    st.error("帳號和密碼不能為空")
-                    return
-                if new_pwd != new_pwd2:
-                    st.error("兩次密碼不一致")
-                    return
-                
-                try:
-                    rows = sheets.get_users_rows()
-                    if auth.find_user(rows, new_user):
-                        st.error("帳號已被使用")
-                        return
-                    
-                    uid = auth.make_user_id()
-                    pwd_hash = auth.hash_password(new_pwd)
-                    goals = {"calorie": calorie, "protein": protein, "carb": carb, "fat": fat, "water": water}
-                    sheets.append_user(uid, new_user, pwd_hash, auth.now_iso(), goals, "simple", weekly)
-                    st.success(f"學員「{new_user}」已建立！")
-                    st.session_state.is_coach_adding = False
-                    st.rerun()
-                except Exception as exc:
-                    st.error("建立失敗: " + str(exc))
-# =============================================================================
-# 學員端：個人頁面
-# =============================================================================
-
-def page_personal() -> None:
-    st.header("📊 今日摘要")
-    uid = st.session_state.user_id
-    
-    try:
-        records = _fetch_records_cached(uid)
-        goals = _fetch_goals_cached(uid)
-    except Exception as exc:
-        st.error("取得資料失敗: " + str(exc))
-        return
-    
-    bmr = goals.get("bmr", 0)
-    calorie_goal = goals.get("calorie", 0)
-    
-    if bmr <= 0 or calorie_goal <= 0:
-        st.warning("你尚未設定營養目標")
-        st.info("請先回答 TDEE 問卷，系統會為你計算個人化的營養目標")
-        if st.button("前往 TDEE 問卷", use_container_width=True):
-            st.session_state.page = "TDEE 問卷"
-            st.rerun()
-        return
-    
-    ws, we = _today_range()
-    today_records = metrics.filter_records(records, ws, we)
-    totals = metrics.sum_totals(today_records).as_dict()
-    
-    st.subheader("個人資訊")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
-    with col2:
-        st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
-    with col3:
-        record_mode = sheets.get_user_record_mode(uid)
-        st.metric("記錄模式", "簡易" if record_mode == "simple" else "完整")
-    
-    st.divider()
-    st.subheader("今日營養攝取")
-    
-    if record_mode == "full":
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            cal = totals.get("calorie", 0)
-            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
-        with col2:
-            pro = totals.get("protein", 0)
-            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
-        with col3:
-            carb = totals.get("carb", 0)
-            st.metric("碳水", f"{carb:.0f}g", f"{goals.get('carb', 0) - carb:.0f}g")
-        with col4:
-            fat = totals.get("fat", 0)
-            st.metric("脂肪", f"{fat:.0f}g", f"{goals.get('fat', 0) - fat:.0f}g")
-        with col5:
-            water = totals.get("water", 0)
-            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
-    else:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            cal = totals.get("calorie", 0)
-            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
-        with col2:
-            pro = totals.get("protein", 0)
-            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
-        with col3:
-            water = totals.get("water", 0)
-            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
-    
-    st.divider()
-    st.subheader("✅ 今日完成率")
-    
-    cal_ratio = min(totals.get("calorie", 0) / calorie_goal, 1.5) if calorie_goal > 0 else 0
-    pro_ratio = min(totals.get("protein", 0) / goals.get("protein", 1), 1.5) if goals.get("protein", 0) > 0 else 0
-    water_ratio = min(totals.get("water", 0) / goals.get("water", 1), 1.5) if goals.get("water", 0) > 0 else 0
-    
-    today = date.today()
-    has_training = sheets.has_training_today(uid, today)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown("**🍽️ 飲食**")
-        pct = cal_ratio * 100
-        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
-        st.markdown(f"{emoji} {pct:.0f}%")
-        st.progress(min(cal_ratio, 1.0))
-    with col2:
-        st.markdown("**💧 水量**")
-        pct = water_ratio * 100
-        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
-        st.markdown(f"{emoji} {pct:.0f}%")
-        st.progress(min(water_ratio, 1.0))
-    with col3:
-        st.markdown("**🏋️ 訓練**")
-        emoji = "✅" if has_training else "❌"
-        st.markdown(f"{emoji} {'已訓練' if has_training else '未訓練'}")
-        st.progress(1.0 if has_training else 0.0)
-    with col4:
-        st.markdown("**🥩 蛋白質**")
-        pct = pro_ratio * 100
-        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
-        st.markdown(f"{emoji} {pct:.0f}%")
-        st.progress(min(pro_ratio, 1.0))
-    
-    st.divider()
-    st.subheader("⚖️ 體重")
-    latest_weight = sheets.get_latest_weight(uid)
-    if latest_weight:
-        st.metric("最新體重", f"{latest_weight:.1f} kg")
-    else:
-        st.info("尚未記錄體重")
-    
-    if st.button("記錄今日體重"):
-        st.session_state.page = "體重記錄"
-        st.rerun()
-
-
-# =============================================================================
-# 學員端：體重記錄
-# =============================================================================
-
-def page_weight() -> None:
-    st.header("⚖️ 體重記錄")
-    uid = st.session_state.user_id
-    
-    with st.form("weight_form"):
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            weight = st.number_input("今日體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=300.0)
-        with col2:
-            st.write("")
-            submitted = st.form_submit_button("儲存", use_container_width=True)
-        
-        if submitted:
-            try:
-                sheets.append_weight(timestamp=datetime.now().strftime("%Y-%m-%d"), user_id=uid, weight_kg=weight)
-                st.success("體重已記錄！")
-                st.rerun()
-            except Exception as exc:
-                st.error("儲存失敗: " + str(exc))
-    
-    st.divider()
-    st.subheader("📈 體重趨勢")
-    weight_records = sheets.get_weight_records(uid)
-    
-    if weight_records:
-        weight_data = {"日期": [], "體重 (kg)": []}
-        for r in weight_records[-30:]:
-            weight_data["日期"].append(r.get("timestamp", "")[:10])
-            weight_data["體重 (kg)"].append(r.get("weight_kg", 0))
-        st.line_chart(weight_data, x="日期", y="體重 (kg)")
-        
-        if len(weight_data["體重 (kg)"]) >= 2:
-            weights = weight_data["體重 (kg)"]
-            change = weights[-1] - weights[0]
-            st.caption(f"起始：{weights[0]:.1f}kg → 目前：{weights[-1]:.1f}kg（{change:+.1f}kg）")
-    else:
-        st.info("尚無體重記錄")
-
-
-# =============================================================================
-# 學員端：訓練記錄
-# =============================================================================
-
-def page_training() -> None:
-    st.header("🏋️ 訓練記錄")
-    uid = st.session_state.user_id
-    
-    today = date.today()
-    today_str = today.isoformat()
-    today_training = sheets.get_training_by_date(uid, today)
-    
-    with st.form("training_form"):
-        st.subheader(f"📅 {today.strftime('%Y/%m/%d')} 訓練項目")
-        
-        cols = st.columns(len(TRAINING_TYPES))
-        training_values = {}
-        for idx, t_type in enumerate(TRAINING_TYPES):
-            with cols[idx]:
-                emoji = TRAINING_EMOJI.get(t_type, "")
-                default = today_training.get(t_type.lower(), 0) if today_training else 0
-                checked = st.checkbox(f"{emoji} {t_type}", value=bool(default))
-                training_values[t_type.lower()] = 1 if checked else 0
-        
-        submitted = st.form_submit_button("儲存訓練記錄", use_container_width=True)
-    
-    if submitted:
-        try:
-            sheets.update_training(
-                timestamp=today_str, user_id=uid,
-                training_back=training_values.get("背", 0),
-                training_chest=training_values.get("胸", 0),
-                training_legs=training_values.get("腿", 0),
-                training_core=training_values.get("核心", 0),
-                training_cardio=training_values.get("有氧", 0),
-            )
-            st.success("訓練記錄已儲存！")
-            st.rerun()
-        except Exception as exc:
-            st.error("儲存失敗: " + str(exc))
-    
-    st.divider()
-    st.subheader("📅 本週訓練回顧")
-    ws, we = _week_range()
-    
-    training_data = []
-    for i in range((we - ws).days + 1):
-        d = ws + timedelta(days=i)
-        training = sheets.get_training_by_date(uid, d)
-        if training and any(v == 1 for v in training.values()):
-            items = [TRAINING_EMOJI.get(t, "") + t for t, v in training.items() if v == 1]
-            training_data.append({"日期": d.strftime("%m/%d"), "訓練項目": " ".join(items)})
-    
-    if training_data:
-        st.dataframe(training_data, use_container_width=True, hide_index=True)
-    else:
-        st.info("本週尚無訓練記錄")
-# =============================================================================
-# 學員端：記錄飲食
-# =============================================================================
-
-def page_log_meal() -> None:
-    st.header("🍽️ 記錄飲食")
-    uid = st.session_state.user_id
-    
-    record_mode = sheets.get_user_record_mode(uid)
-    meal_type = st.selectbox("餐點類型", MEAL_TYPES)
-    
-    st.subheader("選擇輸入方式")
-    input_mode = st.radio(
-        "輸入模式",
-        ["📝 文字輸入", "📷 拍照上傳", "📁 圖片上傳"],
-        horizontal=True,
-        label_visibility="collapsed",
-    )
-    
-    analysis_result = None
-    
-    if input_mode == "📝 文字輸入":
-        with st.form("text_input_form"):
-            food_text = st.text_area("輸入食物內容", placeholder="例如：雞腿便當 + 滷蛋 + 無糖豆漿", height=100)
-            submitted = st.form_submit_button("分析食物", use_container_width=True)
-        
-        if submitted and food_text:
-            with st.spinner("AI 分析中..."):
-                try:
-                    analysis_result = gemini.analyze_text(food_text)
-                except Exception as exc:
-                    st.error("分析失敗: " + str(exc))
-    
-    elif input_mode == "📷 拍照上傳":
-        camera_file = st.camera_input("拍攝食物照片")
-        if camera_file:
-            with st.spinner("AI 分析中..."):
-                try:
-                    analysis_result = gemini.analyze_image(Image.open(camera_file))
-                except Exception as exc:
-                    st.error("分析失敗: " + str(exc))
-    
-    else:
-        uploaded_file = st.file_uploader("上傳食物照片", type=["jpg", "jpeg", "png"])
-        if uploaded_file:
-            with st.spinner("AI 分析中..."):
-                try:
-                    analysis_result = gemini.analyze_image(Image.open(uploaded_file))
-                except Exception as exc:
-                    st.error("分析失敗: " + str(exc))
-    
-    if analysis_result:
-        st.divider()
-        st.subheader("📋 分析結果")
-        
-        cal = analysis_result.get("calories", 0)
-        pro = analysis_result.get("protein", 0)
-        carb = analysis_result.get("carb", 0)
-        fat = analysis_result.get("fat", 0)
-        
-        if record_mode == "full":
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("熱量", f"{cal:.0f} kcal")
-            with col2:
-                st.metric("蛋白質", f"{pro:.0f} g")
-            with col3:
-                st.metric("碳水", f"{carb:.0f} g")
-            with col4:
-                st.metric("脂肪", f"{fat:.0f} g")
-        else:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("熱量", f"{cal:.0f} kcal")
-            with col2:
-                st.metric("蛋白質", f"{pro:.0f} g")
-        
-        portion = st.slider("份量", 0.5, 3.0, 1.0, 0.1)
-        if portion != 1.0:
-            st.caption(f"× {portion} 份")
-        
-        water_ml = st.number_input("飲水量 (ml)", value=0, step=50, min_value=0)
-        
-        if st.button("✅ 存入今日記錄", use_container_width=True):
-            try:
-                sheets.append_record(
-                    timestamp=datetime.now().isoformat(),
-                    user_id=uid,
-                    meal_type=meal_type,
-                    food_summary=analysis_result.get("food_summary", ""),
-                    calories=cal * portion,
-                    protein=pro * portion,
-                    carb=carb * portion if record_mode == "full" else 0,
-                    fat=fat * portion if record_mode == "full" else 0,
-                    water_ml=water_ml,
-                    image_url="",
-                    portion=portion,
-                )
-                _clear_analysis_cache()
-                st.success("已存入今日記錄！")
-                st.rerun()
-            except Exception as exc:
-                st.error("儲存失敗: " + str(exc))
-
-
-# =============================================================================
-# 學員端：歷史記錄
-# =============================================================================
-
-def page_history() -> None:
-    st.header("📜 歷史記錄")
-    uid = st.session_state.user_id
-    
-    try:
-        records = _fetch_records_cached(uid)
-        goals = _fetch_goals_cached(uid)
-    except Exception as exc:
-        st.error("取得記錄失敗: " + str(exc))
-        return
-    
-    bmr = goals.get("bmr", 0)
-    calorie_goal = goals.get("calorie", 0)
-    
-    if bmr <= 0 or calorie_goal <= 0:
-        st.warning("你尚未設定營養目標")
-        return
-    
-    ws, we = _week_range()
-    days = (we - ws).days + 1
-    
-    st.subheader("本週每日達成率")
-    daily_data = []
-    for i in range(days):
-        d = ws + timedelta(days=i)
-        day_recs = metrics.filter_records(records, d, d)
-        day_totals = metrics.sum_totals(day_recs).as_dict()
-        
-        day_cal = float(day_totals.get("calorie", 0.0))
-        day_pro = float(day_totals.get("protein", 0.0))
-        
-        cal_ratio = (day_cal / calorie_goal) if calorie_goal > 0 else 0.0
-        pro_ratio = (day_pro / goals.get("protein", 1)) if goals.get("protein", 0) > 0 else 0.0
-        
-        date_str = d.strftime("%m/%d")
-        weekday = ["一", "二", "三", "四", "五", "六", "日"][d.weekday()]
-        
-        daily_data.append({
-            "日期": f"{date_str}({weekday})",
-            "熱量": f"{day_cal:.0f}",
-            "熱量目標": f"{calorie_goal:.0f}",
-            "熱量%": f"{cal_ratio:.0%}",
-            "蛋白質": f"{day_pro:.0f}g",
-            "蛋白質%": f"{pro_ratio:.0%}",
-        })
-    
-    st.dataframe(daily_data, use_container_width=True, hide_index=True)
-    
-    st.subheader("本週熱量達成率")
-    calorie_chart = {"日期": [], "達成率(%)": []}
-    for i in range(days):
-        d = ws + timedelta(days=i)
-        day_recs = metrics.filter_records(records, d, d)
-        day_totals = metrics.sum_totals(day_recs).as_dict()
-        day_cal = float(day_totals.get("calorie", 0.0))
-        cal_ratio = (day_cal / calorie_goal * 100) if calorie_goal > 0 else 0.0
-        calorie_chart["日期"].append(d.strftime("%m/%d"))
-        calorie_chart["達成率(%)"].append(min(cal_ratio, 100))
-    
-    st.bar_chart(calorie_chart, x="日期", y="達成率(%)")
-
-
-# =============================================================================
-# 學員端：TDEE 頁面
-# =============================================================================
-
-def page_tdee() -> None:
-    st.header("🧮 TDEE 計算機")
-    uid = st.session_state.user_id
-    
-    goals = sheets.get_user_goals(uid)
-    bmr = goals.get("bmr", 0)
-    calorie_goal = goals.get("calorie", 0)
-    
-    if bmr > 0:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
-        with col2:
-            st.metric("每日建議攝取", f"{calorie_goal:.0f} 大卡")
-        st.info("以上為你目前設定的目標，可由教練調整")
-    else:
-        st.warning("你尚未設定營養目標")
-        if st.button("前往 TDEE 問卷"):
-            st.session_state.page = "TDEE 問卷"
-            st.rerun()
-# =============================================================================
-# 主程式
-# =============================================================================
-
-def main() -> None:
-    st.set_page_config(page_title="健身教練管理系統", layout="wide")
-    
-    st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Line+Seed+JP:wght@400&display=swap');
-        
-        .stApp {
-            background-color: #FFFFFF !important;
-            color: #2F3E46 !important;
-            font-family: 'Line Seed JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-        }
-        
-        h1, h2, h3, h4, h5, h6 {
-            color: #2F3E46 !important;
-            font-weight: 400 !important;
-        }
-        
-        div[data-testid="stMetric"] {
-            background-color: #FFFFFF !important;
-            padding: 20px 24px !important;
-            border-radius: 16px !important;
-            box-shadow: 0 8px 24px rgba(149, 157, 165, 0.06) !important;
-        }
-        
-        div[data-testid="stMetric"] label {
-            color: #666 !important;
-        }
-        
-        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-            color: #2F3E46 !important;
-        }
-        
-        div[data-testid="stSidebar"] {
-            background-color: #F8F9FA !important;
-        }
-        
-        div.stButton > button {
-            background-color: #4A7C59 !important;
-            color: #FFFFFF !important;
-            border-radius: 12px !important;
-            border: none !important;
-            padding: 0.5rem 1rem !important;
-        }
-        
-        div.stButton > button:hover {
-            background-color: #385E43 !important;
-        }
-        
-        div[data-testid="stFormSubmitButton"] button {
-            background-color: #4A7C59 !important;
-            color: #FFFFFF !important;
-            border-radius: 12px !important;
-            border: none !important;
-            padding: 0.6rem 2rem !important;
-        }
-        
-        div[data-testid="stFormSubmitButton"] button:hover {
-            background-color: #385E43 !important;
-        }
-        
-        div[data-testid="stTabs"] button[aria-selected="true"] {
-            background-color: #4A7C59 !important;
-            color: #FFFFFF !important;
-        }
-        
-        body, .stApp, .stApp > div, .main, .main > div,
-        .block-container, section.main > div,
-        [data-testid="stSidebar"], [data-testid="stSidebarContent"],
-        div[data-testid="stVerticalBlock"], div[data-testid="stHorizontalBlock"],
-        .stTabs, div[data-testid="stTabContent"],
-        .stForm, [data-testid="stFormSubmitButton"] {
-            background-color: #FFFFFF !important;
-        }
-        
-        [data-testid="stTabsContent"] {
-            background-color: #FFFFFF !important;
-        }
-        
-        .stTabs * {
-            background-color: #FFFFFF !important;
-        }
-        
-        div[data-testid="stProgressBar"] > div > div {
-            background-color: #4A7C59 !important;
-        }
-        
-        @media (max-width: 768px) {
-            div[data-testid="stMetric"] {
-                margin-bottom: 12px !important;
-                padding: 16px !important;
-            }
-            
-            [data-testid="stSidebar"] {
-                width: 220px !important;
-                min-width: 220px !important;
-            }
-            
-            .stColumns > div {
-                flex-wrap: wrap !important;
-            }
-            
-            h1 { font-size: 1.5rem !important; }
-            h2 { font-size: 1.3rem !important; }
-            h3 { font-size: 1.1rem !important; }
-            
-            div.stButton > button,
-            div[data-testid="stFormSubmitButton"] button {
-                width: 100% !important;
-            }
-        }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    init_session()
-    
-    if not st.session_state.user_id:
-        page_login()
-        return
-    
-    role = st.session_state.get("role", "student")
-    is_coach = (role == "coach")
-    
-    coach_pages = ["教練總覽", "新增學員", "學員資料"]
-    student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
-    
-    with st.sidebar:
-        uname = str(st.session_state.username or "")
-        role_label = "教練" if is_coach else "學員"
-        st.write(f"👤 {uname} ({role_label})")
-        
-        if is_coach:
-            available = coach_pages
-            default_idx = coach_pages.index(st.session_state.page) if st.session_state.page in coach_pages else 0
-        else:
-            available = student_pages
-            default_idx = student_pages.index(st.session_state.page) if st.session_state.page in student_pages else 0
-        
-        page = st.radio("導航", available, index=default_idx)
-        st.session_state.page = page
-        
-        if st.button("登出", use_container_width=True):
-            for k in list(st.session_state.keys()):
-                if k != "page":
-                    del st.session_state[k]
-            st.session_state.user_id = None
-            st.session_state.username = None
-            st.rerun()
-    
-    if is_coach:
-        if page == "教練總覽":
-            page_coach_overview()
-        elif page == "新增學員":
-            page_coach_register_student()
-        elif page == "學員資料":
-            page_coach_student_detail()
-    else:
-        if page not in ["TDEE 問卷", "個人"]:
-            goals_check = sheets.get_user_goals(st.session_state.user_id)
-            if goals_check.get("bmr", 0) <= 0 or goals_check.get("calorie", 0) <= 0:
-                st.warning("請先設定營養目標")
-                if st.button("前往 TDEE 問卷"):
-                    st.session_state.page = "TDEE 問卷"
-                    st.rerun()
-                return
-        
-        if page == "個人":
-            page_personal()
-        elif page == "記錄飲食":
-            page_log_meal()
-        elif page == "歷史":
-            page_history()
-        elif page == "體重記錄":
-            page_weight()
-        elif page == "訓練記錄":
-            page_training()
-        elif page == "TDEE":
-            page_tdee()
-        elif page == "TDEE 問卷":
-            page_tdee_questionnaire()
-
-
-if __name__ == "__main__":
-    main()
+"""AI 健身教練管理系統 Web App
+
+健身教練管理學員的飲食、訓練、體重記錄系統。
+
+使用 Streamlit + Gemini 2.5 Flash + Google Sheets + Firebase Storage。
+
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+
+from io import BytesIO
+
+import streamlit as st
+
+from PIL import Image
+
+from services import auth, firebase, gemini, metrics, sheets
+
+# ---------- 常數 ----------
+
+MEAL_TYPES = ["早餐", "午餐", "晚餐", "宵夜", "喝水"]
+
+MEAL_EMOJI = {"早餐": "🌅", "午餐": "☀️", "晚餐": "🌙", "宵夜": "🌛", "喝水": "💧"}
+
+NUTRIENT_KEYS = ("calorie", "protein", "carb", "fat")
+
+CACHE_TTL = 60
+
+DEFAULT_GOALS = {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
+
+# TDEE 活動係數
+
+TDEE_MULTIPLIERS = {
+
+    "幾乎不動": 1.2,
+
+    "每週運動 1-3 天": 1.375,
+
+    "每週運動 3-5 天": 1.55,
+
+    "每週運動 6-7 天": 1.72,
+
+    "每天激烈運動": 1.9,
+
+}
+
+# 訓練項目
+
+TRAINING_TYPES = ["背", "胸", "腿", "核心", "有氧"]
+
+TRAINING_EMOJI = {"背": "🏋️", "胸": "🏋️", "腿": "🦵", "核心": "🎯", "有氧": "🏃"}
+
+# ---------- TDEE 計算 ----------
+
+def _calculate_bmr(weight: float, height: float, age: int, gender: str) -> float:
+
+    if gender == "男":
+
+        return 66 + (13.7 * weight) + (5.0 * height) - (6.8 * age)
+
+    else:
+
+        return 655 + (9.6 * weight) + (1.8 * height) - (4.7 * age)
+
+def _calculate_tdee(bmr: float, exercise_level: str) -> float:
+
+    multiplier = TDEE_MULTIPLIERS.get(exercise_level, 1.2)
+
+    return bmr * multiplier
+
+def _calculate_goals(weight: float, tdee: float, goal_type: str = "維持") -> dict[str, float]:
+
+    protein = weight * 2
+
+    fat = weight * 0.8
+
+    carb = ((tdee - 100) - (protein * 4) - (fat * 9)) / 4
+
+    water = weight * 40
+
+    if goal_type == "減脂":
+
+        calorie = tdee - 300
+
+    elif goal_type == "增肌":
+
+        calorie = tdee + 300
+
+    else:
+
+        calorie = tdee
+
+    return {
+
+        "bmr": 0,
+
+        "calorie": max(0, calorie),
+
+        "protein": protein,
+
+        "carb": max(0, carb),
+
+        "fat": fat,
+
+        "water": water,
+
+    }
+
+# ---------- Session 初始化 ----------
+
+def init_session() -> None:
+
+    defaults = {
+
+        "user_id": None,
+
+        "username": None,
+
+        "role": None,
+
+        "page": "個人",
+
+        "pending_meal_type": None,
+
+        "input_mode": None,
+
+        "pending_analysis": None,
+
+        "pending_student_id": None,
+        "needs_tdee_setup": False,
+
+    }
+
+    for key, value in defaults.items():
+
+        if key not in st.session_state:
+
+            st.session_state[key] = value
+
+@st.cache_data(ttl=CACHE_TTL)
+
+def _fetch_records_cached(user_id: str) -> list:
+
+    return sheets.get_records(user_id=user_id)
+
+@st.cache_data(ttl=CACHE_TTL)
+
+def _fetch_goals_cached(user_id: str) -> dict:
+
+    return sheets.get_user_goals(user_id)
+
+def _clear_analysis_cache() -> None:
+
+    try:
+
+        _fetch_records_cached.clear()
+
+    except Exception:
+
+        pass
+
+    try:
+
+        _fetch_goals_cached.clear()
+
+    except Exception:
+
+        pass
+
+def _run_analysis(image_bytes, content_type, text):
+
+    if image_bytes is not None:
+
+        image = Image.open(BytesIO(image_bytes))
+
+        if image.mode != "RGB":
+
+            image = image.convert("RGB")
+
+        return gemini.analyze_image(image)
+
+    return gemini.analyze_text(text)
+
+def _today_range() -> tuple:
+
+    today = date.today()
+
+    return today, today
+
+def _week_range() -> tuple:
+
+    today = date.today()
+
+    start = metrics.week_start(today)
+
+    return start, today
+
+# =============================================================================
+
+# 教練端頁面
+
+# =============================================================================
+
+def page_coach_overview() -> None:
+
+    st.header("👥 所有學員總覽")
+
+    try:
+
+        students = sheets.get_all_students()
+
+    except Exception as exc:
+
+        st.error("取得學員列表失敗: " + str(exc))
+
+        return
+
+    if not students:
+
+        st.info("目前沒有學員，請點擊左側「新增學員」建立第一位學員！")
+
+        return
+
+    today = date.today()
+
+    overview_data = []
+
+    for student in students:
+
+        uid = student.get("user_id", "")
+
+        name = student.get("username", "未知")
+
+        goals = sheets.get_user_goals(uid)
+
+        today_records = sheets.get_records_by_date(uid, today)
+
+        totals = metrics.sum_totals(today_records).as_dict()
+
+        training_today = sheets.get_training_by_date(uid, today)
+
+        has_training = training_today is not None and any(v == 1 for v in training_today.values()) if training_today else False
+
+        latest_weight = sheets.get_latest_weight(uid)
+
+        calorie_goal = goals.get("calorie", 0)
+
+        protein_goal = goals.get("protein", 0)
+
+        water_goal = goals.get("water", 0)
+
+        calorie_actual = totals.get("calorie", 0)
+
+        protein_actual = totals.get("protein", 0)
+
+        water_actual = totals.get("water", 0)
+
+        cal_pct = (calorie_actual / calorie_goal * 100) if calorie_goal > 0 else 0
+
+        pro_pct = (protein_actual / protein_goal * 100) if protein_goal > 0 else 0
+
+        water_pct = (water_actual / water_goal * 100) if water_goal > 0 else 0
+
+        overview_data.append({
+
+            "姓名": name,
+
+            "蛋白質": f"{protein_actual:.0f}/{protein_goal:.0f}g",
+
+            "蛋白質%": pro_pct,
+
+            "熱量": f"{calorie_actual:.0f}/{calorie_goal:.0f}",
+
+            "熱量%": cal_pct,
+
+            "水量": f"{water_actual:.0f}/{water_goal:.0f}ml",
+
+            "水量%": water_pct,
+
+            "訓練": "✅" if has_training else "❌",
+
+            "體重": f"{latest_weight:.1f}kg" if latest_weight else "-",
+
+            "user_id": uid,
+
+        })
+
+    if overview_data:
+
+        display_data = [{k: v for k, v in row.items() if k != "user_id"} for row in overview_data]
+
+        st.dataframe(display_data, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        st.subheader("📋 學員詳細操作")
+
+        cols = st.columns(3)
+
+        for idx, row in enumerate(overview_data):
+
+            with cols[idx % 3]:
+
+                uid = row["user_id"]
+
+                name = row["姓名"]
+
+                if st.button(f"管理 {name}", key=f"manage_{uid}", use_container_width=True):
+
+                    st.session_state["view_student_id"] = uid
+
+                    st.session_state.page = "學員資料"
+
+                    st.rerun()
+
+def page_coach_student_detail() -> None:
+
+    uid = st.session_state.get("view_student_id")
+
+    if not uid:
+
+        st.error("未指定學員")
+
+        return
+
+    student = sheets.get_student_by_id(uid)
+
+    if not student:
+
+        st.error("找不到學員")
+
+        return
+
+    st.header(f"📋 學員：{student.get('username', '未知')}")
+
+    if st.button("← 返回總覽"):
+
+        st.session_state.page = "教練總覽"
+
+        st.session_state.pop("view_student_id", None)
+
+        st.rerun()
+
+    st.divider()
+
+    goals = sheets.get_user_goals(uid)
+
+    today = date.today()
+
+    today_records = sheets.get_records_by_date(uid, today)
+
+    totals = metrics.sum_totals(today_records).as_dict()
+
+    st.subheader("📊 今日摘要")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+
+        cal = totals.get("calorie", 0)
+
+        st.metric("熱量", f"{cal:.0f}", f"{goals.get('calorie', 0) - cal:.0f}")
+
+    with col2:
+
+        pro = totals.get("protein", 0)
+
+        st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
+
+    with col3:
+
+        water = totals.get("water", 0)
+
+        st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
+
+    with col4:
+
+        weight = sheets.get_latest_weight(uid)
+
+        st.metric("體重", f"{weight:.1f}kg" if weight else "-", delta=None)
+
+    st.divider()
+
+    st.subheader("⚙️ 修改營養目標")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        new_calorie = st.number_input("每日熱量目標 (kcal)", value=float(goals.get("calorie", 2000)), step=50.0)
+
+        new_protein = st.number_input("每日蛋白質目標 (g)", value=float(goals.get("protein", 60)), step=5.0)
+
+    with col2:
+
+        new_carb = st.number_input("每日碳水目標 (g)", value=float(goals.get("carb", 250)), step=10.0)
+
+        new_fat = st.number_input("每日脂肪目標 (g)", value=float(goals.get("fat", 65)), step=5.0)
+
+        new_water = st.number_input("每日水量目標 (ml)", value=float(goals.get("water", 2000)), step=100.0)
+
+    if st.button("儲存目標修改"):
+
+        try:
+
+            sheets.update_user_goals(uid, {
+
+                "calorie": new_calorie,
+
+                "protein": new_protein,
+
+                "carb": new_carb,
+
+                "fat": new_fat,
+
+                "water": new_water,
+
+            })
+
+            _clear_analysis_cache()
+
+            st.success("目標已更新！")
+
+            st.rerun()
+
+        except Exception as exc:
+
+            st.error("更新失敗: " + str(exc))
+
+    st.divider()
+
+    st.subheader("📈 體重趨勢")
+
+    weight_records = sheets.get_weight_records(uid)
+
+    if weight_records:
+
+        weight_data = {"日期": [], "體重 (kg)": []}
+
+        for r in weight_records[-14:]:
+
+            weight_data["日期"].append(r.get("timestamp", "")[:10])
+
+            weight_data["體重 (kg)"].append(r.get("weight_kg", 0))
+
+        st.line_chart(weight_data, x="日期", y="體重 (kg)")
+
+    else:
+
+        st.info("尚無體重記錄")
+
+# =============================================================================
+
+def page_tdee_questionnaire() -> None:
+
+    st.header("📋 設定你的營養目標")
+
+    st.caption("回答以下問題，讓系統為你計算個人化的營養目標")
+
+    with st.form("tdee_form"):
+
+        st.subheader("基本資料")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            weight = st.number_input("體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=200.0)
+
+            height = st.number_input("身高 (cm)", value=165.0, step=0.1, min_value=100.0, max_value=250.0)
+
+        with col2:
+
+            age = st.number_input("年齡", value=25, step=1, min_value=10, max_value=100)
+
+            gender = st.radio("性別", ["男", "女"], horizontal=True)
+
+        st.subheader("運動習慣")
+
+        exercise_level = st.selectbox("每週運動頻率", list(TDEE_MULTIPLIERS.keys()), index=1)
+
+        st.subheader("飲食目標")
+
+        goal_type = st.radio("你的目標是？", ["減脂", "維持", "增肌"], horizontal=True, index=1)
+
+        st.subheader("記錄模式")
+
+        record_mode = st.radio(
+
+            "選擇飲食記錄模式",
+
+            ["簡易模式（蛋白質/熱量/水量）", "完整模式（蛋白質/碳水/脂肪/熱量/水量）"],
+
+            horizontal=False,
+
+        )
+
+        mode = "simple" if "簡易" in record_mode else "full"
+
+        submitted = st.form_submit_button("計算並儲存目標", use_container_width=True)
+
+    if submitted:
+
+        bmr = _calculate_bmr(weight, height, age, gender)
+
+        tdee = _calculate_tdee(bmr, exercise_level)
+
+        goals = _calculate_goals(weight, tdee, goal_type)
+
+        goals["bmr"] = bmr
+
+        try:
+
+            uid = st.session_state.user_id
+
+            sheets.update_user_bmr(uid, bmr)
+
+            sheets.update_user_goals(uid, goals)
+
+            sheets.set_user_record_mode(uid, mode)
+
+            if mode == "simple":
+
+                sheets.update_user_goals(uid, {"carb": 0.0, "fat": 0.0})
+
+            _clear_analysis_cache()
+
+            st.success("目標設定完成！")
+
+            st.balloons()
+
+            st.session_state.page = "個人"
+
+            st.rerun()
+
+        except Exception as exc:
+
+            st.error("儲存失敗: " + str(exc))
+
+# =============================================================================
+
+# 登入頁面
+
+# =============================================================================
+
+def page_login() -> None:
+    st.title("💪 健身教練管理系統")
+    st.caption("教練管理學員的飲食、訓練、體重記錄")
+    
+    tab_login, tab_signup = st.tabs(["登入", "註冊"])
+    
+    with tab_login:
+        with st.form("login_form"):
+            username = st.text_input("帳號", key="login_user")
+            password = st.text_input("密碼", type="password", key="login_pwd")
+            submit = st.form_submit_button("登入", use_container_width=True)
+        
+        if submit:
+            try:
+                rows = sheets.get_users_rows()
+            except Exception as exc:
+                st.error("取得使用者失敗: " + str(exc))
+                return
+            user = auth.find_user(rows, username)
+            if not user:
+                st.error("找不到此帳號")
+                return
+            if not auth.verify_password(password, user.get("password_hash", "")):
+                st.error("密碼錯誤")
+                return
+            
+            st.session_state.user_id = user.get("user_id")
+            st.session_state.username = user.get("username")
+            st.session_state.role = sheets.get_user_role(str(user.get("user_id") or ""))
+            st.success("登入成功！")
+            st.rerun()
+    
+    with tab_signup:
+        st.subheader("新學員註冊")
+        st.info("填寫以下資料即可建立帳號")
+        
+        with st.form("signup_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_user = st.text_input("帳號", placeholder="輸入帳號")
+                new_pwd = st.text_input("密碼", type="password")
+                new_pwd2 = st.text_input("確認密碼", type="password")
+            with col2:
+                initial_weight = st.number_input("目前體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=200.0)
+                goal_type = st.selectbox("目標", ["減脂", "維持", "增肌"], index=1)
+                record_mode = st.radio("記錄模式", ["簡易模式", "完整模式"], horizontal=True, index=0)
+            
+            submitted = st.form_submit_button("註冊並登入", use_container_width=True)
+        
+        if submitted:
+            if not new_user or not new_pwd:
+                st.error("帳號和密碼不能為空")
+                return
+            if new_pwd != new_pwd2:
+                st.error("兩次密碼不一致")
+                return
+            if len(new_pwd) < 4:
+                st.warning("密碼建議至少 4 個字元")
+            
+            try:
+                rows = sheets.get_users_rows()
+            except Exception as exc:
+                st.error("取得使用者失敗: " + str(exc))
+                return
+            
+            if auth.find_user(rows, new_user):
+                st.error("此帳號已被使用")
+                return
+            
+            try:
+                uid = auth.make_user_id()
+                pwd_hash = auth.hash_password(new_pwd)
+                
+                estimated_tdee = initial_weight * 30
+                if goal_type == "減脂":
+                    calorie = estimated_tdee - 300
+                elif goal_type == "增肌":
+                    calorie = estimated_tdee + 300
+                else:
+                    calorie = estimated_tdee
+                
+                protein = initial_weight * 2
+                water = initial_weight * 40
+                
+                goals = {
+                    "calorie": calorie,
+                    "protein": protein,
+                    "carb": 0,
+                    "fat": 0,
+                    "water": water,
+                }
+                
+                sheets.append_user(
+                    uid, new_user, pwd_hash, auth.now_iso(),
+                    goals=goals,
+                    record_mode="simple" if "簡易" in record_mode else "full",
+                    weekly_training=4,
+                )
+                
+                st.session_state.user_id = uid
+                st.session_state.username = new_user
+                st.session_state.role = "student"
+                st.session_state.needs_tdee_setup = True
+                st.success("註冊成功！請先填寫 TDEE 問卷完成設定")
+                st.rerun()
+                
+            except Exception as exc:
+                st.error("註冊失敗: " + str(exc))
+
+def page_personal() -> None:
+
+    st.header("📊 今日摘要")
+
+    uid = st.session_state.user_id
+
+    try:
+
+        records = _fetch_records_cached(uid)
+
+        goals = _fetch_goals_cached(uid)
+
+    except Exception as exc:
+
+        st.error("取得資料失敗: " + str(exc))
+
+        return
+
+    bmr = goals.get("bmr", 0)
+
+    calorie_goal = goals.get("calorie", 0)
+
+    if bmr <= 0 or calorie_goal <= 0:
+
+        st.warning("你尚未設定營養目標")
+
+        st.info("請先回答 TDEE 問卷，系統會為你計算個人化的營養目標")
+
+        if st.button("前往 TDEE 問卷", use_container_width=True):
+
+            st.session_state.page = "TDEE 問卷"
+
+            st.rerun()
+
+        return
+
+    ws, we = _today_range()
+
+    today_records = metrics.filter_records(records, ws, we)
+
+    totals = metrics.sum_totals(today_records).as_dict()
+
+    st.subheader("個人資訊")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
+
+    with col2:
+
+        st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
+
+    with col3:
+
+        record_mode = sheets.get_user_record_mode(uid)
+
+        st.metric("記錄模式", "簡易" if record_mode == "simple" else "完整")
+
+    st.divider()
+
+    st.subheader("今日營養攝取")
+
+    if record_mode == "full":
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+
+        with col1:
+
+            cal = totals.get("calorie", 0)
+
+            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
+
+        with col2:
+
+            pro = totals.get("protein", 0)
+
+            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
+
+        with col3:
+
+            carb = totals.get("carb", 0)
+
+            st.metric("碳水", f"{carb:.0f}g", f"{goals.get('carb', 0) - carb:.0f}g")
+
+        with col4:
+
+            fat = totals.get("fat", 0)
+
+            st.metric("脂肪", f"{fat:.0f}g", f"{goals.get('fat', 0) - fat:.0f}g")
+
+        with col5:
+
+            water = totals.get("water", 0)
+
+            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
+
+    else:
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            cal = totals.get("calorie", 0)
+
+            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
+
+        with col2:
+
+            pro = totals.get("protein", 0)
+
+            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
+
+        with col3:
+
+            water = totals.get("water", 0)
+
+            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
+
+    st.divider()
+
+    st.subheader("✅ 今日完成率")
+
+    cal_ratio = min(totals.get("calorie", 0) / calorie_goal, 1.5) if calorie_goal > 0 else 0
+
+    pro_ratio = min(totals.get("protein", 0) / goals.get("protein", 1), 1.5) if goals.get("protein", 0) > 0 else 0
+
+    water_ratio = min(totals.get("water", 0) / goals.get("water", 1), 1.5) if goals.get("water", 0) > 0 else 0
+
+    today = date.today()
+
+    has_training = sheets.has_training_today(uid, today)
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+
+        st.markdown("**🍽️ 飲食**")
+
+        pct = cal_ratio * 100
+
+        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
+
+        st.markdown(f"{emoji} {pct:.0f}%")
+
+        st.progress(min(cal_ratio, 1.0))
+
+    with col2:
+
+        st.markdown("**💧 水量**")
+
+        pct = water_ratio * 100
+
+        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
+
+        st.markdown(f"{emoji} {pct:.0f}%")
+
+        st.progress(min(water_ratio, 1.0))
+
+    with col3:
+
+        st.markdown("**🏋️ 訓練**")
+
+        emoji = "✅" if has_training else "❌"
+
+        st.markdown(f"{emoji} {'已訓練' if has_training else '未訓練'}")
+
+        st.progress(1.0 if has_training else 0.0)
+
+    with col4:
+
+        st.markdown("**🥩 蛋白質**")
+
+        pct = pro_ratio * 100
+
+        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
+
+        st.markdown(f"{emoji} {pct:.0f}%")
+
+        st.progress(min(pro_ratio, 1.0))
+
+    st.divider()
+
+    st.subheader("⚖️ 體重")
+
+    latest_weight = sheets.get_latest_weight(uid)
+
+    if latest_weight:
+
+        st.metric("最新體重", f"{latest_weight:.1f} kg")
+
+    else:
+
+        st.info("尚未記錄體重")
+
+    if st.button("記錄今日體重"):
+
+        st.session_state.page = "體重記錄"
+
+        st.rerun()
+
+# =============================================================================
+
+# 學員端：體重記錄
+
+# =============================================================================
+
+def page_weight() -> None:
+
+    st.header("⚖️ 體重記錄")
+
+    uid = st.session_state.user_id
+
+    with st.form("weight_form"):
+
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+
+            weight = st.number_input("今日體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=300.0)
+
+        with col2:
+
+            st.write("")
+
+            submitted = st.form_submit_button("儲存", use_container_width=True)
+
+        if submitted:
+
+            try:
+
+                sheets.append_weight(timestamp=datetime.now().strftime("%Y-%m-%d"), user_id=uid, weight_kg=weight)
+
+                st.success("體重已記錄！")
+
+                st.rerun()
+
+            except Exception as exc:
+
+                st.error("儲存失敗: " + str(exc))
+
+    st.divider()
+
+    st.subheader("📈 體重趨勢")
+
+    weight_records = sheets.get_weight_records(uid)
+
+    if weight_records:
+
+        weight_data = {"日期": [], "體重 (kg)": []}
+
+        for r in weight_records[-30:]:
+
+            weight_data["日期"].append(r.get("timestamp", "")[:10])
+
+            weight_data["體重 (kg)"].append(r.get("weight_kg", 0))
+
+        st.line_chart(weight_data, x="日期", y="體重 (kg)")
+
+        if len(weight_data["體重 (kg)"]) >= 2:
+
+            weights = weight_data["體重 (kg)"]
+
+            change = weights[-1] - weights[0]
+
+            st.caption(f"起始：{weights[0]:.1f}kg → 目前：{weights[-1]:.1f}kg（{change:+.1f}kg）")
+
+    else:
+
+        st.info("尚無體重記錄")
+
+# =============================================================================
+
+# 學員端：訓練記錄
+
+# =============================================================================
+
+def page_training() -> None:
+
+    st.header("🏋️ 訓練記錄")
+
+    uid = st.session_state.user_id
+
+    today = date.today()
+
+    today_str = today.isoformat()
+
+    today_training = sheets.get_training_by_date(uid, today)
+
+    with st.form("training_form"):
+
+        st.subheader(f"📅 {today.strftime('%Y/%m/%d')} 訓練項目")
+
+        cols = st.columns(len(TRAINING_TYPES))
+
+        training_values = {}
+
+        for idx, t_type in enumerate(TRAINING_TYPES):
+
+            with cols[idx]:
+
+                emoji = TRAINING_EMOJI.get(t_type, "")
+
+                default = today_training.get(t_type.lower(), 0) if today_training else 0
+
+                checked = st.checkbox(f"{emoji} {t_type}", value=bool(default))
+
+                training_values[t_type.lower()] = 1 if checked else 0
+
+        submitted = st.form_submit_button("儲存訓練記錄", use_container_width=True)
+
+    if submitted:
+
+        try:
+
+            sheets.update_training(
+
+                timestamp=today_str, user_id=uid,
+
+                training_back=training_values.get("背", 0),
+
+                training_chest=training_values.get("胸", 0),
+
+                training_legs=training_values.get("腿", 0),
+
+                training_core=training_values.get("核心", 0),
+
+                training_cardio=training_values.get("有氧", 0),
+
+            )
+
+            st.success("訓練記錄已儲存！")
+
+            st.rerun()
+
+        except Exception as exc:
+
+            st.error("儲存失敗: " + str(exc))
+
+    st.divider()
+
+    st.subheader("📅 本週訓練回顧")
+
+    ws, we = _week_range()
+
+    training_data = []
+
+    for i in range((we - ws).days + 1):
+
+        d = ws + timedelta(days=i)
+
+        training = sheets.get_training_by_date(uid, d)
+
+        if training and any(v == 1 for v in training.values()):
+
+            items = [TRAINING_EMOJI.get(t, "") + t for t, v in training.items() if v == 1]
+
+            training_data.append({"日期": d.strftime("%m/%d"), "訓練項目": " ".join(items)})
+
+    if training_data:
+
+        st.dataframe(training_data, use_container_width=True, hide_index=True)
+
+    else:
+
+        st.info("本週尚無訓練記錄")
+
+# =============================================================================
+
+# 學員端：記錄飲食
+
+# =============================================================================
+
+def page_log_meal() -> None:
+
+    st.header("🍽️ 記錄飲食")
+
+    uid = st.session_state.user_id
+
+    record_mode = sheets.get_user_record_mode(uid)
+
+    meal_type = st.selectbox("餐點類型", MEAL_TYPES)
+
+    st.subheader("選擇輸入方式")
+
+    input_mode = st.radio(
+
+        "輸入模式",
+
+        ["📝 文字輸入", "📷 拍照上傳", "📁 圖片上傳"],
+
+        horizontal=True,
+
+        label_visibility="collapsed",
+
+    )
+
+    analysis_result = None
+
+    if input_mode == "📝 文字輸入":
+
+        with st.form("text_input_form"):
+
+            food_text = st.text_area("輸入食物內容", placeholder="例如：雞腿便當 + 滷蛋 + 無糖豆漿", height=100)
+
+            submitted = st.form_submit_button("分析食物", use_container_width=True)
+
+        if submitted and food_text:
+
+            with st.spinner("AI 分析中..."):
+
+                try:
+
+                    analysis_result = gemini.analyze_text(food_text)
+
+                except Exception as exc:
+
+                    st.error("分析失敗: " + str(exc))
+
+    elif input_mode == "📷 拍照上傳":
+
+        camera_file = st.camera_input("拍攝食物照片")
+
+        if camera_file:
+
+            with st.spinner("AI 分析中..."):
+
+                try:
+
+                    analysis_result = gemini.analyze_image(Image.open(camera_file))
+
+                except Exception as exc:
+
+                    st.error("分析失敗: " + str(exc))
+
+    else:
+
+        uploaded_file = st.file_uploader("上傳食物照片", type=["jpg", "jpeg", "png"])
+
+        if uploaded_file:
+
+            with st.spinner("AI 分析中..."):
+
+                try:
+
+                    analysis_result = gemini.analyze_image(Image.open(uploaded_file))
+
+                except Exception as exc:
+
+                    st.error("分析失敗: " + str(exc))
+
+    if analysis_result:
+
+        st.divider()
+
+        st.subheader("📋 分析結果")
+
+        cal = analysis_result.get("calories", 0)
+
+        pro = analysis_result.get("protein", 0)
+
+        carb = analysis_result.get("carb", 0)
+
+        fat = analysis_result.get("fat", 0)
+
+        if record_mode == "full":
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+
+                st.metric("熱量", f"{cal:.0f} kcal")
+
+            with col2:
+
+                st.metric("蛋白質", f"{pro:.0f} g")
+
+            with col3:
+
+                st.metric("碳水", f"{carb:.0f} g")
+
+            with col4:
+
+                st.metric("脂肪", f"{fat:.0f} g")
+
+        else:
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.metric("熱量", f"{cal:.0f} kcal")
+
+            with col2:
+
+                st.metric("蛋白質", f"{pro:.0f} g")
+
+        portion = st.slider("份量", 0.5, 3.0, 1.0, 0.1)
+
+        if portion != 1.0:
+
+            st.caption(f"× {portion} 份")
+
+        water_ml = st.number_input("飲水量 (ml)", value=0, step=50, min_value=0)
+
+        if st.button("✅ 存入今日記錄", use_container_width=True):
+
+            try:
+
+                sheets.append_record(
+
+                    timestamp=datetime.now().isoformat(),
+
+                    user_id=uid,
+
+                    meal_type=meal_type,
+
+                    food_summary=analysis_result.get("food_summary", ""),
+
+                    calories=cal * portion,
+
+                    protein=pro * portion,
+
+                    carb=carb * portion if record_mode == "full" else 0,
+
+                    fat=fat * portion if record_mode == "full" else 0,
+
+                    water_ml=water_ml,
+
+                    image_url="",
+
+                    portion=portion,
+
+                )
+
+                _clear_analysis_cache()
+
+                st.success("已存入今日記錄！")
+
+                st.rerun()
+
+            except Exception as exc:
+
+                st.error("儲存失敗: " + str(exc))
+
+# =============================================================================
+
+# 學員端：歷史記錄
+
+# =============================================================================
+
+def page_history() -> None:
+
+    st.header("📜 歷史記錄")
+
+    uid = st.session_state.user_id
+
+    try:
+
+        records = _fetch_records_cached(uid)
+
+        goals = _fetch_goals_cached(uid)
+
+    except Exception as exc:
+
+        st.error("取得記錄失敗: " + str(exc))
+
+        return
+
+    bmr = goals.get("bmr", 0)
+
+    calorie_goal = goals.get("calorie", 0)
+
+    if bmr <= 0 or calorie_goal <= 0:
+
+        st.warning("你尚未設定營養目標")
+
+        return
+
+    ws, we = _week_range()
+
+    days = (we - ws).days + 1
+
+    st.subheader("本週每日達成率")
+
+    daily_data = []
+
+    for i in range(days):
+
+        d = ws + timedelta(days=i)
+
+        day_recs = metrics.filter_records(records, d, d)
+
+        day_totals = metrics.sum_totals(day_recs).as_dict()
+
+        day_cal = float(day_totals.get("calorie", 0.0))
+
+        day_pro = float(day_totals.get("protein", 0.0))
+
+        cal_ratio = (day_cal / calorie_goal) if calorie_goal > 0 else 0.0
+
+        pro_ratio = (day_pro / goals.get("protein", 1)) if goals.get("protein", 0) > 0 else 0.0
+
+        date_str = d.strftime("%m/%d")
+
+        weekday = ["一", "二", "三", "四", "五", "六", "日"][d.weekday()]
+
+        daily_data.append({
+
+            "日期": f"{date_str}({weekday})",
+
+            "熱量": f"{day_cal:.0f}",
+
+            "熱量目標": f"{calorie_goal:.0f}",
+
+            "熱量%": f"{cal_ratio:.0%}",
+
+            "蛋白質": f"{day_pro:.0f}g",
+
+            "蛋白質%": f"{pro_ratio:.0%}",
+
+        })
+
+    st.dataframe(daily_data, use_container_width=True, hide_index=True)
+
+    st.subheader("本週熱量達成率")
+
+    calorie_chart = {"日期": [], "達成率(%)": []}
+
+    for i in range(days):
+
+        d = ws + timedelta(days=i)
+
+        day_recs = metrics.filter_records(records, d, d)
+
+        day_totals = metrics.sum_totals(day_recs).as_dict()
+
+        day_cal = float(day_totals.get("calorie", 0.0))
+
+        cal_ratio = (day_cal / calorie_goal * 100) if calorie_goal > 0 else 0.0
+
+        calorie_chart["日期"].append(d.strftime("%m/%d"))
+
+        calorie_chart["達成率(%)"].append(min(cal_ratio, 100))
+
+    st.bar_chart(calorie_chart, x="日期", y="達成率(%)")
+
+# =============================================================================
+
+# 學員端：TDEE 頁面
+
+# =============================================================================
+
+def page_tdee() -> None:
+
+    st.header("🧮 TDEE 計算機")
+
+    uid = st.session_state.user_id
+
+    goals = sheets.get_user_goals(uid)
+
+    bmr = goals.get("bmr", 0)
+
+    calorie_goal = goals.get("calorie", 0)
+
+    if bmr > 0:
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
+
+        with col2:
+
+            st.metric("每日建議攝取", f"{calorie_goal:.0f} 大卡")
+
+        st.info("以上為你目前設定的目標，可由教練調整")
+
+    else:
+
+        st.warning("你尚未設定營養目標")
+
+        if st.button("前往 TDEE 問卷"):
+
+            st.session_state.page = "TDEE 問卷"
+
+            st.rerun()
+
+# =============================================================================
+
+# 主程式
+
+# =============================================================================
+
+def main() -> None:
+
+    st.set_page_config(page_title="健身教練管理系統", layout="wide")
+
+    st.markdown("""
+
+    <style>
+
+        @import url('https://fonts.googleapis.com/css2?family=Line+Seed+JP:wght@400&display=swap');
+
+        .stApp {
+
+            background-color: #FFFFFF !important;
+
+            color: #2F3E46 !important;
+
+            font-family: 'Line Seed JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+
+            color: #2F3E46 !important;
+
+            font-weight: 400 !important;
+
+        }
+
+        div[data-testid="stMetric"] {
+
+            background-color: #FFFFFF !important;
+
+            padding: 20px 24px !important;
+
+            border-radius: 16px !important;
+
+            box-shadow: 0 8px 24px rgba(149, 157, 165, 0.06) !important;
+
+        }
+
+        div[data-testid="stMetric"] label {
+
+            color: #666 !important;
+
+        }
+
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+
+            color: #2F3E46 !important;
+
+        }
+
+        div[data-testid="stSidebar"] {
+
+            background-color: #F8F9FA !important;
+
+        }
+
+        div.stButton > button {
+
+            background-color: #4A7C59 !important;
+
+            color: #FFFFFF !important;
+
+            border-radius: 12px !important;
+
+            border: none !important;
+
+            padding: 0.5rem 1rem !important;
+
+        }
+
+        div.stButton > button:hover {
+
+            background-color: #385E43 !important;
+
+        }
+
+        div[data-testid="stFormSubmitButton"] button {
+
+            background-color: #4A7C59 !important;
+
+            color: #FFFFFF !important;
+
+            border-radius: 12px !important;
+
+            border: none !important;
+
+            padding: 0.6rem 2rem !important;
+
+        }
+
+        div[data-testid="stFormSubmitButton"] button:hover {
+
+            background-color: #385E43 !important;
+
+        }
+
+        div[data-testid="stTabs"] button[aria-selected="true"] {
+
+            background-color: #4A7C59 !important;
+
+            color: #FFFFFF !important;
+
+        }
+
+        body, .stApp, .stApp > div, .main, .main > div,
+
+        .block-container, section.main > div,
+
+        [data-testid="stSidebar"], [data-testid="stSidebarContent"],
+
+        div[data-testid="stVerticalBlock"], div[data-testid="stHorizontalBlock"],
+
+        .stTabs, div[data-testid="stTabContent"],
+
+        .stForm, [data-testid="stFormSubmitButton"] {
+
+            background-color: #FFFFFF !important;
+
+        }
+
+        [data-testid="stTabsContent"] {
+
+            background-color: #FFFFFF !important;
+
+        }
+
+        .stTabs * {
+
+            background-color: #FFFFFF !important;
+
+        }
+
+        div[data-testid="stProgressBar"] > div > div {
+
+            background-color: #4A7C59 !important;
+
+        }
+
+        @media (max-width: 768px) {
+
+            div[data-testid="stMetric"] {
+
+                margin-bottom: 12px !important;
+
+                padding: 16px !important;
+
+            }
+
+            [data-testid="stSidebar"] {
+
+                width: 220px !important;
+
+                min-width: 220px !important;
+
+            }
+
+            .stColumns > div {
+
+                flex-wrap: wrap !important;
+
+            }
+
+            h1 { font-size: 1.5rem !important; }
+
+            h2 { font-size: 1.3rem !important; }
+
+            h3 { font-size: 1.1rem !important; }
+
+            div.stButton > button,
+
+            div[data-testid="stFormSubmitButton"] button {
+
+                width: 100% !important;
+
+            }
+
+        }
+
+    </style>
+
+    """, unsafe_allow_html=True)
+
+    init_session()
+
+    if not st.session_state.user_id:
+
+        page_login()
+
+        return
+
+    role = st.session_state.get("role", "student")
+
+    is_coach = (role == "coach")
+
+    coach_pages = ["教練總覽", "學員資料"]
+
+    student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
+
+    with st.sidebar:
+
+        uname = str(st.session_state.username or "")
+
+        role_label = "教練" if is_coach else "學員"
+
+        st.write(f"👤 {uname} ({role_label})")
+
+        if is_coach:
+
+            available = coach_pages
+
+            default_idx = coach_pages.index(st.session_state.page) if st.session_state.page in coach_pages else 0
+
+        else:
+
+            available = student_pages
+
+            default_idx = student_pages.index(st.session_state.page) if st.session_state.page in student_pages else 0
+
+        page = st.radio("導航", available, index=default_idx)
+
+        st.session_state.page = page
+
+        if st.button("登出", use_container_width=True):
+
+            for k in list(st.session_state.keys()):
+
+                if k != "page":
+
+                    del st.session_state[k]
+
+            st.session_state.user_id = None
+
+            st.session_state.username = None
+
+            st.rerun()
+
+    if is_coach:
+
+        if page == "教練總覽":
+
+            page_coach_overview()
+
+        elif page == "學員資料":
+
+            page_coach_student_detail()
+
+    else:
+
+        if page not in ["TDEE 問卷", "個人"]:
+
+            goals_check = sheets.get_user_goals(st.session_state.user_id)
+
+            if goals_check.get("bmr", 0) <= 0 or goals_check.get("calorie", 0) <= 0:
+
+                st.warning("請先設定營養目標")
+
+                if st.button("前往 TDEE 問卷"):
+
+                    st.session_state.page = "TDEE 問卷"
+
+                    st.rerun()
+
+                return
+
+        if page == "個人":
+
+            page_personal()
+
+        elif page == "記錄飲食":
+
+            page_log_meal()
+
+        elif page == "歷史":
+
+            page_history()
+
+        elif page == "體重記錄":
+
+            page_weight()
+
+        elif page == "訓練記錄":
+
+            page_training()
+
+        elif page == "TDEE":
+
+            page_tdee()
+
+        elif page == "TDEE 問卷":
+
+            page_tdee_questionnaire()
+
+if __name__ == "__main__":
+
+    main()
+
