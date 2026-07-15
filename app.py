@@ -1657,6 +1657,11 @@ def page_log_meal() -> None:
                     st.error("分析失敗: " + str(exc))
 
     if analysis_result:
+        # ===== DEBUG: 顯示 AI 原始回傳 =====
+        import json
+        st.error(f"[AI 原始資料] {json.dumps(analysis_result, ensure_ascii=False)}")
+        # ===== END DEBUG =====
+
 
         st.divider()
 
