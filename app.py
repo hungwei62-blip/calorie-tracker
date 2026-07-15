@@ -249,7 +249,7 @@ def page_coach_overview() -> None:
         training_today = sheets.get_training_by_date(uid, today)
         
         cal_goal = goals.get("calorie", 0)
-        cal_actual = totals.get("calorie", 0)
+        cal_actual = totals.get("calories", 0)
         water_goal = goals.get("water", 0)
         water_actual = totals.get("water", 0)
         
@@ -290,7 +290,7 @@ def page_coach_overview() -> None:
         protein_goal = goals.get("protein", 0)
         water_goal = goals.get("water", 0)
         
-        calorie_actual = totals.get("calorie", 0)
+        calorie_actual = totals.get("calories", 0)
         protein_actual = totals.get("protein", 0)
         water_actual = totals.get("water", 0)
         
@@ -379,7 +379,7 @@ def page_coach_student_detail() -> None:
 
     with col1:
 
-        cal = totals.get("calorie", 0)
+        cal = totals.get("calories", 0)
 
         st.metric("熱量", f"{cal:.0f}", f"{goals.get('calorie', 0) - cal:.0f}")
 
@@ -1274,7 +1274,7 @@ def page_personal() -> None:
 
         with col1:
 
-            cal = totals.get("calorie", 0)
+            cal = totals.get("calories", 0)
 
             st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
 
@@ -1308,7 +1308,7 @@ def page_personal() -> None:
 
         with col1:
 
-            cal = totals.get("calorie", 0)
+            cal = totals.get("calories", 0)
 
             st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
 
@@ -1328,7 +1328,7 @@ def page_personal() -> None:
 
     st.subheader("✅ 今日完成率")
 
-    cal_ratio = min(totals.get("calorie", 0) / calorie_goal, 1.5) if calorie_goal > 0 else 0
+    cal_ratio = min(totals.get("calories", 0) / calorie_goal, 1.5) if calorie_goal > 0 else 0
 
     pro_ratio = min(totals.get("protein", 0) / goals.get("protein", 1), 1.5) if goals.get("protein", 0) > 0 else 0
 
@@ -1823,7 +1823,7 @@ def page_history() -> None:
 
         day_totals = metrics.sum_totals(day_recs).as_dict()
 
-        day_cal = float(day_totals.get("calorie", 0.0))
+        day_cal = float(day_totals.get("calories", 0.0))
 
         day_pro = float(day_totals.get("protein", 0.0))
 
@@ -1865,7 +1865,7 @@ def page_history() -> None:
 
         day_totals = metrics.sum_totals(day_recs).as_dict()
 
-        day_cal = float(day_totals.get("calorie", 0.0))
+        day_cal = float(day_totals.get("calories", 0.0))
 
         cal_ratio = (day_cal / calorie_goal * 100) if calorie_goal > 0 else 0.0
 
