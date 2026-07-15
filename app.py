@@ -1656,7 +1656,12 @@ def page_log_meal() -> None:
 
                     st.error("分析失敗: " + str(exc))
 
+    # 將 analysis_result 存入 session_state，確保按鈕點擊後還能取用
     if analysis_result:
+        st.session_state.pending_analysis = analysis_result
+
+    if st.session_state.get("pending_analysis"):
+        analysis_result = st.session_state.pending_analysis
         # ===== DEBUG: 顯示 AI 原始回傳 =====
         import json
         st.error(f"[AI 原始資料] {json.dumps(analysis_result, ensure_ascii=False)}")
