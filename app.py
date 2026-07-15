@@ -2047,44 +2047,114 @@ def main() -> None:
 
         }
 
+        /* ===== Mobile Responsive (手機響應式) ===== */
         @media (max-width: 768px) {
+            /* 調整區塊標題大小 */
+            h1 { font-size: 1.4rem !important; }
+            h2 { font-size: 1.2rem !important; }
+            h3 { font-size: 1rem !important; }
+
+            /* Metric 卡片在手機上更好看 */
+            div[data-testid="stMetric"] {
+                margin-bottom: 8px !important;
+                padding: 12px !important;
+                border-radius: 12px !important;
+            }
+
+            /* 側邊欄調整 */
+            [data-testid="stSidebar"] {
+                width: 200px !important;
+                min-width: 200px !important;
+            }
+
+            /* 讓所有 columns 在手機上自動換行 */
+            .stColumns > div {
+                flex-wrap: wrap !important;
+            }
+
+            /* 4欄 -> 2x2 在手機上 */
+            div.stHorizontalBlock:has(> div:nth-child(4)) {
+                flex-wrap: wrap !important;
+            }
+            div.stHorizontalBlock:has(> div:nth-child(4)) > div {
+                min-width: 48% !important;
+                flex: 0 0 48% !important;
+            }
+
+            /* 5欄 -> 3+2 或全部堆疊 */
+            div.stHorizontalBlock:has(> div:nth-child(5)) {
+                flex-wrap: wrap !important;
+            }
+            div.stHorizontalBlock:has(> div:nth-child(5)) > div {
+                min-width: 48% !important;
+                flex: 0 0 48% !important;
+            }
+
+            /* 按鈕全寬 */
+            div.stButton > button,
+            div[data-testid="stFormSubmitButton"] button {
+                width: 100% !important;
+                padding: 0.5rem 1rem !important;
+                font-size: 0.9rem !important;
+            }
+
+            /* 表單輸入框全寬 */
+            .stTextInput > div > div > input,
+            .stNumberInput > div > div > input,
+            .stTextArea > div > div > textarea,
+            .stSelectbox > div > div > select {
+                width: 100% !important;
+            }
+
+            /* 資料表可橫向滾動 */
+            .dataframe {
+                overflow-x: auto !important;
+                display: block !important;
+            }
+
+            /* Tabs 在手機上可橫向滾動 */
+            div[data-testid="stTabs"] {
+                overflow-x: auto !important;
+                white-space: nowrap !important;
+            }
+
+            /* 進度條調整 */
+            div[data-testid="stProgressBar"] {
+                height: 8px !important;
+            }
+
+            /* 下載按鈕在手機上全寬 */
+            .stDownloadButton > button {
+                width: 100% !important;
+            }
+
+            /* Expander 在手機上全寬 */
+            .streamlit-expanderHeader {
+                font-size: 0.9rem !important;
+            }
+        }
+
+        /* 超小手機 (320px - 400px) */
+        @media (max-width: 400px) {
+            h1 { font-size: 1.2rem !important; }
+            h2 { font-size: 1.1rem !important; }
+            h3 { font-size: 0.95rem !important; }
 
             div[data-testid="stMetric"] {
-
-                margin-bottom: 12px !important;
-
-                padding: 16px !important;
-
+                padding: 10px !important;
             }
 
-            [data-testid="stSidebar"] {
-
-                width: 220px !important;
-
-                min-width: 220px !important;
-
+            /* 4欄直接變成2欄 */
+            div.stHorizontalBlock:has(> div:nth-child(4)) > div {
+                min-width: 100% !important;
+                flex: 0 0 100% !important;
             }
 
-            .stColumns > div {
-
-                flex-wrap: wrap !important;
-
+            /* 5欄也變成2欄 */
+            div.stHorizontalBlock:has(> div:nth-child(5)) > div {
+                min-width: 100% !important;
+                flex: 0 0 100% !important;
             }
-
-            h1 { font-size: 1.5rem !important; }
-
-            h2 { font-size: 1.3rem !important; }
-
-            h3 { font-size: 1.1rem !important; }
-
-            div.stButton > button,
-
-            div[data-testid="stFormSubmitButton"] button {
-
-                width: 100% !important;
-
-            }
-
         }
 
 
