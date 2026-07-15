@@ -497,7 +497,7 @@ def page_tdee_questionnaire() -> None:
 
         st.subheader("運動習慣")
 
-        exercise_level = st.selectbox("每週運動頻率", list(TDEE_MULTIPLIERS.keys()), index=1)
+        exercise_level = st.selectbox("每週運動頻率", EXERCISE_LEVELS, index=1)
 
         st.subheader("飲食目標")
 
