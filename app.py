@@ -45,6 +45,7 @@ TDEE_MULTIPLIERS = {
     "每天激烈運動": 1.9,
 
 }
+EXERCISE_LEVELS = list(TDEE_MULTIPLIERS.keys())
 
 # 訓練項目
 
