@@ -175,7 +175,7 @@ def _clear_analysis_cache() -> None:
 
         pass
     # 清掉 services/sheets.py 內被快取的讀取函式
-    for fn_name in ("get_records", "get_weight_records", "get_training_records", "get_notes", "get_latest_weight"):
+    for fn_name in ("get_records", "get_weight_records", "get_training_records", "get_notes", "get_latest_weight", "get_users_rows"):
         fn = getattr(sheets, fn_name, None)
         if fn is None:
             continue
@@ -563,6 +563,9 @@ def _build_history_csv(student, daily, weights, trainings, notes, start_date, en
     return ("\ufeff" + buf.getvalue()).encode("utf-8")
 
 def _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date):
+    # 中文字型設定
+    _plt.rcParams["font.sans-serif"] = ["Noto Sans CJK TC", "Microsoft JhengHei", "SimHei"]
+    _plt.rcParams["axes.unicode_minus"] = False
     name = student.get("name", student.get("username", "未知"))
     buf = _io.BytesIO()
     with _PdfPages(buf) as pdf:
@@ -900,32 +903,81 @@ def page_coach_student_history():
         st.info("此區間沒有訓練記錄。")
 
     st.subheader("📝 教練備註")
+
+    # 初始化 session state for editing
+    if "editing_note_ts" not in st.session_state:
+        st.session_state.editing_note_ts = None
+
     if notes:
         sorted_notes = sorted(notes, key=lambda x: x.get("timestamp", ""), reverse=True)
         for n in sorted_notes[:10]:
             ts = n.get("timestamp", "")[:19]
             cid = n.get("coach_id", "")
             note = n.get("note", "")
-            st.markdown("**" + ts + "** _" + cid + "_：" + note)
+            note_key = ts.replace(':', '_').replace('-', '_').replace(' ', '_').replace('.', '_')
+
+            # 如果正在編輯這個備註
+            if st.session_state.editing_note_ts == ts:
+                st.markdown(f"**✏️ 編輯中：** {ts}")
+                edit_text = st.text_area("備註內容", value=note, key=f"edit_{note_key}", height=80, label_visibility="collapsed")
+                col_update, col_cancel = st.columns([1, 1])
+                with col_update:
+                    if st.button("💾 更新", key=f"save_{note_key}", use_container_width=True):
+                        if edit_text.strip():
+                            try:
+                                sheets.update_note(ts, uid, cid, edit_text.strip())
+                                _clear_analysis_cache()
+                                st.success("備註已更新！")
+                                st.session_state.editing_note_ts = None
+                                st.rerun()
+                            except Exception as exc:
+                                st.error("更新失敗：" + str(exc))
+                with col_cancel:
+                    if st.button("取消", key=f"cancel_{note_key}", use_container_width=True):
+                        st.session_state.editing_note_ts = None
+                        st.rerun()
+                st.divider()
+            else:
+                # 顯示備註 + 編輯/刪除按鈕
+                with st.container():
+                    col_text, col_actions = st.columns([4, 1])
+                    with col_text:
+                        st.markdown(f"**{ts}**  _{cid}_：" + note)
+                    with col_actions:
+                        if st.button("✏️", key=f"edit_btn_{note_key}", help="編輯"):
+                            st.session_state.editing_note_ts = ts
+                            st.rerun()
+                        if st.button("🗑️", key=f"del_btn_{note_key}", help="刪除"):
+                            try:
+                                sheets.delete_note(ts, uid, cid)
+                                _clear_analysis_cache()
+                                st.success("備註已刪除！")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error("刪除失敗：" + str(exc))
+                st.divider()
     else:
         st.caption("此區間尚無備註。")
 
-    with st.form("coach_note_form", clear_on_submit=True):
-        new_note = st.text_area(
-            "新增備註", placeholder="輸入觀察意見...", key="coach_note_input"
-        )
-        if st.form_submit_button("💾 儲存備註") and new_note and new_note.strip():
+    # 新增備註（不在 form 內，方便與編輯共存）
+    st.markdown("**➕ 新增備註**")
+    new_note_input = st.text_area("新增備註", placeholder="輸入觀察意見...", key="coach_note_input", label_visibility="collapsed", height=80)
+    if st.button("💾 儲存備註", use_container_width=True):
+        if new_note_input and new_note_input.strip():
             try:
                 sheets.append_note(
                     timestamp=datetime.now().isoformat(timespec="seconds"),
                     user_id=uid,
                     coach_id=str(st.session_state.get("user_id", "")),
-                    note=new_note.strip(),
+                    note=new_note_input.strip(),
                 )
+                _clear_analysis_cache()
                 st.success("備註已儲存！")
                 st.rerun()
             except Exception as exc:
                 st.error("儲存失敗：" + str(exc))
+        else:
+            st.warning("請輸入備註內容")
 
     st.subheader("📤 匯出")
     csv_bytes = _build_history_csv(student, daily, weights, trainings, notes, start_date, end_date)

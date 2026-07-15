@@ -172,6 +172,7 @@ def _to_int(val: Any, default: int) -> int:
 # Users
 # =============================================================================
 
+@st.cache_data(ttl=CACHE_TTL)
 def get_users_rows() -> list[dict[str, Any]]:
     """取得所有使用者列（教練與學員）。"""
     sh = _get_sheet()
@@ -625,3 +626,25 @@ def get_latest_note(user_id: str) -> dict[str, Any] | None:
     if not notes:
         return None
     return notes[-1]  # 因為是時間排序，最後一筆是最新的
+def update_note(timestamp: str, user_id: str, coach_id: str, new_note: str) -> bool:
+    """更新指定教練備註的內容。成功回傳 True。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Notes", NOTES_HEADERS)
+    raw_records = ws.get_all_values()
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):
+        if raw_row and raw_row[0] == timestamp and raw_row[1] == user_id and raw_row[2] == coach_id:
+            ws.update_cell(row_idx, 4, new_note)  # note 在第 4 欄
+            return True
+    return False
+
+
+def delete_note(timestamp: str, user_id: str, coach_id: str) -> bool:
+    """刪除指定教練備註。成功回傳 True。"""
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Notes", NOTES_HEADERS)
+    raw_records = ws.get_all_values()
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):
+        if raw_row and raw_row[0] == timestamp and raw_row[1] == user_id and raw_row[2] == coach_id:
+            ws.delete_rows(row_idx)
+            return True
+    return False
