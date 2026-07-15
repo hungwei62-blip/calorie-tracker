@@ -158,24 +158,17 @@ def _fetch_goals_cached(user_id: str) -> dict:
     return sheets.get_user_goals(user_id)
 
 def _clear_analysis_cache() -> None:
-
+    # 清掉 app.py 的快取，，避免殘留
     try:
-
         _fetch_records_cached.clear()
-
     except Exception:
-
         pass
-
     try:
-
         _fetch_goals_cached.clear()
-
     except Exception:
-
         pass
-    # 清掉 services/sheets.py 內被快取的讀取函式
-    for fn_name in ("get_records", "get_weight_records", "get_training_records", "get_notes", "get_latest_weight", "get_users_rows"):
+    # 清掉 services/sheets.py 的快取函式，包括所有查詢函式
+    for fn_name in ("get_records", "get_weight_records", "get_training_records", "get_notes", "get_latest_weight", "get_users_rows", "get_student_by_id", "get_user_goals", "get_all_students"):
         fn = getattr(sheets, fn_name, None)
         if fn is None:
             continue
@@ -1719,7 +1712,18 @@ def page_log_meal() -> None:
 
         if st.button("✅ 存入今日記錄", use_container_width=True):
 
+            # 驗證即將寫入的數值
+            final_calories = cal * portion
+            final_protein = pro * portion
+            if final_calories <= 0 and final_protein <= 0:
+                st.warning("熱量和蛋白質都為 0，請確認 AI 分析結果是否正確")
+                return
+
             try:
+
+                # Debug: 顯示即將寫入的數值
+                print(f"[DEBUG] 寫入記錄: calories={cal * portion}, protein={pro * portion}, portion={portion}")
+                st.info(f"DEBUG: 熱量={cal * portion:.1f}, 蛋白={pro * portion:.1f}g")
 
                 sheets.append_record(
 
