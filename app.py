@@ -2546,19 +2546,33 @@ def main() -> None:
 
 
     # ==========================================
-    # 底部導航 - 置中簡化版（兩顆按鈕在 layout 流中央）
+    # 底部導航 - 角色自適應版（教練 2 顆、學員 7 顆）
     # ==========================================
-    _pad_l, _nav_outer, _pad_r = st.columns([3, 1, 3])
+    if is_coach:
+        _nav_items = [
+            ("學員狀態", "👤"),
+            ("學員歷史", "📅"),
+        ]
+        _pad_l, _nav_outer, _pad_r = st.columns([3, 1, 3])
+    else:
+        _nav_items = [
+            ("個人", "👤"),
+            ("記錄飲食", "🍴"),
+            ("歷史", "🕐"),
+            ("體重記錄", "⚖️"),
+            ("訓練記錄", "🏋️"),
+            ("TDEE", "📊"),
+            ("TDEE 問卷", "📋"),
+        ]
+        _pad_l, _nav_outer, _pad_r = st.columns([1, 7, 1])
+
     with _nav_outer:
-        _col1, _col2 = st.columns(2)
-        with _col1:
-            if st.button("👤", key="nav_status", help="學員狀態 - 查看學員膠囊進度條"):
-                st.session_state.page = "學員狀態"
-                st.rerun()
-        with _col2:
-            if st.button("📅", key="nav_history", help="學員歷史 - 查看每位學員的歷史圖表"):
-                st.session_state.page = "學員歷史"
-                st.rerun()
+        _btn_cols = st.columns(len(_nav_items))
+        for _i, (_page_name, _emoji) in enumerate(_nav_items):
+            with _btn_cols[_i]:
+                if st.button(_emoji, key=f"nav_{_page_name}", help=_page_name):
+                    st.session_state.page = _page_name
+                    st.rerun()
 
 
 if __name__ == "__main__":
