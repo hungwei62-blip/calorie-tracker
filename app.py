@@ -16,6 +16,8 @@ import io as _io
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as _plt
+import altair as alt
+import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages as _PdfPages
 
 import time
@@ -1034,86 +1036,55 @@ def page_coach_student_history():
 
         st.subheader("📈 每日攝取趨勢")
 
+        # 深色卡片趨勢圖 CSS
+        st.markdown("""<style>
+            .chart-card { background: #1e1e38 !important; border-radius: 20px !important; padding: 20px !important; margin: 10px 0 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important; }
+            .chart-value { font-size: 28px !important; font-weight: 700 !important; color: #ffffff !important; }
+            .chart-unit { font-size: 14px !important; color: #a0a0a0 !important; }
+            .chart-emoji { font-size: 32px !important; }
+            .chart-header { display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 16px !important; }
+        </style>""", unsafe_allow_html=True)
+
         if daily:
             sorted_days = sorted(daily.keys())
             xs = [d.strftime("%m/%d") for d in sorted_days]
 
-            # ----- 熱量趨勢圖（深色卡片） -----
+            # ----- 熱量趨勢圖（深色卡片）-----
             total_cal = sum(daily[d]["calorie"] for d in sorted_days)
             avg_cal = total_cal / len(sorted_days) if sorted_days else 0
 
-            cal_data = {
-                "date": xs,
-                "calorie": [daily[d]["calorie"] for d in sorted_days],
-            }
-
-            # 熱量卡片
-            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-            st.markdown(f'''
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-value">{avg_cal:.0f} <span class="chart-unit">kcal</span></div>
-                        <div style="color:#a0a0a0;font-size:12px;">平均每日熱量</div>
-                    </div>
-                    <div class="chart-emoji">🔥</div>
-                </div>
-            ''', unsafe_allow_html=True)
-
-            # 熱量 Altair 折線圖
-            import pandas as pd
+            cal_data = {"date": xs, "calorie": [daily[d]["calorie"] for d in sorted_days]}
             cal_df = pd.DataFrame(cal_data)
-            cal_chart = alt.Chart(cal_df).mark_line(
-                color="#FFA500",
-                strokeWidth=2.5,
-                point=alt.Chart({}).mark_circle(size=60, color="#FFA500")
-            ).encode(
-                x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888")),
-                y=alt.Y("calorie:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888"), title=""),
-            ).properties(
-                height=200,
-                width=alt.Step(40)
-            )
-            st.altair_chart(cal_chart, use_container_width=True)
+
+            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+            st.markdown('<div class="chart-header"><div><div class="chart-value">' + str(avg_cal) + ' <span class="chart-unit">kcal</span></div><div style="color:#a0a0a0;font-size:12px;">平均每日熱量</div></div><div class="chart-emoji">🔥</div></div>', unsafe_allow_html=True)
+
+            base_cal = alt.Chart(cal_df).encode(x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", labelAngle=0)), y=alt.Y("calorie:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", gridColor="#2a2a4a"), title=""))
+            line_cal = base_cal.mark_line(color="#FFA500", strokeWidth=3, interpolate="monotone")
+            points_cal = base_cal.mark_circle(size=60, color="#FFA500")
+            area_cal = base_cal.mark_area(color=alt.Gradient(gradient="linear", stops=[alt.GradientStop(color="rgba(255,165,0,0.25)", offset=0), alt.GradientStop(color="rgba(255,165,0,0)", offset=1)], x1=1, y1=0, x2=1, y2=1), interpolate="monotone")
+            final_cal_chart = (area_cal + line_cal + points_cal).properties(height=200)
+            st.altair_chart(final_cal_chart, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # ----- 蛋白質趨勢圖（深色卡片） -----
+            # ----- 蛋白質趨勢圖（深色卡片）-----
             total_pro = sum(daily[d]["protein"] for d in sorted_days)
             avg_pro = total_pro / len(sorted_days) if sorted_days else 0
 
-            pro_data = {
-                "date": xs,
-                "protein": [daily[d]["protein"] for d in sorted_days],
-            }
-
-            # 蛋白質卡片
-            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-            st.markdown(f'''
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-value">{avg_pro:.0f} <span class="chart-unit">g</span></div>
-                        <div style="color:#a0a0a0;font-size:12px;">平均每日蛋白質</div>
-                    </div>
-                    <div class="chart-emoji">🍗</div>
-                </div>
-            ''', unsafe_allow_html=True)
-
-            # 蛋白質 Altair 折線圖
+            pro_data = {"date": xs, "protein": [daily[d]["protein"] for d in sorted_days]}
             pro_df = pd.DataFrame(pro_data)
-            pro_chart = alt.Chart(pro_df).mark_line(
-                color="#38b6ff",
-                strokeWidth=2.5,
-                point=alt.Chart({}).mark_circle(size=60, color="#38b6ff")
-            ).encode(
-                x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888")),
-                y=alt.Y("protein:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888"), title=""),
-            ).properties(
-                height=200,
-                width=alt.Step(40)
-            )
-            st.altair_chart(pro_chart, use_container_width=True)
+
+            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+            st.markdown('<div class="chart-header"><div><div class="chart-value">' + str(avg_pro) + ' <span class="chart-unit">g</span></div><div style="color:#a0a0a0;font-size:12px;">平均每日蛋白質</div></div><div class="chart-emoji">🍗</div></div>', unsafe_allow_html=True)
+
+            base_pro = alt.Chart(pro_df).encode(x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", labelAngle=0)), y=alt.Y("protein:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", gridColor="#2a2a4a"), title=""))
+            line_pro = base_pro.mark_line(color="#38b6ff", strokeWidth=3, interpolate="monotone")
+            points_pro = base_pro.mark_circle(size=60, color="#38b6ff")
+            area_pro = base_pro.mark_area(color=alt.Gradient(gradient="linear", stops=[alt.GradientStop(color="rgba(56,182,255,0.25)", offset=0), alt.GradientStop(color="rgba(56,182,255,0)", offset=1)], x1=1, y1=0, x2=1, y2=1), interpolate="monotone")
+            final_pro_chart = (area_pro + line_pro + points_pro).properties(height=200)
+            st.altair_chart(final_pro_chart, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # 水量長條圖（維持原樣或也改為深色卡片可選）
             st.subheader("💧 水量趨勢")
             bar_data = {"date": xs, "water": [daily[d]["water"] for d in sorted_days]}
             st.bar_chart(bar_data, x="date", y="water")
