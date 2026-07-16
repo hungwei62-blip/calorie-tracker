@@ -2408,60 +2408,27 @@ def main() -> None:
 
         /* ========================================== */
         /* ========================================== */
-        /* 底部導航列（Bottom Nav） — Gemini 設計規格 */
+        /* 底部導航 - 簡化版（按鈕在 layout 流中） */
         /* ========================================== */
 
-        /* 外層容器 - 淺灰膠囊 */
-        .bottom-nav-bar {
-            position: fixed !important;
-            bottom: 20px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            display: inline-flex !important;
-            gap: 4px !important;
-            padding: 6px 8px !important;
-            background: #F3F4F6 !important;
-            border: 1px solid #E5E7EB !important;
-            border-radius: 28px !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-            z-index: 999 !important;
-            justify-content: space-around !important;
-            align-items: center !important;
-            width: fit-content !important;
-            max-width: fit-content !important;
-        }
-
-        /* 內部按鈕 - 48x48 白色圓形 */
-        .bn-btn {
+        /* 按鈕樣式 - 48x48 圓形白色按鈕 */
+        button[data-testid="baseButton-nav_status"],
+        button[data-testid="baseButton-nav_history"] {
             width: 48px !important;
             height: 48px !important;
             border-radius: 50% !important;
-            background: #ffffff !important;
-            border: none !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
-            cursor: pointer !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            font-size: 20px !important;
-            color: #9CA3AF !important;
-            transition: all 0.2s !important;
-            flex-shrink: 0 !important;
-            text-decoration: none !important;
             padding: 0 !important;
+            min-width: 0 !important;
+            font-size: 20px !important;
+            background: #ffffff !important;
+            color: #9CA3AF !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+            transition: all 0.2s ease !important;
         }
 
         /* Hover 效果 */
-        .bn-btn:hover {
-            background: #f0f4f1 !important;
-            transform: scale(1.05) !important;
-        }
-
-        /* Active 狀態 - 黃色圓形 */
-        .bn-btn.active {
-            background: #FFF78B !important;
-            color: #1F2937 !important;
-            box-shadow: 0 2px 8px rgba(255, 247, 139, 0.6) !important;
+        button[data-testid="baseButton-nav_status"]:hover,
+        button[data-testid="baseButton-nav_history"]:hover {
             transform: scale(1.05) !important;
         }
 
@@ -2506,24 +2473,6 @@ def main() -> None:
     coach_pages = ["學員狀態", "學員歷史"]
 
     student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
-
-    # 角色頁面預設：教練登入後自動進入學員狀態（Phase 5 保險機制）
-    # 處理 query params 切換頁面（底部導航觸發）
-    try:
-        _qp = st.query_params
-        if "nav" in _qp:
-            _nav_target = _qp["nav"]
-            _page_map = {"status": "學員狀態", "history": "學員歷史"}
-            if _nav_target in _page_map:
-                _new = _page_map[_nav_target]
-                if st.session_state.get("page") != _new:
-                    st.session_state.page = _new
-                    # 清掉 query params 避免 loop
-                    st.query_params.clear()
-                    st.rerun()
-    except Exception:
-        pass
-
 
     if is_coach:
         _available_pages = list(coach_pages) + ["學員資料"]
@@ -2597,25 +2546,19 @@ def main() -> None:
 
 
     # ==========================================
-    # 底部導航（教練端 2 個圓形按鈕，使用 st.html 完全控制樣式）
+    # 底部導航 - 置中簡化版（兩顆按鈕在 layout 流中央）
     # ==========================================
-    _current_page = st.session_state.get("page", "學員狀態")
-    _status_active = " active" if _current_page == "學員狀態" else ""
-    _history_active = " active" if _current_page == "學員歷史" else ""
-
-    st.markdown(
-        f'''
-<div class="bottom-nav-bar">
-    <a class="bn-btn{_status_active}" href="?nav=status" title="學員狀態">
-        <span>&#128100;</span>
-    </a>
-    <a class="bn-btn{_history_active}" href="?nav=history" title="學員歷史">
-        <span>&#128197;</span>
-    </a>
-</div>
-''',
-        unsafe_allow_html=True,
-    )
+    _pad_l, _nav_outer, _pad_r = st.columns([3, 1, 3])
+    with _nav_outer:
+        _col1, _col2 = st.columns(2)
+        with _col1:
+            if st.button("👤", key="nav_status", help="學員狀態 - 查看學員膠囊進度條"):
+                st.session_state.page = "學員狀態"
+                st.rerun()
+        with _col2:
+            if st.button("📅", key="nav_history", help="學員歷史 - 查看每位學員的歷史圖表"):
+                st.session_state.page = "學員歷史"
+                st.rerun()
 
 
 if __name__ == "__main__":
