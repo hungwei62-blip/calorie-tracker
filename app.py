@@ -138,6 +138,7 @@ def init_session() -> None:
 
         "pending_student_id": None,
         "needs_tdee_setup": False,
+        "auth_mode": "login",
 
     }
 
@@ -1246,18 +1247,22 @@ def page_tdee_questionnaire() -> None:
 
 # =============================================================================
 
+
 def page_login() -> None:
-    st.title("💪 健身教練管理系統")
-    st.caption("教練管理學員的飲食、訓練、體重記錄")
-    
-    tab_login, tab_signup = st.tabs(["登入", "註冊"])
-    
-    with tab_login:
+    st.title("飲食控制管理系統")
+    st.caption("輕鬆記錄飲食，追蹤你的營養目標")
+
+    # 確保 auth_mode 存在
+    if "auth_mode" not in st.session_state:
+        st.session_state.auth_mode = "login"
+
+    if st.session_state.auth_mode == "login":
+        # ==================== 登入表單 ====================
         with st.form("login_form"):
             username = st.text_input("帳號", key="login_user")
             password = st.text_input("密碼", type="password", key="login_pwd")
             submit = st.form_submit_button("登入", use_container_width=True)
-        
+
         if submit:
             try:
                 rows = sheets.get_users_rows()
@@ -1271,23 +1276,28 @@ def page_login() -> None:
             if not auth.verify_password(password, user.get("password_hash", "")):
                 st.error("密碼錯誤")
                 return
-            
+
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
             st.session_state.role = sheets.get_user_role(str(user.get("user_id") or ""))
 
-            # 設定預設頁面（Phase 5：教練登入後預設為學員狀態）
             if st.session_state.role == "coach":
                 st.session_state.page = "學員狀態"
             else:
                 st.session_state.page = "個人"
             st.success("登入成功！")
             st.rerun()
-    
-    with tab_signup:
+
+        # 切換到註冊
+        if st.button("還沒有帳號？立即註冊", key="nav_to_register"):
+            st.session_state.auth_mode = "register"
+            st.rerun()
+
+    else:
+        # ==================== 註冊表單 ====================
         st.subheader("新學員註冊")
         st.info("填寫以下資料即可建立帳號")
-        
+
         with st.form("signup_form"):
             col1, col2 = st.columns(2)
             with col1:
@@ -1299,9 +1309,9 @@ def page_login() -> None:
                 initial_weight = st.number_input("目前體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=200.0)
                 goal_type = st.selectbox("目標", ["減脂", "維持", "增肌"], index=1)
                 record_mode = st.radio("記錄模式", ["簡易模式", "完整模式"], horizontal=True, index=0)
-            
+
             submitted = st.form_submit_button("註冊並登入", use_container_width=True)
-        
+
         if submitted:
             if not new_user or not new_name or not new_pwd:
                 st.error("帳號、姓名和密碼都不能為空")
@@ -1311,21 +1321,21 @@ def page_login() -> None:
                 return
             if len(new_pwd) < 4:
                 st.warning("密碼建議至少 4 個字元")
-            
+
             try:
                 rows = sheets.get_users_rows()
             except Exception as exc:
                 st.error("取得使用者失敗: " + str(exc))
                 return
-            
+
             if auth.find_user(rows, new_user):
                 st.error("此帳號已被使用")
                 return
-            
+
             try:
                 uid = auth.make_user_id()
                 pwd_hash = auth.hash_password(new_pwd)
-                
+
                 estimated_tdee = initial_weight * 30
                 if goal_type == "減脂":
                     calorie = estimated_tdee - 300
@@ -1333,10 +1343,10 @@ def page_login() -> None:
                     calorie = estimated_tdee + 300
                 else:
                     calorie = estimated_tdee
-                
+
                 protein = initial_weight * 2
                 water = initial_weight * 40
-                
+
                 goals = {
                     "calorie": calorie,
                     "protein": protein,
@@ -1344,23 +1354,30 @@ def page_login() -> None:
                     "fat": 0,
                     "water": water,
                 }
-                
+
                 sheets.append_user(
                     uid, new_user, new_name, pwd_hash, auth.now_iso(),
                     goals=goals,
                     record_mode="simple" if "簡易" in record_mode else "full",
                     weekly_training=4,
                 )
-                
+
                 st.session_state.user_id = uid
                 st.session_state.username = new_user
                 st.session_state.role = "student"
                 st.session_state.needs_tdee_setup = True
                 st.success("註冊成功！請先填寫 TDEE 問卷完成設定")
                 st.rerun()
-                
+
             except Exception as exc:
                 st.error("註冊失敗: " + str(exc))
+
+        # 切換回登入
+        if st.button("已經有帳號了？立即登入", key="nav_to_login"):
+            st.session_state.auth_mode = "login"
+            st.rerun()
+
+
 
 def page_personal() -> None:
 
@@ -2069,7 +2086,7 @@ def page_tdee() -> None:
 
 def main() -> None:
 
-    st.set_page_config(page_title="健身教練管理系統", layout="wide")
+    st.set_page_config(page_title="飲食控制管理系統", layout="wide")
 
     st.markdown("""
 
@@ -2423,6 +2440,31 @@ def main() -> None:
         .main .block-container {
             padding-bottom: 120px !important;
         }
+
+
+    
+        
+        /* ============================================================
+           強制限制登入表單（st.form）寬度並使其水平置中
+           ============================================================ */
+        div[data-testid="stForm"] {
+            max-width: 400px !important;              /* 限制最大寬度，防止橫向拉長 */
+            width: 100% !important;
+            margin: 40px auto !important;            /* 頂部外距 40px，auto 達成水平置中 */
+            background: #ffffff !important;          /* 純白卡片背景 */
+            border-radius: 32px !important;          /* 大圓角 */
+            padding: 30px !important;                 /* 內部留白 */
+            border: 1px solid #E5E7EB !important;     /* 柔和細邊框 */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05) !important; /* 懸浮感陰影 */
+            box-sizing: border-box !important;
+        }
+
+        /* 確保 Form 內部的元素不會溢出 */
+        div[data-testid="stForm"] > div {
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
 
 
     </style>
