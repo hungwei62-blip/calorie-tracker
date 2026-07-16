@@ -997,48 +997,11 @@ def page_coach_student_history():
 
 
 
-        # ============================================================
-        # 深色卡片趨勢圖 CSS
-        # ============================================================
-        st.markdown("""
-        <style>
-            .chart-card {
-                background: #1e1e38 !important;
-                border-radius: 20px !important;
-                padding: 20px !important;
-                margin: 10px 0 !important;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
-            }
-            .chart-card h3 {
-                color: #ffffff !important;
-                margin-bottom: 8px !important;
-            }
-            .chart-value {
-                font-size: 28px !important;
-                font-weight: 700 !important;
-                color: #ffffff !important;
-            }
-            .chart-unit {
-                font-size: 14px !important;
-                color: #a0a0a0 !important;
-            }
-            .chart-emoji {
-                font-size: 32px !important;
-            }
-            .chart-header {
-                display: flex !important;
-                justify-content: space-between !important;
-                align-items: center !important;
-                margin-bottom: 16px !important;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-
         st.subheader("📈 每日攝取趨勢")
 
         # 深色卡片趨勢圖 CSS
         st.markdown("""<style>
-            .chart-card { background: #1e1e38 !important; border-radius: 20px !important; padding: 20px !important; margin: 10px 0 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important; }
+            .chart-card { background: #1e1e38 !important; border-radius: 20px !important; padding: 24px !important; margin: 15px 0 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important; display: block !important; width: 100% !important; box-sizing: border-box !important; }
             .chart-value { font-size: 28px !important; font-weight: 700 !important; color: #ffffff !important; }
             .chart-unit { font-size: 14px !important; color: #a0a0a0 !important; }
             .chart-emoji { font-size: 32px !important; }
@@ -1062,7 +1025,7 @@ def page_coach_student_history():
             base_cal = alt.Chart(cal_df).encode(x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", labelAngle=0)), y=alt.Y("calorie:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", gridColor="#2a2a4a"), title=""))
             line_cal = base_cal.mark_line(color="#FFA500", strokeWidth=3, interpolate="monotone")
             points_cal = base_cal.mark_circle(size=60, color="#FFA500")
-            area_cal = base_cal.mark_area(color=alt.Gradient(gradient="linear", stops=[alt.GradientStop(color="rgba(255,165,0,0.25)", offset=0), alt.GradientStop(color="rgba(255,165,0,0)", offset=1)], x1=1, y1=0, x2=1, y2=1), interpolate="monotone")
+            area_cal = base_cal.mark_area(color="rgba(255, 165, 0, 0.15)", interpolate="monotone")
             final_cal_chart = (area_cal + line_cal + points_cal).properties(height=200)
             st.altair_chart(final_cal_chart, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -1080,7 +1043,7 @@ def page_coach_student_history():
             base_pro = alt.Chart(pro_df).encode(x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", labelAngle=0)), y=alt.Y("protein:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", gridColor="#2a2a4a"), title=""))
             line_pro = base_pro.mark_line(color="#38b6ff", strokeWidth=3, interpolate="monotone")
             points_pro = base_pro.mark_circle(size=60, color="#38b6ff")
-            area_pro = base_pro.mark_area(color=alt.Gradient(gradient="linear", stops=[alt.GradientStop(color="rgba(56,182,255,0.25)", offset=0), alt.GradientStop(color="rgba(56,182,255,0)", offset=1)], x1=1, y1=0, x2=1, y2=1), interpolate="monotone")
+            area_pro = base_pro.mark_area(color="rgba(56, 182, 255, 0.15)", interpolate="monotone")
             final_pro_chart = (area_pro + line_pro + points_pro).properties(height=200)
             st.altair_chart(final_pro_chart, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
