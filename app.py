@@ -266,7 +266,7 @@ def page_coach_overview() -> None:
         return
     
     today = date.today()
-    st.markdown("<p class=\"section-title\">Student Status</p>", unsafe_allow_html=True)
+    st.markdown("<p class=\"section-title\">本日學員狀態</p>", unsafe_allow_html=True)
     
     for student in students:
         uid = student.get("user_id", "")
