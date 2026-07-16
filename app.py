@@ -2424,58 +2424,6 @@ def main() -> None:
             padding-bottom: 120px !important;
         }
 
-        /* ========================================== */
-        /* 登出按鈕 - 右上角 fixed icon-only */
-        /* ========================================== */
-
-        /* 外層容器 - fixed 到右上角 */
-        div[data-testid="element-container"]:has(button[data-testid="baseButton-logout_btn"]) {
-            position: fixed !important;
-            top: 16px !important;
-            right: 20px !important;
-            width: 48px !important;
-            height: 48px !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            z-index: 999 !important;
-        }
-
-        /* 內部按鈕 - 100% 填滿容器 */
-        button[data-testid="baseButton-logout_btn"] {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            border-radius: 50% !important;
-            border: 1px solid #E5E7EB !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            min-width: 0 !important;
-            font-size: 16px !important;
-            background: #ffffff !important;
-            color: #6B7280 !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
-            transition: all 0.2s ease !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-        }
-
-        /* Hover - 變紅色 */
-        button[data-testid="baseButton-logout_btn"]:hover {
-            background: #FEE2E2 !important;
-            color: #DC2626 !important;
-            border-color: #FECACA !important;
-            transform: scale(1.05) !important;
-        }
-
-        /* Click - 反色 */
-        button[data-testid="baseButton-logout_btn"]:active {
-            background: #DC2626 !important;
-            color: #ffffff !important;
-        }
-
 
     </style>
 
@@ -2568,11 +2516,6 @@ def main() -> None:
             page_tdee_questionnaire()
 
 
-    # ==========================================
-    # 登出按鈕（右上角 fixed，由 CSS 處理位置）
-    # ==========================================
-    if st.button("↪", key="logout_btn", help="登出"):
-        do_logout()
 
 
     # ==========================================
@@ -2605,7 +2548,7 @@ def main() -> None:
                     st.rerun()
 
 
+    # ==========================================
 if __name__ == "__main__":
 
     main()
-
