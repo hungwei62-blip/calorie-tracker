@@ -420,7 +420,11 @@ def page_coach_student_detail() -> None:
                 if st.button("確認匯入", type="primary", use_container_width=True):
                     with st.spinner("匯入資料中..."):
                         # 第二次呼叫，實際寫入
-                        final_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=do_overwrite)
+                        final_result = sheets.import_records_from_excel(
+                            precomputed_data=analysis_result['parsed_data'],
+                            user_id=uid,
+                            overwrite_duplicates=do_overwrite
+                        )
                         _clear_analysis_cache()
                         
                         msg = f"匯入完成！新增 {final_result['imported']} 筆"
@@ -874,7 +878,11 @@ def page_coach_student_history():
 
                     if st.button("確認匯入", type="primary", use_container_width=True):
                         with st.spinner("匯入資料中..."):
-                            final_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=do_overwrite)
+                            final_result = sheets.import_records_from_excel(
+                                precomputed_data=analysis_result['parsed_data'],
+                                user_id=uid,
+                                overwrite_duplicates=do_overwrite
+                            )
                             _clear_analysis_cache()
                             
                             msg = f"匯入完成！新增 {final_result['imported']} 筆"
