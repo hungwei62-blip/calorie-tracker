@@ -436,8 +436,7 @@ def page_coach_student_detail() -> None:
                         st.success(msg)
                         
                         st.session_state.excel_import_file = None
-                        time.sleep(2)  # 等待 API 配額冷卻
-                        st.rerun()
+                        st.info("請手動刷新頁面以查看最新資料")
             else:
                 st.info("沒有找到可匯入的資料")
 
@@ -894,8 +893,7 @@ def page_coach_student_history():
                                 msg += f"，跳過 {final_result['skipped']} 筆"
                             st.success(msg)
                             
-                            time.sleep(2)  # 等待 API 配額冷卻
-                            st.rerun()
+                            st.info("請手動刷新頁面以查看最新資料")
                 else:
                     st.info("沒有找到可匯入的資料")
 
