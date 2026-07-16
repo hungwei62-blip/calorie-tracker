@@ -1,4 +1,4 @@
-"""AI 健身教練管理系統 Web App
+﻿"""AI 健身教練管理系統 Web App
 
 健身教練管理學員的飲食、訓練、體重記錄系統。
 
@@ -214,6 +214,17 @@ def _week_range() -> tuple:
 
 # =============================================================================
 
+def do_logout() -> None:
+    """清除 session 並重新整理頁面（用於登出按鈕）"""
+    for k in list(st.session_state.keys()):
+        if k != "page":
+            del st.session_state[k]
+    st.session_state.user_id = None
+    st.session_state.username = None
+    st.rerun()
+
+
+
 def page_coach_overview() -> None:
     st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -242,6 +253,13 @@ def page_coach_overview() -> None:
     
     coach_name = str(st.session_state.username or "Coach")
     st.markdown("<div class=\"coach-header\"><div class=\"coach-avatar\"></div><div class=\"coach-greeting\">Hello ! " + coach_name + "</div></div>", unsafe_allow_html=True)
+
+    # 登出按鈕（header 右側）
+    _sp_col, _lo_col = st.columns([9, 1])
+    with _lo_col:
+        if st.button("登出", key="logout_btn", use_container_width=True):
+            do_logout()
+
     
     try:
         students = sheets.get_all_students()
@@ -758,6 +776,13 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
 
 def page_coach_student_history():
     """教練端：檢視單一學員的歷史記錄（圖表 / 備註 / 匯出）。"""
+    # 登出按鈕（header 右側）
+    _sp_col2, _lo_col2 = st.columns([9, 1])
+    with _lo_col2:
+        if st.button("登出", key="logout_btn", use_container_width=True):
+            do_logout()
+
+
     uid = st.session_state.get("view_student_id")
 
     if not uid:
@@ -1264,6 +1289,12 @@ def page_login() -> None:
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
             st.session_state.role = sheets.get_user_role(str(user.get("user_id") or ""))
+
+            # 設定預設頁面（Phase 5：教練登入後預設為學員狀態）
+            if st.session_state.role == "coach":
+                st.session_state.page = "學員狀態"
+            else:
+                st.session_state.page = "個人"
             st.success("登入成功！")
             st.rerun()
     
@@ -2374,6 +2405,94 @@ def main() -> None:
             background-color: #2563EB !important;
         }
 
+
+        /* ========================================== */
+        /* 底部導航列（Bottom Nav）— Stage 2-1 注入 */
+        /* ========================================== */
+
+        /* 底部導航容器 - 固定在視窗底部中央 */
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]),
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) {
+            position: fixed !important;
+            bottom: 20px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            background: #ffffff !important;
+            border-radius: 28px !important;
+            padding: 8px 12px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+            z-index: 100 !important;
+            width: auto !important;
+            gap: 8px !important;
+        }
+
+        /* 樣式化底部導航按鈕本身 */
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]) button,
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) button {
+            background: transparent !important;
+            color: #9CA3AF !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 12px 24px !important;
+            border-radius: 20px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 4px !important;
+            font-size: 14px !important;
+            min-width: 100px !important;
+            transition: all 0.2s !important;
+        }
+
+        /* Hover 效果 */
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]) button:hover,
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) button:hover {
+            background: #f0f4f1 !important;
+        }
+
+        /* 隱藏原有按鈕圓角預設值 */
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]) button p,
+        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) button p {
+            margin: 0 !important;
+            font-size: 12px !important;
+            font-weight: 500 !important;
+            color: #9CA3AF !important;
+        }
+
+        /* Active 樣式（per-button via :has() + data attribute） */
+        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_status"],
+        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_history"] {
+            background: #FFF78B !important;
+            color: #1F2937 !important;
+        }
+        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_status"] p,
+        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_history"] p {
+            color: #1F2937 !important;
+            font-weight: 600 !important;
+        }
+
+
+        /* 內容不被導航列遮住 */
+        .main .block-container {
+            padding-bottom: 120px !important;
+        }
+
+        /* header 上的登出按鈕使用小尺寸 */
+        div[data-testid="baseButton-logout_btn"] {
+            background: transparent !important;
+            color: #6B7280 !important;
+            border: 1px solid #E5E7EB !important;
+            box-shadow: none !important;
+            padding: 4px 12px !important;
+            border-radius: 8px !important;
+            font-size: 13px !important;
+        }
+        div[data-testid="baseButton-logout_btn"]:hover {
+            background: #FEE2E2 !important;
+            color: #DC2626 !important;
+            border-color: #FECACA !important;
+        }
+
     </style>
 
     """, unsafe_allow_html=True)
@@ -2394,55 +2513,30 @@ def main() -> None:
 
     student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
 
-    with st.sidebar:
+    # 角色頁面預設：教練登入後自動進入學員狀態（Phase 5 保險機制）
+    if is_coach:
+        _available_pages = list(coach_pages) + ["學員資料"]
+    else:
+        _available_pages = list(student_pages)
 
-        uname = str(st.session_state.username or "")
+    if st.session_state.page not in _available_pages:
+        st.session_state.page = "學員狀態" if is_coach else "個人"
 
-        role_label = "教練" if is_coach else "學員"
+    # ----- 暫時定義 page 以維持向下相容 -----
+    # ----- 路由：直接使用 st.session_state.page（Stage 2-6 簡化） -----
 
-        st.write(f"👤 {uname} ({role_label})")
-
-        if is_coach:
-
-            available = coach_pages
-
-            default_idx = coach_pages.index(st.session_state.page) if st.session_state.page in coach_pages else 0
-
-        else:
-
-            available = student_pages
-
-            default_idx = student_pages.index(st.session_state.page) if st.session_state.page in student_pages else 0
-
-        page = st.radio("導航", available, index=default_idx)
-
-        st.session_state.page = page
-
-        if st.button("登出", use_container_width=True):
-
-            for k in list(st.session_state.keys()):
-
-                if k != "page":
-
-                    del st.session_state[k]
-
-            st.session_state.user_id = None
-
-            st.session_state.username = None
-
-            st.rerun()
 
     if is_coach:
 
-        if page == "學員狀態":
+        if st.session_state.page == "學員狀態":
 
             page_coach_overview()
 
-        elif page == "學員資料":
+        elif st.session_state.page == "學員資料":
 
             page_coach_student_detail()
 
-        elif page == "學員歷史":
+        elif st.session_state.page == "學員歷史":
             page_coach_student_history()
     else:
 
@@ -2462,33 +2556,53 @@ def main() -> None:
 
                 return
 
-        if page == "個人":
+        if st.session_state.page == "個人":
 
             page_personal()
 
-        elif page == "記錄飲食":
+        elif st.session_state.page == "記錄飲食":
 
             page_log_meal()
 
-        elif page == "歷史":
+        elif st.session_state.page == "歷史":
 
             page_history()
 
-        elif page == "體重記錄":
+        elif st.session_state.page == "體重記錄":
 
             page_weight()
 
-        elif page == "訓練記錄":
+        elif st.session_state.page == "訓練記錄":
 
             page_training()
 
-        elif page == "TDEE":
+        elif st.session_state.page == "TDEE":
 
             page_tdee()
 
-        elif page == "TDEE 問卷":
+        elif st.session_state.page == "TDEE 問卷":
 
             page_tdee_questionnaire()
+
+
+    # ==========================================
+    # 底部導航（教練端 2 個按鈕，Stage 2-4 最終版）
+    # ==========================================
+    _current_page = st.session_state.get("page", "學員狀態")
+    _status_label = "學員狀態 ●" if _current_page == "學員狀態" else "學員狀態"
+    _history_label = "教練歷史 ●" if _current_page == "教練歷史" else "教練歷史"
+
+    with st.container():
+        _nav_c1, _nav_c2 = st.columns(2)
+        with _nav_c1:
+            if st.button(_status_label, key="nav_status", use_container_width=True):
+                st.session_state.page = "學員狀態"
+                st.rerun()
+        with _nav_c2:
+            if st.button(_history_label, key="nav_history", use_container_width=True):
+                st.session_state.page = "教練歷史"
+                st.rerun()
+
 
 if __name__ == "__main__":
 

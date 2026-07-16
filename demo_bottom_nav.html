@@ -1,0 +1,204 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教練頁面 - 底部導航版</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #F7F7F7; min-height: 100vh; padding: 20px; padding-bottom: 120px; }
+
+/* 教練抬頭 */
+.coach-header { display: flex; align-items: center; margin-bottom: 24px; }
+.coach-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #BBE8EE 0%, #8B5CF6 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 16px; }
+.coach-greeting { font-size: 24px; font-weight: 400; color: #1F2937; }
+
+/* 成員卡片 */
+.member-card { background: #FFFFFF; border-radius: 12px; padding: 20px; margin-bottom: 16px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.member-avatar { width: 56px; height: 56px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 20px; flex-shrink: 0; }
+.member-info { flex: 1; }
+.member-name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.member-name { font-size: 18px; font-weight: 400; color: #1F2937; }
+.training-badge { background: #DCFCE7; color: #16A34A; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.training-badge.not-done { background: #F3F4F6; color: #9CA3AF; }
+
+/* 膠囊進度條 */
+.capsule-container { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 80px; }
+.capsule-track { position: relative; overflow: hidden; width: 64px; height: 200px; border-radius: 50px; background-color: #f0f4f1; }
+.capsule-fill { position: absolute; bottom: 0; left: 0; width: 100%; }
+.capsule-fill.cal { background: linear-gradient(180deg, #d4f0f5 0%, #bbe8ee 100%); }
+.capsule-fill.pro { background: linear-gradient(180deg, #e2f5dd 0%, #d1ebbe 100%); }
+.capsule-fill.water { background: linear-gradient(180deg, #ffe0a3 0%, #ffc766 100%); }
+.capsule-badge { position: absolute; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; background-color: #ffffff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 400; color: #3c3c3c; z-index: 10; }
+.capsule-label { font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; }
+.capsule-value { font-size: 10px; color: #9CA3AF; }
+.capsule-row { display: flex; gap: 24px; justify-content: center; padding: 20px; background: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.section-title { font-size: 18px; font-weight: 600; color: #1F2937; margin-bottom: 12px; }
+
+/* 底部導覽列 */
+.bottom-nav {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffffff;
+    border-radius: 28px;
+    padding: 8px 20px;
+    display: flex;
+    gap: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+/* 導覽按鈕 */
+.nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 24px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 100px;
+    border: none;
+    background: transparent;
+}
+.nav-btn:hover {
+    background: #f0f4f1;
+}
+.nav-btn.active {
+    background: #FFF78B;
+}
+.nav-btn i {
+    font-size: 24px;
+    color: #9CA3AF;
+    margin-bottom: 4px;
+}
+.nav-btn.active i {
+    color: #1F2937;
+}
+.nav-btn span {
+    font-size: 12px;
+    color: #9CA3AF;
+}
+.nav-btn.active span {
+    color: #1F2937;
+    font-weight: 600;
+}
+
+/* 頁面切換 */
+.page { display: none; }
+.page.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- 學員狀態頁面 -->
+<div class="page active" id="statusPage">
+    <div class="coach-header">
+        <div class="coach-avatar">圖</div>
+        <div class="coach-greeting">Hello ! 美麗肉乙教練</div>
+    </div>    
+
+    <h2 class="section-title">學員狀態</h2>
+
+    <!-- 學員卡片 -->
+    <div class="member-card">
+        <div class="member-avatar">陳</div>
+        <div class="member-info">
+            <div class="member-name-row">
+                <div class="member-name">陳小明</div>
+                <div class="training-badge">
+                    <i class="fas fa-check"></i> 已訓練
+                </div>
+            </div>
+            <div class="capsule-row">
+                <div class="capsule-container">
+                    <div class="capsule-track">
+                        <div class="capsule-fill cal" style="height: 75%;"></div>
+                        <div class="capsule-badge" style="top: 25%;">1658</div>
+                    </div>
+                    <div class="capsule-label">CAL</div>
+                    <div class="capsule-value">1658/2200</div>
+                </div>
+                <div class="capsule-container">
+                    <div class="capsule-track">
+                        <div class="capsule-fill pro" style="height: 72%;"></div>
+                        <div class="capsule-badge" style="top: 28%;">119</div>
+                    </div>
+                    <div class="capsule-label">PROT</div>
+                    <div class="capsule-value">119/168g</div>
+                </div>
+                <div class="capsule-container">
+                    <div class="capsule-track">
+                        <div class="capsule-fill water" style="height: 60%;"></div>
+                        <div class="capsule-badge" style="top: 40%;">1200</div>
+                    </div>
+                    <div class="capsule-label">WATER</div>
+                    <div class="capsule-value">1200/2000</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 教練歷史頁面 -->
+<div class="page" id="historyPage">
+    <div class="coach-header">
+        <div class="coach-avatar">圖</div>
+        <div class="coach-greeting">Hello ! 美麗肉乙教練</div>
+    </div>    
+
+    <h2 class="section-title">教練歷史</h2>
+    
+    <div class="member-card">
+        <div class="member-info">
+            <div class="member-name">這是教練歷史頁面的內容</div>
+        </div>
+    </div>
+</div>
+
+<!-- 底部導覽列 -->
+<div class="bottom-nav">
+    <button class="nav-btn active" onclick="switchPage('status')">
+        <i class="fas fa-chart-pie"></i>
+        <span>學員狀態</span>
+    </button>
+    <button class="nav-btn" onclick="switchPage('history')">
+        <i class="fas fa-users"></i>
+        <span>教練歷史</span>
+    </button>
+</div>
+
+<script>
+function switchPage(page) {
+    // 移除所有頁面的 active class
+    document.querySelectorAll('.page').forEach(function(p) {
+        p.classList.remove('active');
+    });
+    
+    // 移除所有按鈕的 active class
+    document.querySelectorAll('.nav-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    
+    // 顯示目標頁面
+    if (page === 'status') {
+        document.getElementById('statusPage').classList.add('active');
+        // 第一個按鈕變active
+        document.querySelectorAll('.nav-btn')[0].classList.add('active');
+        // 滾動到頂部
+        window.scrollTo(0, 0);
+    } else {
+        document.getElementById('historyPage').classList.add('active');
+        // 第二個按鈕變active
+        document.querySelectorAll('.nav-btn')[1].classList.add('active');
+        // 滾動到頂部
+        window.scrollTo(0, 0);
+    }
+}
+</script>
+
+</body>
+</html>
