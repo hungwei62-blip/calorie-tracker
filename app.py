@@ -641,12 +641,27 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
     # 中文字型設定
     import matplotlib.font_manager as fm
     # 嘗試使用系統中文字型
-    font_paths = [
-        "C:/Windows/Fonts/msjh.ttc",  # Microsoft JhengHei
-        "C:/Windows/Fonts/NotoSansCJKtc-Regular.otf",
-        "C:/Windows/Fonts/simhei.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-    ]
+    # 內嵌中文字型（放在 assets/fonts/ 目錄）
+    font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "NotoSansTC-Regular.otf")
+
+    if os.path.exists(font_path):
+        prop = fm.FontProperties(fname=font_path)
+        _plt.rcParams["font.sans-serif"] = [font_path]
+        _plt.rcParams["font.family"] = ["sans-serif"]
+    else:
+        # Fallback 到系統字型
+        font_paths = [
+            "C:/Windows/Fonts/msjh.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        ]
+        for fp in font_paths:
+            if os.path.exists(fp):
+                prop = fm.FontProperties(fname=fp)
+                _plt.rcParams["font.sans-serif"] = [fp]
+                _plt.rcParams["font.family"] = ["sans-serif"]
+                break
+        else:
+            _plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
     font_found = False
     for fp in font_paths:
         if os.path.exists(fp):
