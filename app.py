@@ -577,7 +577,7 @@ def _history_aggregate_daily(records, start_date, end_date):
         d = _parse_record_date(r.get("timestamp", ""))
         if d in days:
             t = days[d]
-            t["calorie"] += float(r.get("calorie", 0) or 0)
+            t["calorie"] += float(r.get("calories", 0) or 0)
             t["protein"] += float(r.get("protein", 0) or 0)
             t["carb"]    += float(r.get("carb", 0) or 0)
             t["fat"]     += float(r.get("fat", 0) or 0)
