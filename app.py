@@ -677,6 +677,7 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
             _plt.rcParams["font.family"] = "sans-serif"
 
     _plt.rcParams["axes.unicode_minus"] = False
+    name = student.get("name", student.get("username", "未知"))
     buf = _io.BytesIO()
     with _PdfPages(buf) as pdf:
         # Page 1: 摘要
