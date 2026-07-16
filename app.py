@@ -231,7 +231,7 @@ def page_coach_overview() -> None:
     .coach-header { display: flex; align-items: center; margin-bottom: 24px; }
     .coach-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #BBE8EE 0%, #8B5CF6 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 16px; }
     .coach-greeting { font-size: 24px; font-weight: 400; color: #1F2937; }
-    .member-card { background: #FFFFFF; border-radius: 12px; padding: 20px; margin-bottom: 16px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .member-card { padding: 16px 0; margin-bottom: 16px; display: flex; align-items: center; }
     .member-avatar { width: 56px; height: 56px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 20px; flex-shrink: 0; }
     .member-info { flex: 1; }
     .member-name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -247,7 +247,7 @@ def page_coach_overview() -> None:
     .capsule-badge { position: absolute; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; background-color: #ffffff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 400; color: #3c3c3c; z-index: 10; }
     .capsule-label { font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; }
     .capsule-value { font-size: 10px; color: #9CA3AF; }
-    .capsule-row { display: flex; gap: 24px; justify-content: center; padding: 20px; background: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .capsule-row { display: flex; gap: 24px; justify-content: center; padding: 16px 0; }
     .section-title { font-size: 18px; font-weight: 600; color: #1F2937; margin-bottom: 12px; }
     </style>""", unsafe_allow_html=True)
     
@@ -2407,68 +2407,62 @@ def main() -> None:
 
 
         /* ========================================== */
-        /* 底部導航列（Bottom Nav）— Stage 2-1 注入 */
+        /* ========================================== */
+        /* 底部導航列（Bottom Nav） — Gemini 設計規格 */
         /* ========================================== */
 
-        /* 底部導航容器 - 固定在視窗底部中央 */
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]),
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) {
+        /* 外層容器 - 淺灰膠囊 */
+        .bottom-nav-bar {
             position: fixed !important;
             bottom: 20px !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
-            background: #ffffff !important;
+            display: inline-flex !important;
+            gap: 4px !important;
+            padding: 6px 8px !important;
+            background: #F3F4F6 !important;
+            border: 1px solid #E5E7EB !important;
             border-radius: 28px !important;
-            padding: 8px 12px !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-            z-index: 100 !important;
-            width: auto !important;
-            gap: 8px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+            z-index: 999 !important;
+            justify-content: space-around !important;
+            align-items: center !important;
+            width: fit-content !important;
+            max-width: fit-content !important;
         }
 
-        /* 樣式化底部導航按鈕本身 */
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]) button,
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) button {
-            background: transparent !important;
-            color: #9CA3AF !important;
+        /* 內部按鈕 - 48x48 白色圓形 */
+        .bn-btn {
+            width: 48px !important;
+            height: 48px !important;
+            border-radius: 50% !important;
+            background: #ffffff !important;
             border: none !important;
-            box-shadow: none !important;
-            padding: 12px 24px !important;
-            border-radius: 20px !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+            cursor: pointer !important;
             display: flex !important;
-            flex-direction: column !important;
             align-items: center !important;
-            gap: 4px !important;
-            font-size: 14px !important;
-            min-width: 100px !important;
+            justify-content: center !important;
+            font-size: 20px !important;
+            color: #9CA3AF !important;
             transition: all 0.2s !important;
+            flex-shrink: 0 !important;
+            text-decoration: none !important;
+            padding: 0 !important;
         }
 
         /* Hover 效果 */
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]) button:hover,
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) button:hover {
+        .bn-btn:hover {
             background: #f0f4f1 !important;
+            transform: scale(1.05) !important;
         }
 
-        /* 隱藏原有按鈕圓角預設值 */
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_status"]) button p,
-        div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-nav_history"]) button p {
-            margin: 0 !important;
-            font-size: 12px !important;
-            font-weight: 500 !important;
-            color: #9CA3AF !important;
-        }
-
-        /* Active 樣式（per-button via :has() + data attribute） */
-        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_status"],
-        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_history"] {
+        /* Active 狀態 - 黃色圓形 */
+        .bn-btn.active {
             background: #FFF78B !important;
             color: #1F2937 !important;
-        }
-        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_status"] p,
-        div[data-testid="column"]:has(> div > .data-active-marker.active) button[data-testid="baseButton-nav_history"] p {
-            color: #1F2937 !important;
-            font-weight: 600 !important;
+            box-shadow: 0 2px 8px rgba(255, 247, 139, 0.6) !important;
+            transform: scale(1.05) !important;
         }
 
 
@@ -2514,6 +2508,23 @@ def main() -> None:
     student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
 
     # 角色頁面預設：教練登入後自動進入學員狀態（Phase 5 保險機制）
+    # 處理 query params 切換頁面（底部導航觸發）
+    try:
+        _qp = st.query_params
+        if "nav" in _qp:
+            _nav_target = _qp["nav"]
+            _page_map = {"status": "學員狀態", "history": "學員歷史"}
+            if _nav_target in _page_map:
+                _new = _page_map[_nav_target]
+                if st.session_state.get("page") != _new:
+                    st.session_state.page = _new
+                    # 清掉 query params 避免 loop
+                    st.query_params.clear()
+                    st.rerun()
+    except Exception:
+        pass
+
+
     if is_coach:
         _available_pages = list(coach_pages) + ["學員資料"]
     else:
@@ -2586,22 +2597,25 @@ def main() -> None:
 
 
     # ==========================================
-    # 底部導航（教練端 2 個按鈕，Stage 2-4 最終版）
+    # 底部導航（教練端 2 個圓形按鈕，使用 st.html 完全控制樣式）
     # ==========================================
     _current_page = st.session_state.get("page", "學員狀態")
-    _status_label = "學員狀態 ●" if _current_page == "學員狀態" else "學員狀態"
-    _history_label = "教練歷史 ●" if _current_page == "教練歷史" else "教練歷史"
+    _status_active = " active" if _current_page == "學員狀態" else ""
+    _history_active = " active" if _current_page == "學員歷史" else ""
 
-    with st.container():
-        _nav_c1, _nav_c2 = st.columns(2)
-        with _nav_c1:
-            if st.button(_status_label, key="nav_status", use_container_width=True):
-                st.session_state.page = "學員狀態"
-                st.rerun()
-        with _nav_c2:
-            if st.button(_history_label, key="nav_history", use_container_width=True):
-                st.session_state.page = "教練歷史"
-                st.rerun()
+    st.markdown(
+        f'''
+<div class="bottom-nav-bar">
+    <a class="bn-btn{_status_active}" href="?nav=status" title="學員狀態">
+        <span>&#128100;</span>
+    </a>
+    <a class="bn-btn{_history_active}" href="?nav=history" title="學員歷史">
+        <span>&#128197;</span>
+    </a>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
