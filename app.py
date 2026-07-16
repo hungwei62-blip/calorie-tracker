@@ -2500,7 +2500,7 @@ def main() -> None:
             page_coach_student_history()
     else:
 
-        if page not in ["TDEE 問卷", "個人"]:
+        if st.session_state.page not in ["TDEE 問卷", "個人"]:
 
             goals_check = sheets.get_user_goals(st.session_state.user_id)
 
