@@ -215,128 +215,82 @@ def _week_range() -> tuple:
 # =============================================================================
 
 def page_coach_overview() -> None:
-    """教練首頁：所有學員狀態 - 緊湊表格風格"""
-    st.header("📊 學員狀態")
+    st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+    .coach-header { display: flex; align-items: center; margin-bottom: 24px; }
+    .coach-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #BBE8EE 0%, #8B5CF6 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 16px; }
+    .coach-greeting { font-size: 24px; font-weight: 400; color: #1F2937; }
+    .member-card { background: #FFFFFF; border-radius: 12px; padding: 20px; margin-bottom: 16px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .member-avatar { width: 56px; height: 56px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 20px; flex-shrink: 0; }
+    .member-info { flex: 1; }
+    .member-name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .member-name { font-size: 18px; font-weight: 400; color: #1F2937; }
+    .training-badge { background: #DCFCE7; color: #16A34A; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+    .training-badge.not-done { background: #F3F4F6; color: #9CA3AF; }
+    .capsule-container { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 80px; }
+    .capsule-track { position: relative; overflow: hidden; width: 64px; height: 200px; border-radius: 50px; background-color: #f0f4f1; }
+    .capsule-fill { position: absolute; bottom: 0; left: 0; width: 100%; }
+    .capsule-fill.cal { background: linear-gradient(180deg, #d4f0f5 0%, #bbe8ee 100%); }
+    .capsule-fill.pro { background: linear-gradient(180deg, #e2f5dd 0%, #d1ebbe 100%); }
+    .capsule-fill.water { background: linear-gradient(180deg, #ffe0a3 0%, #ffc766 100%); }
+    .capsule-badge { position: absolute; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; background-color: #ffffff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 400; color: #3c3c3c; z-index: 10; }
+    .capsule-label { font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; }
+    .capsule-value { font-size: 10px; color: #9CA3AF; }
+    .capsule-row { display: flex; gap: 24px; justify-content: center; padding: 20px; background: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .section-title { font-size: 18px; font-weight: 600; color: #1F2937; margin-bottom: 12px; }
+    </style>""", unsafe_allow_html=True)
     
-    # 即時更新指示
-    col_status, col_time = st.columns([1, 3])
-    with col_status:
-        st.markdown("🟢 **即時更新中**")
-    with col_time:
-        st.caption(f"今日日期：{date.today().strftime('%Y/%m/%d')}")
+    coach_name = str(st.session_state.username or "Coach")
+    st.markdown("<div class=\"coach-header\"><div class=\"coach-avatar\"></div><div class=\"coach-greeting\">Hello ! " + coach_name + "</div></div>", unsafe_allow_html=True)
     
     try:
         students = sheets.get_all_students()
     except Exception as exc:
-        st.error("取得學員列表失敗: " + str(exc))
+        st.error("Failed to get students: " + str(exc))
         return
     
     if not students:
-        st.info("目前沒有學員！")
+        st.info("No students yet.")
         return
     
     today = date.today()
-    
-    # 統計概覽
-    total_students = len(students)
-    completed_diet = 0
-    completed_water = 0
-    completed_training = 0
+    st.markdown("<p class=\"section-title\">Student Status</p>", unsafe_allow_html=True)
     
     for student in students:
         uid = student.get("user_id", "")
-        goals = sheets.get_user_goals(uid)
-        today_records = sheets.get_records_by_date(uid, today)
-        totals = metrics.sum_totals(today_records).as_dict()
-        training_today = sheets.get_training_by_date(uid, today)
-        
-        cal_goal = goals.get("calorie", 0)
-        cal_actual = totals.get("calories", 0)
-        water_goal = goals.get("water", 0)
-        water_actual = totals.get("water", 0)
-        
-        if cal_goal > 0 and cal_actual >= cal_goal * 0.8:
-            completed_diet += 1
-        if water_goal > 0 and water_actual >= water_goal * 0.8:
-            completed_water += 1
-        if training_today and any(v == 1 for v in training_today.values()):
-            completed_training += 1
-    
-    # 概覽卡片
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("👥 學員", total_students)
-    with col2:
-        st.metric("✅ 飲食達標", f"{completed_diet}/{total_students}")
-    with col3:
-        st.metric("💧 水量達標", f"{completed_water}/{total_students}")
-    with col4:
-        st.metric("🏋️ 已訓練", f"{completed_training}/{total_students}")
-    
-    st.markdown("---")
-    st.subheader("👥 學員狀態一覽")
-    
-    # 建立學員狀態表格
-    table_data = []
-    for student in students:
-        uid = student.get("user_id", "")
-        name = student.get("name", student.get("username", "未知"))
+        name = student.get("name", student.get("username", "Unknown"))
         goals = sheets.get_user_goals(uid)
         today_records = sheets.get_records_by_date(uid, today)
         totals = metrics.sum_totals(today_records).as_dict()
         training_today = sheets.get_training_by_date(uid, today)
         has_training = training_today is not None and any(v == 1 for v in training_today.values()) if training_today else False
-        latest_weight = sheets.get_latest_weight(uid)
         
         calorie_goal = goals.get("calorie", 0)
         protein_goal = goals.get("protein", 0)
         water_goal = goals.get("water", 0)
-        
-        calorie_actual = totals.get("calories", 0)
-        protein_actual = totals.get("protein", 0)
-        water_actual = totals.get("water", 0)
+        calorie_actual = int(totals.get("calories", 0))
+        protein_actual = int(totals.get("protein", 0))
+        water_actual = int(totals.get("water", 0))
         
         cal_pct = min((calorie_actual / calorie_goal) * 100, 100) if calorie_goal > 0 else 0
         pro_pct = min((protein_actual / protein_goal) * 100, 100) if protein_goal > 0 else 0
         water_pct = min((water_actual / water_goal) * 100, 100) if water_goal > 0 else 0
         
-        # 狀態emoji
-        def status_emoji(pct):
-            if pct >= 80: return "🟢"
-            elif pct >= 50: return "🟡"
-            else: return "🔴"
+        cal_top = 100 - cal_pct
+        pro_top = 100 - pro_pct
+        water_top = 100 - water_pct
         
-        training_emoji = "🏋️" if has_training else "⚪"
+        if has_training:
+            training_html = "<i class=\"fas fa-check\"></i> Trained"
+            training_class = ""
+        else:
+            training_html = "<i class=\"fas fa-times\"></i> Not trained"
+            training_class = "not-done"
         
-        table_data.append({
-            "姓名": name,
-            "體重": f"{latest_weight:.1f}kg" if latest_weight else "-",
-            "蛋白質": status_emoji(pro_pct),
-            "蛋白質 g": f"{protein_actual:.0f}/{protein_goal:.0f}g",
-            "蛋白質%": f"{pro_pct:.0f}%",
-            "熱量": status_emoji(cal_pct),
-            "熱量 kcal": f"{calorie_actual:.0f}/{calorie_goal:.0f}",
-            "熱量%": f"{cal_pct:.0f}%",
-            "水量": status_emoji(water_pct),
-            "水量 ml": f"{water_actual:.0f}/{water_goal:.0f}ml",
-            "水量%": f"{water_pct:.0f}%",
-            "訓練": training_emoji,
-        })
-    
-    st.dataframe(table_data, use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-    st.caption("點選學員後按下方按鈕查看其歷史記錄：")
-    _opts = {s.get("user_id", ""): s.get("name", s.get("username", "未知")) for s in students}
-    _hist_pick = st.selectbox("選擇學員查看歷史", options=list(_opts.keys()),
-                             format_func=lambda x: _opts.get(x, x), key="coach_hist_pick")
-    if st.button("📚 開啟歷史頁面", key="open_history_btn"):
-        st.session_state.view_student_id = _hist_pick
-        st.session_state.page = "學員歷史"
-        st.rerun()
-
-
-
+        surname = name[0] if name else "?"
+        
+        card_html = "<div class=\"member-card\"><div class=\"member-avatar\">" + surname + "</div><div class=\"member-info\"><div class=\"member-name-row\"><div class=\"member-name\">" + name + "</div><div class=\"training-badge " + training_class + "\">" + training_html + "</div></div><div class=\"capsule-row\"><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill cal\" style=\"height: " + str(cal_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(cal_top) + "%\">" + str(calorie_actual) + "</div></div><div class=\"capsule-label\">CAL</div><div class=\"capsule-value\">" + str(calorie_actual) + "/" + str(int(calorie_goal)) + "</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill pro\" style=\"height: " + str(pro_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(pro_top) + "%\">" + str(protein_actual) + "</div></div><div class=\"capsule-label\">PROT</div><div class=\"capsule-value\">" + str(protein_actual) + "/" + str(int(protein_goal)) + "g</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill water\" style=\"height: " + str(water_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(water_top) + "%\">" + str(water_actual) + "</div></div><div class=\"capsule-label\">WATER</div><div class=\"capsule-value\">" + str(water_actual) + "/" + str(int(water_goal)) + "</div></div></div></div></div>"
+        st.markdown(card_html, unsafe_allow_html=True)
 def page_coach_student_detail() -> None:
 
     uid = st.session_state.get("view_student_id")
