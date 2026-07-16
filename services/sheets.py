@@ -680,6 +680,7 @@ def import_records_from_excel(
     from io import BytesIO
     from datetime import datetime
     
+    import time
     from services.sheets import get_records, delete_record, append_record
     
     result = {
@@ -865,6 +866,7 @@ def import_records_from_excel(
                 if record["date"] in existing_dates:
                     if overwrite_duplicates:
                         delete_record(record["timestamp"], user_id)
+                        time.sleep(0.5)  # 避免 API 配額限制
                         append_record(
                             timestamp=record["timestamp"],
                             user_id=user_id,
