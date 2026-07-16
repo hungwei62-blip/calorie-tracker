@@ -1,4 +1,4 @@
-"""AI 健身教練管理系統 Web App
+﻿"""AI 健身教練管理系統 Web App
 
 健身教練管理學員的飲食、訓練、體重記錄系統。
 
@@ -16,7 +16,7 @@ import io as _io
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as _plt
-import altair as alt
+import plotly.graph_objects as go
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages as _PdfPages
 
@@ -997,62 +997,56 @@ def page_coach_student_history():
 
 
 
-        st.subheader("📈 每日攝取趨勢")
+    st.subheader("📈 每日攝取趨勢")
 
-        # 深色卡片趨勢圖 CSS
-        st.markdown("""<style>
-            .chart-card { background: #1e1e38 !important; border-radius: 20px !important; padding: 24px !important; margin: 15px 0 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important; display: block !important; width: 100% !important; box-sizing: border-box !important; }
-            .chart-value { font-size: 28px !important; font-weight: 700 !important; color: #ffffff !important; }
-            .chart-unit { font-size: 14px !important; color: #a0a0a0 !important; }
-            .chart-emoji { font-size: 32px !important; }
-            .chart-header { display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 16px !important; }
-        </style>""", unsafe_allow_html=True)
+    # 深色卡片趨勢圖 CSS
+    st.markdown("""<style>
+        .chart-card { background: #1e1e38 !important; border-radius: 20px !important; padding: 20px 20px 5px 20px !important; margin: 15px 0 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important; box-sizing: border-box !important; }
+        .chart-value { font-size: 28px !important; font-weight: 700 !important; color: #ffffff !important; }
+        .chart-unit { font-size: 14px !important; color: #a0a0a0 !important; }
+        .chart-emoji { font-size: 32px !important; }
+        .chart-header { display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 16px !important; }
+    </style>""", unsafe_allow_html=True)
 
-        if daily:
-            sorted_days = sorted(daily.keys())
-            xs = [d.strftime("%m/%d") for d in sorted_days]
+    
+    if daily:
+        sorted_days = sorted(daily.keys())
+        xs = [d.strftime("%m/%d") for d in sorted_days]
 
-            # ----- 熱量趨勢圖（深色卡片）-----
-            total_cal = sum(daily[d]["calorie"] for d in sorted_days)
-            avg_cal = total_cal / len(sorted_days) if sorted_days else 0
+        # ----- 1. 準備數據 -----
+        cals = [daily[d]["calorie"] for d in sorted_days]
+        pros = [daily[d]["protein"] for d in sorted_days]
 
-            cal_data = {"date": xs, "calorie": [daily[d]["calorie"] for d in sorted_days]}
-            cal_df = pd.DataFrame(cal_data)
+        total_cal = sum(cals)
+        avg_cal = total_cal / len(sorted_days) if sorted_days else 0
 
-            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-            st.markdown('<div class="chart-header"><div><div class="chart-value">' + str(avg_cal) + ' <span class="chart-unit">kcal</span></div><div style="color:#a0a0a0;font-size:12px;">平均每日熱量</div></div><div class="chart-emoji">🔥</div></div>', unsafe_allow_html=True)
+        total_pro = sum(pros)
+        avg_pro = total_pro / len(sorted_days) if sorted_days else 0
 
-            base_cal = alt.Chart(cal_df).encode(x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", labelAngle=0)), y=alt.Y("calorie:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", gridColor="#2a2a4a"), title=""))
-            line_cal = base_cal.mark_line(color="#FFA500", strokeWidth=3, interpolate="monotone")
-            points_cal = base_cal.mark_circle(size=60, color="#FFA500")
-            area_cal = base_cal.mark_area(color="rgba(255, 165, 0, 0.15)", interpolate="monotone")
-            final_cal_chart = (area_cal + line_cal + points_cal).properties(height=200)
-            st.altair_chart(final_cal_chart, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        # ----- 2. 熱量趨勢圖 (Plotly 版) -----
+        st.markdown(f"""<div class="chart-card" style="margin-bottom: -10px;"><div class="chart-header"><div><div class="chart-value">{avg_cal:.0f} <span class="chart-unit">kcal</span></div><div style="color:#a0a0a0;font-size:12px;font-family:sans-serif;">平均每日熱量</div></div></div></div>""", unsafe_allow_html=True)
 
-            # ----- 蛋白質趨勢圖（深色卡片）-----
-            total_pro = sum(daily[d]["protein"] for d in sorted_days)
-            avg_pro = total_pro / len(sorted_days) if sorted_days else 0
+        fig_cal = go.Figure()
+        fig_cal.add_trace(go.Scatter(x=xs, y=cals, mode="lines+markers", line=dict(color="#FFA500", width=3, shape="spline"), marker=dict(size=8, color="#FFA500"), fill="tozeroy", fillcolor="rgba(255, 165, 0, 0.15)", hovertemplate="日期: %{x}<br>熱量: %{y:.0f} kcal<extra></extra>"))
+        fig_cal.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=5, r=5, t=5, b=5), height=180, xaxis=dict(showgrid=False, tickfont=dict(color="#888888"), linecolor="#2a2a4a"), yaxis=dict(showgrid=True, gridcolor="#2a2a4a", tickfont=dict(color="#888888"), zeroline=False), showlegend=False)
+        st.plotly_chart(fig_cal, use_container_width=True, config={"displayModeBar": False})
 
-            pro_data = {"date": xs, "protein": [daily[d]["protein"] for d in sorted_days]}
-            pro_df = pd.DataFrame(pro_data)
 
-            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-            st.markdown('<div class="chart-header"><div><div class="chart-value">' + str(avg_pro) + ' <span class="chart-unit">g</span></div><div style="color:#a0a0a0;font-size:12px;">平均每日蛋白質</div></div><div class="chart-emoji">🍗</div></div>', unsafe_allow_html=True)
+        # ----- 3. 蛋白質趨勢圖 (Plotly 版) -----
+        st.markdown(f"""<div class="chart-card" style="margin-top: 15px; margin-bottom: -10px;"><div class="chart-header"><div><div class="chart-value">{avg_pro:.0f} <span class="chart-unit">g</span></div><div style="color:#a0a0a0;font-size:12px;font-family:sans-serif;">平均每日蛋白質</div></div></div></div>""", unsafe_allow_html=True)
 
-            base_pro = alt.Chart(pro_df).encode(x=alt.X("date:O", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", labelAngle=0)), y=alt.Y("protein:Q", axis=alt.Axis(labelColor="#888888", tickColor="#888888", domainColor="#888888", gridColor="#2a2a4a"), title=""))
-            line_pro = base_pro.mark_line(color="#38b6ff", strokeWidth=3, interpolate="monotone")
-            points_pro = base_pro.mark_circle(size=60, color="#38b6ff")
-            area_pro = base_pro.mark_area(color="rgba(56, 182, 255, 0.15)", interpolate="monotone")
-            final_pro_chart = (area_pro + line_pro + points_pro).properties(height=200)
-            st.altair_chart(final_pro_chart, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        fig_pro = go.Figure()
+        fig_pro.add_trace(go.Scatter(x=xs, y=pros, mode="lines+markers", line=dict(color="#38b6ff", width=3, shape="spline"), marker=dict(size=8, color="#38b6ff"), fill="tozeroy", fillcolor="rgba(56, 182, 255, 0.15)", hovertemplate="日期: %{x}<br>蛋白質: %{y:.0f} g<extra></extra>"))
+        fig_pro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=5, r=5, t=5, b=5), height=180, xaxis=dict(showgrid=False, tickfont=dict(color="#888888"), linecolor="#2a2a4a"), yaxis=dict(showgrid=True, gridcolor="#2a2a4a", tickfont=dict(color="#888888"), zeroline=False), showlegend=False)
+        st.plotly_chart(fig_pro, use_container_width=True, config={"displayModeBar": False})
 
-            st.subheader("💧 水量趨勢")
-            bar_data = {"date": xs, "water": [daily[d]["water"] for d in sorted_days]}
-            st.bar_chart(bar_data, x="date", y="water")
-        else:
-            st.info("此區間沒有飲食記錄。")
+        # ----- 4. 水量趨勢圖 -----
+        st.subheader("💧 水量趨勢")
+        bar_data = {"date": xs, "water": [daily[d]["water"] for d in sorted_days]}
+        st.bar_chart(bar_data, x="date", y="water")
+
+    else:
+        st.info("此區間沒有飲食記錄。")
 
 
     st.subheader("🏋️ 訓練記錄")
