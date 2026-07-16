@@ -653,24 +653,27 @@ def delete_note(timestamp: str, user_id: str, coach_id: str) -> bool:
 def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_duplicates: bool = False) -> dict[str, Any]:
     """從 Excel 檔案匯入飲食記錄。
     
-    自動識別欄位：日期、蛋白質(g)、總熱量(kcal)、喝水(ml)
+    固定解析第 8 列（A8:G8）為欄位列。
+    只認精確欄位名稱：日期、總熱量(kcal)、蛋白質(g)、喝水(ml)
     
     參數：
     - excel_file_bytes: Excel 檔案位元組
     - user_id: 學員 ID
-    - overwrite_duplicates: 是否覆寫已存在的日期記錄（預設 False，表示跳過）
+    - overwrite_duplicates: 是否覆寫已存在的日期記錄（預設 False=跳過）
     
-    回傳：{
-        "imported": 新增數量, 
-        "overwritten": 覆寫數量, 
-        "skipped": 跳過數量,
-        "duplicates": [{"date": 日期, "existing": 現有資料}]（僅當 overwrite_duplicates=False 時）,
-        "errors": [錯誤訊息]
+    返回：
+        imported: 新增數量, 
+        overwritten: 覆寫數量, 
+        skipped: 跳過數量,
+        duplicates: [{date: 日期, existing: 既有資料}]（僅當 overwrite_duplicates=False 時）,
+        errors: [錯誤訊息]
     }
     """
     import openpyxl
     from io import BytesIO
     from datetime import datetime
+    
+    from services.sheets import get_records, delete_record, append_record
     
     result = {
         "imported": 0,
@@ -683,6 +686,7 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
     try:
         wb = openpyxl.load_workbook(BytesIO(excel_file_bytes))
         
+        # 取得現有記錄以檢查重複
         existing_records = get_records(user_id)
         existing_dates = {}
         for r in existing_records:
@@ -690,114 +694,131 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
             if ts:
                 existing_dates[ts[:10]] = r
         
-        column_keywords = {
-            "date": ["日期", "date", "日期欄"],
-            "protein": ["蛋白質", "蛋白質(g)", "蛋白", "protein", "蛋白 (g)", "蛋白(g)"],
-            "calories": ["熱量", "總熱量", "總熱量(kcal)", "calories", "calorie", "kcal", "能量", "總熱量(kcal)"],
-            "water": ["喝水", "喝水(ml)", "飲水量", "水量", "water", "ml", "水"],
+        # 固定欄位名稱（精確匹配）
+        TARGET_HEADERS = {
+            "date": "日期",
+            "calories": "總熱量(kcal)",
+            "protein": "蛋白質(g)",
+            "water": "喝水(ml)"
         }
         
-        def find_column(headers, target_key):
-            for col_idx, header in enumerate(headers):
-                header_str = str(header).strip().lower() if header else ""
-                keywords = column_keywords.get(target_key, [])
-                for keyword in keywords:
-                    if keyword.lower() in header_str or header_str in keyword.lower():
-                        return col_idx
-            return -1
+        # 排除關鍵字
+        EXCLUDE_KEYWORDS = ["總分", "合計"]
+        
+        # 需要轉換為 0 的值
+        ZERO_VALUES = ["-", "無", "NA", "", None]
+        
+        def clean_numeric(val):
+            if val is None:
+                return 0.0
+            val_str = str(val).strip()
+            if val_str in ZERO_VALUES:
+                return 0.0
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return 0.0
+        
+        def parse_date(date_val):
+            if isinstance(date_val, datetime):
+                return date_val.strftime("%Y-%m-%d")
+            elif isinstance(date_val, str):
+                # 嘗試 %m/%d 格式（如 6/30）
+                try:
+                    parsed = datetime.strptime(date_val.strip(), "%m/%d")
+                    return f"2026-{parsed.month:02d}-{parsed.day:02d}"
+                except ValueError:
+                    pass
+                # 嘗試其他常見格式
+                for fmt in ["%Y/%m/%d", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d %H:%M:%S"]:
+                    try:
+                        return datetime.strptime(date_val.strip(), fmt).strftime("%Y-%m-%d")
+                    except ValueError:
+                        continue
+            return None
         
         for sheet_name in wb.sheetnames:
+            # 只處理名稱包含「記錄」的工作表
+            if "記錄" not in sheet_name:
+                continue
+                
             ws = wb[sheet_name]
             
-            # 掃描前 10 列找出包含關鍵字的標題列
-            headers = None
-            header_row = 1
-            for row_idx in range(1, min(11, ws.max_row + 1)):
-                row_values = [cell.value for cell in ws[row_idx]]
-                row_str = " ".join([str(v).lower() if v else "" for v in row_values])
-                # 檢查這列是否包含必要的關鍵字
-                has_date = any(kw in row_str for kw in ["日期", "date"])
-                has_nutrient = any(kw in row_str for kw in ["熱量", "蛋白質", "calorie", "protein", "kcal", "能量"])
-                if has_date and has_nutrient:
-                    headers = row_values
-                    header_row = row_idx
-                    break
-            
-            if headers is None:
-                result["errors"].append(f"工作表「{sheet_name}」找不到包含日期和營養素的標題列，跳過")
+            # 第 8 列為欄位列
+            header_row = 8
+            if ws.max_row < header_row:
+                result["errors"].append(f"工作表「{sheet_name}」列數不足，略過")
                 continue
             
-            date_col = find_column(headers, "date")
-            protein_col = find_column(headers, "protein")
-            calories_col = find_column(headers, "calories")
-            water_col = find_column(headers, "water")
+            # 讀取 A8:G8
+            headers = []
+            for col in range(1, 8):
+                cell_val = ws.cell(row=header_row, column=col).value
+                headers.append(cell_val)
             
-            if date_col == -1 or (calories_col == -1 and protein_col == -1):
-                result["errors"].append(f"工作表「{sheet_name}」找不到必要欄位，跳過（headers={headers}）")
+            # 找出各欄位索引
+            col_idx = {key: -1 for key in TARGET_HEADERS}
+            for idx, header_val in enumerate(headers):
+                header_str = str(header_val).strip() if header_val else ""
+                for key, target in TARGET_HEADERS.items():
+                    if header_str == target:
+                        col_idx[key] = idx
+                        break
+            
+            # 檢查必要欄位
+            if col_idx["date"] == -1:
+                result["errors"].append(f"工作表「{sheet_name}」找不到「日期」欄位，略過")
+                continue
+            if col_idx["calories"] == -1 and col_idx["protein"] == -1:
+                result["errors"].append(f"工作表「{sheet_name}」找不到熱量或蛋白質欄位，略過")
                 continue
             
-            for row_idx, row in enumerate(ws.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1):
+            # 從第 9 列開始讀取資料
+            for row_idx in range(header_row + 1, ws.max_row + 1):
                 try:
-                    date_val = row[date_col] if date_col < len(row) else None
+                    row = [ws.cell(row=row_idx, column=col).value for col in range(1, 8)]
+                    
+                    # 取得日期值
+                    date_val = row[col_idx["date"]]
                     if date_val is None:
                         continue
                     
-                    if isinstance(date_val, datetime):
-                        date_str = date_val.strftime("%Y-%m-%d")
-                    elif isinstance(date_val, str):
-                        for fmt in ["%Y/%m/%d", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d %H:%M:%S"]:
-                            try:
-                                date_str = datetime.strptime(date_val, fmt).strftime("%Y-%m-%d")
-                                break
-                            except ValueError:
-                                continue
-                        else:
-                            result["errors"].append(f"工作表「{sheet_name}」第{row_idx}列：日期格式無法解析")
-                            continue
-                    else:
+                    # 檢查是否為排除關鍵字（如「總分」）
+                    date_str = str(date_val).strip()
+                    if any(kw in date_str for kw in EXCLUDE_KEYWORDS):
                         continue
                     
+                    # 解析日期
+                    parsed_date = parse_date(date_val)
+                    if parsed_date is None:
+                        result["errors"].append(f"工作表「{sheet_name}」第 {row_idx} 列：日期格式無法解析「{date_val}」")
+                        continue
+                    
+                    # 解析數值欄位
                     protein = 0.0
                     calories = 0.0
                     water = 0.0
                     
-                    if protein_col != -1 and protein_col < len(row):
-                        val = row[protein_col]
-                        if val is not None:
-                            try:
-                                protein = float(val)
-                            except (ValueError, TypeError):
-                                pass
+                    if col_idx["protein"] != -1 and col_idx["protein"] < len(row):
+                        protein = clean_numeric(row[col_idx["protein"]])
                     
-                    if calories_col != -1 and calories_col < len(row):
-                        val = row[calories_col]
-                        if val is not None:
-                            try:
-                                calories = float(val)
-                            except (ValueError, TypeError):
-                                pass
-                        else:
-                            import streamlit as st_tmp
-                            st_tmp.warning(f"工作表{sheet_name}第{row_idx}列熱量為None")
+                    if col_idx["calories"] != -1 and col_idx["calories"] < len(row):
+                        calories = clean_numeric(row[col_idx["calories"]])
                     
-                    if water_col != -1 and water_col < len(row):
-                        val = row[water_col]
-                        if val is not None:
-                            try:
-                                water = float(val)
-                            except (ValueError, TypeError):
-                                pass
+                    if col_idx["water"] != -1 and col_idx["water"] < len(row):
+                        water = clean_numeric(row[col_idx["water"]])
                     
-                    timestamp = f"{date_str}T12:00:00"
+                    timestamp = f"{parsed_date}T12:00:00"
                     
-                    if date_str in existing_dates:
+                    # 檢查是否重複
+                    if parsed_date in existing_dates:
                         if overwrite_duplicates:
                             delete_record(timestamp, user_id)
                             append_record(
                                 timestamp=timestamp,
                                 user_id=user_id,
                                 meal_type="午餐",
-                                food_summary="從 Excel 匯入（覆寫）",
+                                food_summary="由 Excel 匯入（覆寫）",
                                 calories=calories,
                                 protein=protein,
                                 carb=0,
@@ -809,8 +830,8 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
                             result["overwritten"] += 1
                         else:
                             result["duplicates"].append({
-                                "date": date_str,
-                                "existing": existing_dates[date_str]
+                                "date": parsed_date,
+                                "existing": existing_dates[parsed_date]
                             })
                             result["skipped"] += 1
                     else:
@@ -818,7 +839,7 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
                             timestamp=timestamp,
                             user_id=user_id,
                             meal_type="午餐",
-                            food_summary="從 Excel 匯入",
+                            food_summary="由 Excel 匯入",
                             calories=calories,
                             protein=protein,
                             carb=0,
@@ -827,18 +848,14 @@ def import_records_from_excel(excel_file_bytes: bytes, user_id: str, overwrite_d
                             image_url="",
                             portion=1.0,
                         )
-                        existing_dates[date_str] = True
+                        existing_dates[parsed_date] = True
                         result["imported"] += 1
                     
                 except Exception as e:
-                    result["errors"].append(f"工作表「{sheet_name}」第{row_idx}列：{str(e)}")
+                    result["errors"].append(f"工作表「{sheet_name}」第 {row_idx} 列：{str(e)}")
         
     except Exception as e:
-        result["errors"].append(f"開啟 Excel 檔案失敗：{str(e)}")
-    
-    # Debug: 顯示最終結果摘要
-    import streamlit as st_final
-    st_final.info(f"匯入結果：新增={result['imported']}, 覆寫={result['overwritten']}, 跳過={result['skipped']}, 錯誤={len(result['errors'])}")
+        result["errors"].append(f"讀取 Excel 檔案失敗：{str(e)}")
     
     return result
 
