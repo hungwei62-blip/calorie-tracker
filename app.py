@@ -254,13 +254,6 @@ def page_coach_overview() -> None:
     coach_name = str(st.session_state.username or "Coach")
     st.markdown("<div class=\"coach-header\"><div class=\"coach-avatar\"></div><div class=\"coach-greeting\">Hello ! " + coach_name + "</div></div>", unsafe_allow_html=True)
 
-    # 登出按鈕（header 右側）
-    _sp_col, _lo_col = st.columns([9, 1])
-    with _lo_col:
-        if st.button("登出", key="logout_btn", use_container_width=True):
-            do_logout()
-
-    
     try:
         students = sheets.get_all_students()
     except Exception as exc:
@@ -776,13 +769,6 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
 
 def page_coach_student_history():
     """教練端：檢視單一學員的歷史記錄（圖表 / 備註 / 匯出）。"""
-    # 登出按鈕（header 右側）
-    _sp_col2, _lo_col2 = st.columns([9, 1])
-    with _lo_col2:
-        if st.button("登出", key="logout_btn", use_container_width=True):
-            do_logout()
-
-
     uid = st.session_state.get("view_student_id")
 
     if not uid:
@@ -2438,21 +2424,58 @@ def main() -> None:
             padding-bottom: 120px !important;
         }
 
-        /* header 上的登出按鈕使用小尺寸 */
-        div[data-testid="baseButton-logout_btn"] {
-            background: transparent !important;
-            color: #6B7280 !important;
-            border: 1px solid #E5E7EB !important;
-            box-shadow: none !important;
-            padding: 4px 12px !important;
-            border-radius: 8px !important;
-            font-size: 13px !important;
+        /* ========================================== */
+        /* 登出按鈕 - 右上角 fixed icon-only */
+        /* ========================================== */
+
+        /* 外層容器 - fixed 到右上角 */
+        div[data-testid="element-container"]:has(button[data-testid="baseButton-logout_btn"]) {
+            position: fixed !important;
+            top: 16px !important;
+            right: 20px !important;
+            width: 48px !important;
+            height: 48px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            z-index: 999 !important;
         }
-        div[data-testid="baseButton-logout_btn"]:hover {
+
+        /* 內部按鈕 - 100% 填滿容器 */
+        button[data-testid="baseButton-logout_btn"] {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 50% !important;
+            border: 1px solid #E5E7EB !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            min-width: 0 !important;
+            font-size: 16px !important;
+            background: #ffffff !important;
+            color: #6B7280 !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+            transition: all 0.2s ease !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        /* Hover - 變紅色 */
+        button[data-testid="baseButton-logout_btn"]:hover {
             background: #FEE2E2 !important;
             color: #DC2626 !important;
             border-color: #FECACA !important;
+            transform: scale(1.05) !important;
         }
+
+        /* Click - 反色 */
+        button[data-testid="baseButton-logout_btn"]:active {
+            background: #DC2626 !important;
+            color: #ffffff !important;
+        }
+
 
     </style>
 
@@ -2543,6 +2566,13 @@ def main() -> None:
         elif st.session_state.page == "TDEE 問卷":
 
             page_tdee_questionnaire()
+
+
+    # ==========================================
+    # 登出按鈕（右上角 fixed，由 CSS 處理位置）
+    # ==========================================
+    if st.button("↪", key="logout_btn", help="登出"):
+        do_logout()
 
 
     # ==========================================
