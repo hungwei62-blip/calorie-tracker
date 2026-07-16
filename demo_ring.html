@@ -1,0 +1,512 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教練儀表板 - 環形進度版</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #F7F7F7; min-height: 100vh; }
+
+.main-content {
+    padding: 20px;
+    padding-bottom: 100px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #BBE8EE 0%, #8B5CF6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-right: 16px;
+}
+
+.greeting {
+    font-size: 24px;
+    font-weight: 400;
+    color: #1F2937;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.metric-card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.metric-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: #fff;
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #6B7280;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1F2937;
+}
+
+.metric-delta {
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.delta-positive { color: #10B981; }
+.delta-negative { color: #EF4444; }
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1F2937;
+    margin-bottom: 12px;
+}
+
+/* 學員卡片 - 環形進度版 */
+.member-card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.member-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #BBE8EE;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-right: 20px;
+    flex-shrink: 0;
+}
+
+.member-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.member-name-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.member-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.training-badge {
+    background: #DCFCE7;
+    color: #16A34A;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.training-badge.not-done {
+    background: #F3F4F6;
+    color: #9CA3AF;
+}
+
+/* 環形進度組 */
+.ring-progress-group {
+    display: flex;
+    gap: 24px;
+}
+
+.ring-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.ring-chart {
+    position: relative;
+    width: 64px;
+    height: 64px;
+}
+
+.ring-chart svg {
+    transform: rotate(-90deg);
+}
+
+.ring-bg {
+    fill: none;
+    stroke: #E5E7EB;
+    stroke-width: 6;
+}
+
+.ring-progress {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+}
+
+.ring-cal { stroke: #bbe8ee; }
+.ring-pro { stroke: #d1ebbe; }
+.ring-carb { stroke: #ffc766; }
+.ring-fat { stroke: #6B7280; }
+
+.ring-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.ring-label {
+    font-size: 11px;
+    color: #6B7280;
+    text-align: center;
+}
+
+.ring-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.bottom-nav {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #f7f7f7;
+    border-radius: 28px;
+    padding: 8px 20px;
+    display: flex;
+    gap: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.nav-item {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nav-item:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.nav-item.active {
+    background: #FFF78B;
+}
+
+.nav-icon {
+    font-size: 20px;
+    color: #9CA3AF;
+}
+
+.nav-item.active .nav-icon {
+    color: #1F2937;
+}
+</style>
+</head>
+<body>
+
+<div class="main-content">
+    
+    <div class="header">
+        <div class="avatar">圖</div>
+        <div class="greeting">Hello ! 美麗肉乙教練</div>
+    </div>    
+    
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-icon" style="background: #3B82F6;"><i class="fas fa-users"></i></div>
+            <div class="metric-label">學員總數</div>
+            <div class="metric-value">12</div>
+            <div class="metric-delta">本月新增 3 位</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon" style="background: #10B981;"><i class="fas fa-chart-pie"></i></div>
+            <div class="metric-label">飲食達標率</div>
+            <div class="metric-value">75%</div>
+            <div class="metric-delta delta-positive">+5%</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon" style="background: #8B5CF6;"><i class="fas fa-tint"></i></div>
+            <div class="metric-label">水量達標率</div>
+            <div class="metric-value">60%</div>
+            <div class="metric-delta delta-negative">-3%</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon" style="background: #F59E0B;"><i class="fas fa-dumbbell"></i></div>
+            <div class="metric-label">今日訓練率</div>
+            <div class="metric-value">83%</div>
+            <div class="metric-delta delta-positive">+12%</div>
+        </div>
+    </div>
+    
+    <h2 class="section-title">學員狀態</h2>
+    
+    <!-- 學員卡片 1 -->
+    <div class="member-card">
+        <div class="member-avatar">陳</div>
+        <div class="member-info">
+            <div class="member-name-row">
+                <div class="member-name">陳小明</div>
+                <div class="training-badge">
+                    <i class="fas fa-check"></i> 已訓練
+                </div>
+            </div>
+            <div class="ring-progress-group">
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-cal" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="24.5"/>
+                        </svg>
+                        <div class="ring-center">85%</div>
+                    </div>
+                    <div class="ring-label">熱量</div>
+                    <div class="ring-value">1658/2200</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-pro" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="45.7"/>
+                        </svg>
+                        <div class="ring-center">72%</div>
+                    </div>
+                    <div class="ring-label">蛋白質</div>
+                    <div class="ring-value">119/168</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-carb" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="69.4"/>
+                        </svg>
+                        <div class="ring-center">58%</div>
+                    </div>
+                    <div class="ring-label">碳水</div>
+                    <div class="ring-value">145/250</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-fat" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="32.7"/>
+                        </svg>
+                        <div class="ring-center">80%</div>
+                    </div>
+                    <div class="ring-label">脂肪</div>
+                    <div class="ring-value">52/65</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 學員卡片 2 -->
+    <div class="member-card">
+        <div class="member-avatar">林</div>
+        <div class="member-info">
+            <div class="member-name-row">
+                <div class="member-name">林美麗</div>
+                <div class="training-badge not-done">
+                    <i class="fas fa-times"></i> 未訓練
+                </div>
+            </div>
+            <div class="ring-progress-group">
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-cal" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="24.5"/>
+                        </svg>
+                        <div class="ring-center">85%</div>
+                    </div>
+                    <div class="ring-label">熱量</div>
+                    <div class="ring-value">1870/2200</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-pro" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="57.2"/>
+                        </svg>
+                        <div class="ring-center">65%</div>
+                    </div>
+                    <div class="ring-label">蛋白質</div>
+                    <div class="ring-value">109/168</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-carb" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="49.0"/>
+                        </svg>
+                        <div class="ring-center">70%</div>
+                    </div>
+                    <div class="ring-label">碳水</div>
+                    <div class="ring-value">175/250</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-fat" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="73.5"/>
+                        </svg>
+                        <div class="ring-center">55%</div>
+                    </div>
+                    <div class="ring-label">脂肪</div>
+                    <div class="ring-value">36/65</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 學員卡片 3 -->
+    <div class="member-card">
+        <div class="member-avatar">王</div>
+        <div class="member-info">
+            <div class="member-name-row">
+                <div class="member-name">王小華</div>
+                <div class="training-badge">
+                    <i class="fas fa-check"></i> 已訓練
+                </div>
+            </div>
+            <div class="ring-progress-group">
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-cal" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="8.2"/>
+                        </svg>
+                        <div class="ring-center">95%</div>
+                    </div>
+                    <div class="ring-label">熱量</div>
+                    <div class="ring-value">2090/2200</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-pro" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="19.6"/>
+                        </svg>
+                        <div class="ring-center">88%</div>
+                    </div>
+                    <div class="ring-label">蛋白質</div>
+                    <div class="ring-value">148/168</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-carb" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="24.5"/>
+                        </svg>
+                        <div class="ring-center">85%</div>
+                    </div>
+                    <div class="ring-label">碳水</div>
+                    <div class="ring-value">212/250</div>
+                </div>
+                <div class="ring-item">
+                    <div class="ring-chart">
+                        <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle class="ring-bg" cx="32" cy="32" r="26"/>
+                            <circle class="ring-progress ring-fat" cx="32" cy="32" r="26" 
+                                stroke-dasharray="163.36" stroke-dashoffset="26.1"/>
+                        </svg>
+                        <div class="ring-center">84%</div>
+                    </div>
+                    <div class="ring-label">脂肪</div>
+                    <div class="ring-value">55/65</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-users"></i></div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-history"></i></div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-cog"></i></div>
+    </div>
+</div>
+
+<script>
+function setActive(el) {
+    document.querySelectorAll(".nav-item").forEach(item => {
+        item.classList.remove("active");
+    });
+    el.classList.add("active");
+}
+</script>
+
+</body>
+</html>

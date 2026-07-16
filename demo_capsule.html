@@ -1,0 +1,389 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教練儀表板 - 精簡版</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    background-color: #F7F7F7; 
+    min-height: 100vh; 
+    padding: 20px;
+    padding-bottom: 100px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #BBE8EE 0%, #8B5CF6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-right: 16px;
+}
+
+.greeting {
+    font-size: 24px;
+    font-weight: 400;
+    color: #1F2937;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1F2937;
+    margin-bottom: 12px;
+}
+
+.capsule-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 80px;
+}
+
+.capsule-track {
+    position: relative;
+    overflow: hidden;
+    width: 64px;
+    height: 200px;
+    border-radius: 50px;
+    background-color: #f0f4f1;
+}
+
+.capsule-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(180deg, #d4edda 0%, #c2e7b9 100%);
+}
+
+.capsule-fill.cal {
+    background: linear-gradient(180deg, #d4f0f5 0%, #bbe8ee 100%);
+}
+
+.capsule-fill.pro {
+    background: linear-gradient(180deg, #e2f5dd 0%, #d1ebbe 100%);
+}
+
+.capsule-fill.water {
+    background: linear-gradient(180deg, #ffe0a3 0%, #ffc766 100%);
+}
+
+.capsule-badge {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 52px;
+    height: 52px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    color: #3c3c3c;
+    letter-spacing: -0.5px;
+    z-index: 10;
+}
+
+.capsule-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.capsule-value {
+    font-size: 10px;
+    color: #9CA3AF;
+}
+
+.capsule-row {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.member-card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.member-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #BBE8EE;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-right: 20px;
+}
+
+.member-info { flex: 1; }
+
+.member-name-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.member-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.training-badge {
+    background: #DCFCE7;
+    color: #16A34A;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.training-badge.not-done {
+    background: #F3F4F6;
+    color: #9CA3AF;
+}
+
+/* 底部導覽列 */
+.bottom-nav {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #f7f7f7;
+    border-radius: 28px;
+    padding: 8px 20px;
+    display: flex;
+    gap: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+.nav-item {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nav-item:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.nav-item.active {
+    background: #FFF78B;
+}
+
+.nav-icon {
+    font-size: 20px;
+    color: #9CA3AF;
+}
+
+.nav-item.active .nav-icon {
+    color: #1F2937;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="avatar">圖</div>
+    <div class="greeting">Hello ! 美麗肉乙教練</div>
+</div>    
+
+<h2 class="section-title">學員狀態</h2>
+
+<!-- 學員卡片 1：陳小明 -->
+<div class="member-card">
+    <div class="member-avatar">陳</div>
+    <div class="member-info">
+        <div class="member-name-row">
+            <div class="member-name">陳小明</div>
+            <div class="training-badge">
+                <i class="fas fa-check"></i> 已訓練
+            </div>
+        </div>
+        
+        <div class="capsule-row">
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill cal" style="height: 75%;"></div>
+                    <div class="capsule-badge" style="top: 25%;">1658</div>
+                </div>
+                <div class="capsule-label">CAL</div>
+                <div class="capsule-value">1658/2200</div>
+            </div>
+            
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill pro" style="height: 72%;"></div>
+                    <div class="capsule-badge" style="top: 28%;">119</div>
+                </div>
+                <div class="capsule-label">PROT</div>
+                <div class="capsule-value">119/168g</div>
+            </div>
+            
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill water" style="height: 60%;"></div>
+                    <div class="capsule-badge" style="top: 40%;">1200</div>
+                </div>
+                <div class="capsule-label">WATER</div>
+                <div class="capsule-value">1200/2000</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 學員卡片 2：林美麗 -->
+<div class="member-card">
+    <div class="member-avatar">林</div>
+    <div class="member-info">
+        <div class="member-name-row">
+            <div class="member-name">林美麗</div>
+            <div class="training-badge not-done">
+                <i class="fas fa-times"></i> 未訓練
+            </div>
+        </div>
+        
+        <div class="capsule-row">
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill cal" style="height: 85%;"></div>
+                    <div class="capsule-badge" style="top: 15%;">1870</div>
+                </div>
+                <div class="capsule-label">CAL</div>
+                <div class="capsule-value">1870/2200</div>
+            </div>
+            
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill pro" style="height: 65%;"></div>
+                    <div class="capsule-badge" style="top: 35%;">109</div>
+                </div>
+                <div class="capsule-label">PROT</div>
+                <div class="capsule-value">109/168g</div>
+            </div>
+            
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill water" style="height: 45%;"></div>
+                    <div class="capsule-badge" style="top: 55%;">900</div>
+                </div>
+                <div class="capsule-label">WATER</div>
+                <div class="capsule-value">900/2000</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 學員卡片 3：王小華 -->
+<div class="member-card">
+    <div class="member-avatar">王</div>
+    <div class="member-info">
+        <div class="member-name-row">
+            <div class="member-name">王小華</div>
+            <div class="training-badge">
+                <i class="fas fa-check"></i> 已訓練
+            </div>
+        </div>
+        
+        <div class="capsule-row">
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill cal" style="height: 95%;"></div>
+                    <div class="capsule-badge" style="top: 5%;">2090</div>
+                </div>
+                <div class="capsule-label">CAL</div>
+                <div class="capsule-value">2090/2200</div>
+            </div>
+            
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill pro" style="height: 88%;"></div>
+                    <div class="capsule-badge" style="top: 12%;">148</div>
+                </div>
+                <div class="capsule-label">PROT</div>
+                <div class="capsule-value">148/168g</div>
+            </div>
+            
+            <div class="capsule-container">
+                <div class="capsule-track">
+                    <div class="capsule-fill water" style="height: 92%;"></div>
+                    <div class="capsule-badge" style="top: 8%;">1840</div>
+                </div>
+                <div class="capsule-label">WATER</div>
+                <div class="capsule-value">1840/2000</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 底部導覽列 -->
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-users"></i></div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-history"></i></div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+        <div class="nav-icon"><i class="fas fa-cog"></i></div>
+    </div>
+</div>
+
+<script>
+function setActive(el) {
+    document.querySelectorAll(".nav-item").forEach(item => {
+        item.classList.remove("active");
+    });
+    el.classList.add("active");
+}
+</script>
+
+</body>
+</html>
