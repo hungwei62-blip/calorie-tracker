@@ -642,12 +642,19 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
     import matplotlib.font_manager as fm
     # 嘗試使用系統中文字型
     # 內嵌中文字型（放在 assets/fonts/ 目錄）
+    # 嘗試載入內嵌中文字型
     font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "NotoSansTC-Regular.otf")
 
     if os.path.exists(font_path):
-        prop = fm.FontProperties(fname=font_path)
-        _plt.rcParams["font.sans-serif"] = [font_path]
-        _plt.rcParams["font.family"] = ["sans-serif"]
+        # 使用 addfont 註冊字型
+        try:
+            fm.fontManager.addfont(font_path)
+            _plt.rcParams["font.family"] = "sans-serif"
+            _plt.rcParams["font.sans-serif"] = ["Noto Sans TC", "DejaVu Sans"]
+        except Exception:
+            prop = fm.FontProperties(fname=font_path)
+            _plt.rcParams["font.family"] = prop.get_family()
+            _plt.rcParams["font.sans-serif"] = [font_path]
     else:
         # Fallback 到系統字型
         font_paths = [
@@ -656,25 +663,20 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
         ]
         for fp in font_paths:
             if os.path.exists(fp):
-                prop = fm.FontProperties(fname=fp)
-                _plt.rcParams["font.sans-serif"] = [fp]
-                _plt.rcParams["font.family"] = ["sans-serif"]
+                try:
+                    fm.fontManager.addfont(fp)
+                    _plt.rcParams["font.family"] = "sans-serif"
+                    _plt.rcParams["font.sans-serif"] = ["Noto Sans CJK TC", "DejaVu Sans"]
+                except Exception:
+                    prop = fm.FontProperties(fname=fp)
+                    _plt.rcParams["font.family"] = prop.get_family()
+                    _plt.rcParams["font.sans-serif"] = [fp]
                 break
         else:
             _plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
-    font_found = False
-    for fp in font_paths:
-        if os.path.exists(fp):
-            prop = fm.FontProperties(fname=fp)
-            _plt.rcParams["font.sans-serif"] = [fp]
-            _plt.rcParams["font.family"] = ["sans-serif"]
-            font_found = True
-            break
-    if not font_found:
-        # 如果找不到中文字型，使用預設但避免顯示問題
-        _plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
+            _plt.rcParams["font.family"] = "sans-serif"
+
     _plt.rcParams["axes.unicode_minus"] = False
-    name = student.get("name", student.get("username", "未知"))
     buf = _io.BytesIO()
     with _PdfPages(buf) as pdf:
         # Page 1: 摘要
