@@ -92,6 +92,16 @@ def test_bottom_navigation_uses_compact_circular_button_styles():
     assert 'button[data-testid^="stBaseButton"]' in stylesheet
     assert ".st-key-bottom_navigation button::before" in stylesheet
     assert "box-shadow: none !important;" in stylesheet
+    assert "position: fixed !important;" in stylesheet
+    assert "top: auto !important;" in stylesheet
+    assert "bottom: 12px !important;" in stylesheet
+    assert "bottom: calc(12px + constant(safe-area-inset-bottom)) !important;" in stylesheet
+    assert "bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;" in stylesheet
+    assert "-webkit-transform: translate3d(-50%, 0, 0) !important;" in stylesheet
+    assert "transform: translate3d(-50%, 0, 0) !important;" in stylesheet
+    assert "z-index: 2147483000 !important;" in stylesheet
+    assert "padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important;" in stylesheet
+    assert "bottom: max(12px, env(safe-area-inset-bottom)) !important;" not in stylesheet
 
 
 @pytest.mark.parametrize(

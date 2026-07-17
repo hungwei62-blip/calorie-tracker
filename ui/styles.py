@@ -146,6 +146,16 @@ def apply_global_styles() -> None:
                 h2 { font-size: 1.2rem !important; }
                 h3 { font-size: 1rem !important; }
 
+                /* 強制使用實際 viewport 寬度，避免手機呈現桌面版內容寬度 */
+                .main .block-container {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    min-width: 0 !important;
+                    padding-left: 1rem !important;
+                    padding-right: 1rem !important;
+                    box-sizing: border-box !important;
+                }
+
                 /* Metric 卡片在手機上更好看 */
                 div[data-testid="stMetric"] {
                     margin-bottom: 8px !important;
@@ -367,10 +377,17 @@ def apply_global_styles() -> None:
             /* 按鈕樣式 - 48x48 圓形白色按鈕 */
             .st-key-bottom_navigation {
                 position: fixed !important;
+                top: auto !important;
                 left: 50% !important;
-                bottom: max(12px, env(safe-area-inset-bottom)) !important;
-                transform: translateX(-50%) !important;
-                z-index: 1000 !important;
+                right: auto !important;
+                bottom: 12px !important;
+                bottom: calc(12px + constant(safe-area-inset-bottom)) !important;
+                bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+                margin: 0 !important;
+                -webkit-transform: translate3d(-50%, 0, 0) !important;
+                transform: translate3d(-50%, 0, 0) !important;
+                will-change: transform;
+                z-index: 2147483000 !important;
                 width: max-content !important;
                 max-width: calc(100vw - 24px) !important;
                 padding: 6px !important;
@@ -493,7 +510,9 @@ def apply_global_styles() -> None:
 
             /* 內容不被導航列遮住 */
             .main .block-container {
-                padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+                padding-bottom: 100px !important;
+                padding-bottom: calc(100px + constant(safe-area-inset-bottom)) !important;
+                padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important;
             }
 
 
