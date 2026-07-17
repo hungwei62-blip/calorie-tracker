@@ -1,0 +1,100 @@
+Line 1796:     # ?????? ????????? ????
+Line 1797:     col1, col2, col3 = st.columns(3)
+Line 1798: 
+Line 1799:     # ?????? ????????? ????
+Line 1800:     with col1:
+Line 1801:         fig_cal = go.Figure()
+Line 1802:         fig_cal.add_trace(go.Pie(
+Line 1803:             values=[cal_pct, 100 - cal_pct],
+Line 1804:             hole=0.75,
+Line 1805:             marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
+Line 1806:             sort=False,
+Line 1807:             direction='clockwise',
+Line 1808:             showlegend=False,
+Line 1809:             hoverinfo='none',
+Line 1810:             textinfo='none'
+Line 1811:         ))
+Line 1812:         fig_cal.update_layout(
+Line 1813:             paper_bgcolor=CARD_BG_COLOR,
+Line 1814:             plot_bgcolor=CARD_BG_COLOR,
+Line 1815:             margin=dict(l=20, r=20, t=20, b=20),
+Line 1816:             height=160,
+Line 1817:             annotations=[
+Line 1818:                 dict(
+Line 1819:                     x=0.75, y=0.5, xref="paper", yref="paper",
+Line 1820:                     text=f"<b style='font-size:20px; color:#1a2530;'>{totals.get('calories', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>kcal</span>",
+Line 1821:                     showarrow=False, align="center"
+Line 1822:                 ),
+Line 1823:                 dict(
+Line 1824:                     x=0.05, y=0.90, xref="paper", yref="paper",
+Line 1825:                     text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>飥餩郋度</span>",
+Line 1826:                     showarrow=False, align="left"
+Line 1827:                 ),
+Line 1828:                 dict(
+Line 1829:                     x=0.05, y=0.50, xref="paper", yref="paper",
+Line 1830:                     text=f"<b style='font-size:36px; color:#1a2530;'>{cal_pct:.0f}%</b>",
+Line 1831:                     showarrow=False, align="left"
+Line 1832:                 ),
+Line 1833:                 dict(
+Line 1834:                     x=0.05, y=0.10, xref="paper", yref="paper",
+Line 1835:                     text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
+Line 1836:                     showarrow=False, align="left"
+Line 1837:                 )
+Line 1838:             ]
+Line 1839:         )
+Line 1840:         st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
+Line 1841: 
+Line 1842:     # 
+Line 1843:     with col2:
+Line 1844:         fig_water = go.Figure()
+Line 1845:         fig_water.add_trace(go.Pie(
+Line 1846:             values=[water_pct, 100 - water_pct],
+Line 1847:             hole=0.75,
+Line 1848:             marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
+Line 1849:             sort=False,
+Line 1850:             direction='clockwise',
+Line 1851:             showlegend=False,
+Line 1852:             hoverinfo='none',
+Line 1853:             textinfo='none'
+Line 1854:         ))
+Line 1855:         fig_water.update_layout(
+Line 1856:             paper_bgcolor=CARD_BG_COLOR,
+Line 1857:             plot_bgcolor=CARD_BG_COLOR,
+Line 1858:             margin=dict(l=20, r=20, t=20, b=20),
+Line 1859:             height=160,
+Line 1860:             annotations=[
+Line 1861:                 dict(
+Line 1862:                     x=0.75, y=0.5, xref="paper", yref="paper",
+Line 1863:                     text=f"<b style='font-size:18px; color:#1a2530;'>{totals.get('water', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>ml</span>",
+Line 1864:                     showarrow=False, align="center"
+Line 1865:                 ),
+Line 1866:                 dict(
+Line 1867:                     x=0.05, y=0.90, xref="paper", yref="paper",
+Line 1868:                     text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>水量郋度</span>",
+Line 1869:                     showarrow=False, align="left"
+Line 1870:                 ),
+Line 1871:                 dict(
+Line 1872:                     x=0.05, y=0.50, xref="paper", yref="paper",
+Line 1873:                     text=f"<b style='font-size:36px; color:#1a2530;'>{water_pct:.0f}%</b>",
+Line 1874:                     showarrow=False, align="left"
+Line 1875:                 ),
+Line 1876:                 dict(
+Line 1877:                     x=0.05, y=0.10, xref="paper", yref="paper",
+Line 1878:                     text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
+Line 1879:                     showarrow=False, align="left"
+Line 1880:                 )
+Line 1881:             ]
+Line 1882:         )
+Line 1883:         st.plotly_chart(fig_water, use_container_width=True, config={'displayModeBar': False})
+Line 1884: 
+Line 1885:     # 水量圓環卡區
+Line 1886:     with col3:
+Line 1887:         fig_pro = go.Figure()
+Line 1888:         fig_pro.add_trace(go.Pie(
+Line 1889:             values=[pro_pct, 100 - pro_pct],
+Line 1890:             hole=0.75,
+Line 1891:             marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
+Line 1892:             sort=False,
+Line 1893:             direction='clockwise',
+Line 1894:             showlegend=False,
+Line 1895:             hoverinfo='none',

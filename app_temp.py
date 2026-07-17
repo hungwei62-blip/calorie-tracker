@@ -254,7 +254,7 @@ def page_coach_overview() -> None:
     .capsule-row { display: flex; gap: 24px; justify-content: center; padding: 16px 0; }
     .section-title { font-size: 18px; font-weight: 600; color: #1F2937; margin-bottom: 12px; }
     </style>""", unsafe_allow_html=True)
-    
+
     coach_name = str(st.session_state.username or "Coach")
     st.markdown("<div class=\"coach-header\"><div class=\"coach-avatar\"></div><div class=\"coach-greeting\">Hello ! " + coach_name + "</div></div>", unsafe_allow_html=True)
 
@@ -263,14 +263,14 @@ def page_coach_overview() -> None:
     except Exception as exc:
         st.error("Failed to get students: " + str(exc))
         return
-    
+
     if not students:
         st.info("No students yet.")
         return
-    
+
     today = date.today()
     st.markdown("<p class=\"section-title\">本日學員狀態</p>", unsafe_allow_html=True)
-    
+
     for student in students:
         uid = student.get("user_id", "")
         name = student.get("name", student.get("username", "Unknown"))
@@ -279,31 +279,31 @@ def page_coach_overview() -> None:
         totals = metrics.sum_totals(today_records).as_dict()
         training_today = sheets.get_training_by_date(uid, today)
         has_training = training_today is not None and any(v == 1 for v in training_today.values()) if training_today else False
-        
+
         calorie_goal = goals.get("calorie", 0)
         protein_goal = goals.get("protein", 0)
         water_goal = goals.get("water", 0)
         calorie_actual = int(totals.get("calories", 0))
         protein_actual = int(totals.get("protein", 0))
         water_actual = int(totals.get("water", 0))
-        
+
         cal_pct = min((calorie_actual / calorie_goal) * 100, 100) if calorie_goal > 0 else 0
         pro_pct = min((protein_actual / protein_goal) * 100, 100) if protein_goal > 0 else 0
         water_pct = min((water_actual / water_goal) * 100, 100) if water_goal > 0 else 0
-        
+
         cal_top = 100 - cal_pct
         pro_top = 100 - pro_pct
         water_top = 100 - water_pct
-        
+
         if has_training:
             training_html = "<i class=\"fas fa-check\"></i> Trained"
             training_class = ""
         else:
             training_html = "<i class=\"fas fa-times\"></i> Not trained"
             training_class = "not-done"
-        
+
         surname = name[0] if name else "?"
-        
+
         card_html = "<div class=\"member-card\"><div class=\"member-top-row\"><div class=\"member-avatar\">" + surname + "</div><div class=\"member-name\">" + name + "</div><div class=\"training-badge " + training_class + "\">" + training_html + "</div></div><div class=\"capsule-row\"><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill cal\" style=\"height: " + str(cal_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(cal_top) + "%\">" + str(calorie_actual) + "</div></div><div class=\"capsule-label\">CAL</div><div class=\"capsule-value\">" + str(calorie_actual) + "/" + str(int(calorie_goal)) + "</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill pro\" style=\"height: " + str(pro_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(pro_top) + "%\">" + str(protein_actual) + "</div></div><div class=\"capsule-label\">PROT</div><div class=\"capsule-value\">" + str(protein_actual) + "/" + str(int(protein_goal)) + "g</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill water\" style=\"height: " + str(water_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(water_top) + "%\">" + str(water_actual) + "</div></div><div class=\"capsule-label\">WATER</div><div class=\"capsule-value\">" + str(water_actual) + "/" + str(int(water_goal)) + "</div></div></div></div>"
         st.markdown(card_html, unsafe_allow_html=True)
 def page_coach_student_detail() -> None:
@@ -351,7 +351,7 @@ def page_coach_student_detail() -> None:
     if uploaded_file is not None:
         try:
             file_bytes = uploaded_file.getvalue()
-            
+
             # 第一次分析（不回寫）
             with st.spinner("分析 Excel 檔案中..."):
                 analysis_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=False)
@@ -396,14 +396,14 @@ def page_coach_student_detail() -> None:
                             overwrite_duplicates=do_overwrite
                         )
                         _clear_analysis_cache()
-                        
+
                         msg = f"匯入完成！新增 {final_result['imported']} 筆"
                         if final_result["overwritten"] > 0:
                             msg += f"，覆寫 {final_result['overwritten']} 筆"
                         if final_result["skipped"] > 0:
                             msg += f"，跳過 {final_result['skipped']} 筆"
                         st.success(msg)
-                        
+
                         st.session_state.excel_import_file = None
                         st.info("請手動刷新頁面以查看最新資料")
             else:
@@ -822,7 +822,7 @@ def page_coach_student_history():
         if uploaded_file is not None:
             try:
                 file_bytes = uploaded_file.getvalue()
-                
+
                 with st.spinner("分析 Excel 檔案中..."):
                     analysis_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=False)
 
@@ -860,14 +860,14 @@ def page_coach_student_history():
                                 overwrite_duplicates=do_overwrite
                             )
                             _clear_analysis_cache()
-                            
+
                             msg = f"匯入完成！新增 {final_result['imported']} 筆"
                             if final_result["overwritten"] > 0:
                                 msg += f"，覆寫 {final_result['overwritten']} 筆"
                             if final_result["skipped"] > 0:
                                 msg += f"，跳過 {final_result['skipped']} 筆"
                             st.success(msg)
-                            
+
                             st.info("請手動刷新頁面以查看最新資料")
                 else:
                     st.info("沒有找到可匯入的資料")
@@ -999,14 +999,14 @@ def page_coach_student_history():
                 if len(parts) >= 3:
                     return f"{int(parts[1]):02d}/{int(parts[2]):02d}"
             return ts_str[:10]
-        
+
         weight_xs = [parse_weight_date(r.get("timestamp", "")) for r in sorted_w]
         weight_ys = [r.get("weight_kg", 0) for r in sorted_w]
         # 自適應 Y軸範圍
         min_w = min(weight_ys) if weight_ys else 0
         max_w = max(weight_ys) if weight_ys else 100
         weight_range = max_w - min_w
-        
+
         # 根據範圍選擇刻度間隔
         if weight_range < 5:
             step = 1
@@ -1016,22 +1016,22 @@ def page_coach_student_history():
             step = 5
         else:
             step = 10
-        
+
         # 計算 Y軸範圍（加入緩衝）
         y_min = int(min_w) - step
         y_max = int(max_w) + step
         # 確保不為負數
         y_min = max(0, y_min)
-        
+
         # 生成刻度列表
         weight_ticks = list(range(y_min, y_max + 1, step))
 
         last_weight = weight_ys[-1] if weight_ys else 0
         first_weight = weight_ys[0] if weight_ys else 0
         weight_change = last_weight - first_weight
-        
+
         fig_weight = go.Figure()
-        
+
         fig_weight.add_trace(go.Scatter(
             x=weight_xs,
             y=weight_ys,
@@ -1042,9 +1042,9 @@ def page_coach_student_history():
             fillcolor='rgba(255, 255, 255, 0.04)',
             hovertemplate='日期: %{x}<br>體重: %{y:.1f} kg<extra></extra>'
         ))
-        
+
         change_str = f"{weight_change:+.1f}" if weight_change != 0 else "0.0"
-        
+
         fig_weight.update_layout(
             paper_bgcolor=CARD_BG,
             plot_bgcolor=CARD_BG,
@@ -1063,7 +1063,7 @@ def page_coach_student_history():
             yaxis=dict(showgrid=True, gridcolor="rgba(255, 255, 255, 0.05)", tickfont=dict(color="#888888", size=11), zeroline=False, showline=False, ticks="", tickvals=weight_ticks, range=[y_min, y_max]),
             showlegend=False
         )
-        
+
         st.plotly_chart(fig_weight, use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("此區間沒有體重記錄。")
@@ -1082,7 +1082,7 @@ def page_coach_student_history():
         .chart-header { display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 16px !important; }
     </style>""", unsafe_allow_html=True)
 
-    
+
     if daily:
         sorted_days = sorted(daily.keys())
         xs = [d.strftime("%m/%d") for d in sorted_days]
@@ -1530,25 +1530,75 @@ def page_login() -> None:
 def page_personal() -> None:
 
     # ============================================================
-    # 👋 1. 個人化頭像歡迎區 (單行無縮排安全版)
+    # 👋 個人化頭像歡迎區
     # ============================================================
-    import base64
-    import os
+    user_name = st.session_state.get("username", "學員")
 
-    user_name = st.session_state.get('username', '學員')
-    avatar_path = './static/avatar.jpg'
+    avatar_url = "./static/avatar.jpg"
 
-    avatar_base64 = ""
-    if os.path.exists(avatar_path):
-        with open(avatar_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-            avatar_base64 = f"data:image/jpeg;base64,{encoded_string}"
-    else:
-        avatar_base64 = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200"
+    st.markdown("""
+    <style>
+        .welcome-container {
+            display: flex !important;
+            align-items: center !important;
+            gap: 16px !important;
+            margin-bottom: 24px !important;
+            margin-top: 10px !important;
+        }
 
-    welcome_html = f'<div style="display: flex; align-items: center; gap: 16px; margin-top: 10px; margin-bottom: 25px; width: 100%;"><img src="{avatar_base64}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" alt="avatar"><span style="font-size: 24px; font-weight: 700; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; white-space: nowrap;">Hello, {user_name}!</span></div>'
+        .welcome-avatar {
+            width: 56px !important;
+            height: 56px !important;
+            border-radius: 50% !important;
+            object-fit: cover !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+        }
 
-    st.markdown(welcome_html, unsafe_allow_html=True)
+        .welcome-text {
+            font-size: 24px !important;
+            font-weight: 600 !important;
+            color: #1a1a1a !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+        }
+    </style>
+
+    # 使用 HTML Flexbox 保持在同一行
+    st.markdown("""
+    <style>
+    .avatar-row {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 16px !important;
+        margin-bottom: 24px !important;
+        margin-top: 10px !important;
+    }
+    .avatar-row img {
+        border-radius: 50% !important;
+        width: 56px !important;
+        height: 56px !important;
+        object-fit: cover !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="avatar-row">
+        <img src="{avatar_url}" alt="Avatar">
+        <h1 style="font-size:24px; font-weight:600; color:#1a1a1a; margin:0; line-height:1.2;">Hello, {user_name}!</h1>
+    </div>
+    """, unsafe_allow_html=True)
+    <style>
+    div[data-testid="stImage"] {
+        display: flex !important;
+        align-items: center !important;
+        gap: 16px !important;
+        margin-bottom: 24px !important;
+    }
+    </style>
 
     st.header("📊 今日摘要")
 
@@ -1592,13 +1642,10 @@ def page_personal() -> None:
 
     st.subheader("今日完成率")
 
-    col1, col2 = st.columns(2)
 
-    with col1:
 
         st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
 
-    with col2:
 
         st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
 
@@ -1613,9 +1660,7 @@ def page_personal() -> None:
 
         col1, col2, col3 = st.columns(3)
 
-        with col1:
             # CSS for calories chart
-            st.markdown("""
 <style>
     .cal-chart-full div[data-testid="stPlotlyChart"] {
         border-radius: 24px !important;
@@ -1628,10 +1673,10 @@ def page_personal() -> None:
 
             # Calculate calorie percentage
             cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
-            
+
             FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
             CAL_CARD_BG = "#ffffff"
-            
+
             fig_cal = go.Figure()
             fig_cal.add_trace(go.Pie(
                 values=[cal_pct, 100 - cal_pct],
@@ -1670,7 +1715,6 @@ def page_personal() -> None:
             )
             st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
-        with col2:
 
             carb = totals.get("carb", 0)
 
@@ -1686,9 +1730,7 @@ def page_personal() -> None:
 
         col1, col2, col3 = st.columns(3)
 
-        with col1:
             # CSS for calories chart
-            st.markdown("""
 <style>
     .cal-chart-simple div[data-testid="stPlotlyChart"] {
         border-radius: 24px !important;
@@ -1701,10 +1743,10 @@ def page_personal() -> None:
 
             # Calculate calorie percentage
             cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
-            
+
             FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
             CAL_CARD_BG = "#ffffff"
-            
+
             fig_cal = go.Figure()
             fig_cal.add_trace(go.Pie(
                 values=[cal_pct, 100 - cal_pct],
@@ -1743,10 +1785,20 @@ def page_personal() -> None:
             )
             st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
+
+            pro = totals.get("protein", 0)
+
+            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
+
+        with col3:
+
+            water = totals.get("water", 0)
+
+            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
+
     st.divider()
 
     # CSS for pie charts
-    st.markdown("""
 <style>
     div[data-testid="stPlotlyChart"] {
         border-radius: 24px !important;
@@ -1768,7 +1820,7 @@ def page_personal() -> None:
     cal_pct = min(cal_ratio * 100, 100)
     water_pct = min(water_ratio * 100, 100)
     pro_pct = min(pro_ratio * 100, 100)
-    
+
     # 取得今日日期字串
     today_str = date.today().strftime("%d %B")
 
@@ -1779,7 +1831,6 @@ def page_personal() -> None:
     col1, col2, col3 = st.columns(3)
 
     # ?????? ????????? ????
-    with col1:
         fig_cal = go.Figure()
         fig_cal.add_trace(go.Pie(
             values=[cal_pct, 100 - cal_pct],
@@ -1821,8 +1872,7 @@ def page_personal() -> None:
         )
         st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
-    # 
-    with col2:
+    #
         fig_water = go.Figure()
         fig_water.add_trace(go.Pie(
             values=[water_pct, 100 - water_pct],
@@ -1913,7 +1963,6 @@ def page_personal() -> None:
     st.subheader("⚖️ 體重")
 
     # 注入精確定位與排版的 CSS
-    st.markdown("""
     <style>
         .weight-card-container {
             position: relative !important;
@@ -1928,7 +1977,7 @@ def page_personal() -> None:
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
             box-sizing: border-box !important;
         }
-        
+
         .weight-title {
             font-size: 16px !important;
             font-weight: 500 !important;
@@ -1936,7 +1985,7 @@ def page_personal() -> None:
             margin-bottom: 12px !important;
             font-family: system-ui, -apple-system, sans-serif !important;
         }
-        
+
         .weight-value {
             font-size: 36px !important;
             font-weight: 700 !important;
@@ -1944,7 +1993,7 @@ def page_personal() -> None:
             font-family: system-ui, -apple-system, sans-serif !important;
             line-height: 1 !important;
         }
-        
+
         .weight-unit {
             font-size: 18px !important;
             font-weight: normal !important;
@@ -1996,11 +2045,10 @@ def page_personal() -> None:
             box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
         }
     </style>
-    """, unsafe_allow_html=True)
 
     latest_weight = sheets.get_latest_weight(uid)
     weight_display_str = f"{latest_weight:.1f}" if latest_weight else "--.-"
-    
+
     # 歷史紀錄與變動計算
     weight_history = []
     if "records" in dir() and records:
@@ -2020,7 +2068,7 @@ def page_personal() -> None:
         prev_weight = weight_history[-2]
         diff = latest_weight - prev_weight
         diff_pct = (diff / prev_weight) * 100
-        
+
         if diff < 0:
             trend_content = f"⇩ {abs(diff):.1f} Kg ({diff_pct:.1f}%)"
         elif diff > 0:
@@ -2038,16 +2086,16 @@ def page_personal() -> None:
         <div class="weight-value">
             {weight_display_str}<span class="weight-unit">Kg</span>
         </div>"""
-    
+
     if trend_content:
         card_html += f"""
         <div class="weight-trend">
             {trend_content}
         </div>"""
-    
+
     card_html += """
     </div>"""
-    
+
     st.markdown(card_html, unsafe_allow_html=True)
 
     if st.button("⚡", key="weight_lightning_btn"):
@@ -2078,13 +2126,10 @@ def page_weight() -> None:
 
     with st.form("weight_form"):
 
-        col1, col2 = st.columns([2, 1])
 
-        with col1:
 
             weight = st.number_input("今日體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=300.0)
 
-        with col2:
 
             st.write("")
 
@@ -2337,11 +2382,9 @@ def page_log_meal() -> None:
 
             col1, col2, col3, col4 = st.columns(4)
 
-            with col1:
 
                 st.metric("熱量", f"{cal:.0f} kcal")
 
-            with col2:
 
                 st.metric("蛋白質", f"{pro:.0f} g")
 
@@ -2355,13 +2398,10 @@ def page_log_meal() -> None:
 
         else:
 
-            col1, col2 = st.columns(2)
 
-            with col1:
 
                 st.metric("熱量", f"{cal:.0f} kcal")
 
-            with col2:
 
                 st.metric("蛋白質", f"{pro:.0f} g")
 
@@ -2539,13 +2579,10 @@ def page_tdee() -> None:
 
     if bmr > 0:
 
-        col1, col2 = st.columns(2)
 
-        with col1:
 
             st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
 
-        with col2:
 
             st.metric("每日建議攝取", f"{calorie_goal:.0f} 大卡")
 
@@ -2571,7 +2608,6 @@ def main() -> None:
 
     st.set_page_config(page_title="飲食控制管理系統", layout="wide")
 
-    st.markdown("""
 
     <style>
 
@@ -2819,12 +2855,12 @@ def main() -> None:
 
 
         /* ===== Dashboard Styles (教練端) ===== */
-        
+
         /* 狀態指示燈 */
         .status-green { color: #22C55E; }
         .status-yellow { color: #EAB308; }
         .status-red { color: #DC2626; }
-        
+
         /* 學員卡片容器 */
         .student-card {
             background: #FFFFFF;
@@ -2834,28 +2870,28 @@ def main() -> None:
             border: 1px solid #E5E7EB;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
-        
+
         /* 進度條優化 */
         div[data-testid="stProgressBar"] {
             height: 12px !important;
             border-radius: 6px !important;
             background-color: #E5E7EB !important;
         }
-        
+
         div[data-testid="stProgressBar"] > div > div {
             background: linear-gradient(90deg, #22C55E, #10B981) !important;
             border-radius: 6px !important;
         }
-        
+
         /* 警示進度條 */
         .progress-warning > div > div {
             background: linear-gradient(90deg, #EAB308, #F59E0B) !important;
         }
-        
+
         .progress-danger > div > div {
             background: linear-gradient(90deg, #DC2626, #EF4444) !important;
         }
-        
+
         /* 數據卡片 */
         .metric-card {
             background: #FFFFFF;
@@ -2864,7 +2900,7 @@ def main() -> None:
             border: 1px solid #E5E7EB;
             text-align: center;
         }
-        
+
         /* 即時更新指示 */
         .live-indicator {
             display: inline-block;
@@ -2874,19 +2910,19 @@ def main() -> None:
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
-        
+
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
             100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
         }
-        
+
         /* 按鍵樣式優化 */
         div.stButton > button {
             background-color: #3B82F6 !important;
             border-radius: 8px !important;
         }
-        
+
         div.stButton > button:hover {
             background-color: #2563EB !important;
         }
@@ -2925,8 +2961,8 @@ def main() -> None:
         }
 
 
-    
-        
+
+
         /* ============================================================
            強制限制登入表單（st.form）寬度並使其水平置中
            ============================================================ */
@@ -2952,7 +2988,6 @@ def main() -> None:
 
     </style>
 
-    """, unsafe_allow_html=True)
 
     init_session()
 
@@ -3077,7 +3112,6 @@ def main() -> None:
 if __name__ == "__main__":
 
     main()
-
 
 
 

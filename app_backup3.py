@@ -234,12 +234,11 @@ def page_coach_overview() -> None:
     .coach-header { display: flex; align-items: center; margin-bottom: 24px; }
     .coach-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #BBE8EE 0%, #8B5CF6 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 16px; }
     .coach-greeting { font-size: 24px; font-weight: 400; color: #1F2937; }
-    .member-card { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 16px; }
-    .member-top-row { display: flex; align-items: center; gap: 12px; }
-    .member-avatar { width: 48px; height: 48px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-    .member-name { font-size: 18px; font-weight: 500; color: #1F2937; }
+    .member-card { padding: 16px 0; margin-bottom: 16px; display: flex; align-items: center; }
     .member-avatar { width: 56px; height: 56px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 20px; flex-shrink: 0; }
-            .member-name { font-size: 18px; font-weight: 400; color: #1F2937; }
+    .member-info { flex: 1; }
+    .member-name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .member-name { font-size: 18px; font-weight: 400; color: #1F2937; }
     .training-badge { background: #DCFCE7; color: #16A34A; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
     .training-badge.not-done { background: #F3F4F6; color: #9CA3AF; }
     .capsule-container { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 80px; }
@@ -304,7 +303,7 @@ def page_coach_overview() -> None:
         
         surname = name[0] if name else "?"
         
-        card_html = "<div class=\"member-card\"><div class=\"member-top-row\"><div class=\"member-avatar\">" + surname + "</div><div class=\"member-name\">" + name + "</div><div class=\"training-badge " + training_class + "\">" + training_html + "</div></div><div class=\"capsule-row\"><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill cal\" style=\"height: " + str(cal_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(cal_top) + "%\">" + str(calorie_actual) + "</div></div><div class=\"capsule-label\">CAL</div><div class=\"capsule-value\">" + str(calorie_actual) + "/" + str(int(calorie_goal)) + "</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill pro\" style=\"height: " + str(pro_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(pro_top) + "%\">" + str(protein_actual) + "</div></div><div class=\"capsule-label\">PROT</div><div class=\"capsule-value\">" + str(protein_actual) + "/" + str(int(protein_goal)) + "g</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill water\" style=\"height: " + str(water_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(water_top) + "%\">" + str(water_actual) + "</div></div><div class=\"capsule-label\">WATER</div><div class=\"capsule-value\">" + str(water_actual) + "/" + str(int(water_goal)) + "</div></div></div></div>"
+        card_html = "<div class=\"member-card\"><div class=\"member-avatar\">" + surname + "</div><div class=\"member-info\"><div class=\"member-name-row\"><div class=\"member-name\">" + name + "</div><div class=\"training-badge " + training_class + "\">" + training_html + "</div></div><div class=\"capsule-row\"><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill cal\" style=\"height: " + str(cal_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(cal_top) + "%\">" + str(calorie_actual) + "</div></div><div class=\"capsule-label\">CAL</div><div class=\"capsule-value\">" + str(calorie_actual) + "/" + str(int(calorie_goal)) + "</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill pro\" style=\"height: " + str(pro_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(pro_top) + "%\">" + str(protein_actual) + "</div></div><div class=\"capsule-label\">PROT</div><div class=\"capsule-value\">" + str(protein_actual) + "/" + str(int(protein_goal)) + "g</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill water\" style=\"height: " + str(water_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(water_top) + "%\">" + str(water_actual) + "</div></div><div class=\"capsule-label\">WATER</div><div class=\"capsule-value\">" + str(water_actual) + "/" + str(int(water_goal)) + "</div></div></div></div></div>"
         st.markdown(card_html, unsafe_allow_html=True)
 def page_coach_student_detail() -> None:
 
@@ -340,7 +339,7 @@ def page_coach_student_detail() -> None:
     # ============================================================
     # Excel 匯入功能
     # ============================================================
-    st.subheader("今日完成率")
+    st.subheader("📥 匯入 Excel 資料")
 
     uploaded_file = st.file_uploader(
         "選擇 Excel 檔案（每個工作表代表一個月份）",
@@ -423,9 +422,9 @@ def page_coach_student_detail() -> None:
 
     totals = metrics.sum_totals(today_records).as_dict()
 
-    st.subheader("今日完成率")
+    st.subheader("📊 今日摘要")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
 
@@ -435,13 +434,25 @@ def page_coach_student_detail() -> None:
 
     with col2:
 
+        pro = totals.get("protein", 0)
+
+        st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
+
+    with col3:
+
+        water = totals.get("water", 0)
+
+        st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
+
+    with col4:
+
         weight = sheets.get_latest_weight(uid)
 
         st.metric("體重", f"{weight:.1f}kg" if weight else "-", delta=None)
 
     st.divider()
 
-    st.subheader("今日完成率")
+    st.subheader("⚙️ 修改營養目標")
 
     col1, col2 = st.columns(2)
 
@@ -489,7 +500,7 @@ def page_coach_student_detail() -> None:
 
     st.divider()
 
-    st.subheader("今日完成率")
+    st.subheader("📈 體重趨勢")
 
     weight_records = sheets.get_weight_records(uid)
 
@@ -769,7 +780,7 @@ def page_coach_student_history():
         except Exception as exc:
             st.error("取得學員列表失敗：" + str(exc))
             return
-        st.header("學員歷史")
+        st.header("📚 學員歷史")
         if not students:
             st.info("目前沒有學員。")
             return
@@ -807,7 +818,7 @@ def page_coach_student_history():
     with col_title:
         st.header("📚 " + str(name) + " 的歷史記錄")
     st.divider()
-    st.subheader("今日完成率")
+    st.subheader("⏱️ 時間範圍")
 
     # ============================================================
     # Excel 匯入功能
@@ -948,7 +959,7 @@ def page_coach_student_history():
         d = _parse_record_date(r.get("timestamp", ""))
         if start_date <= d <= end_date:
             notes.append(r)
-    st.subheader("今日完成率")
+    st.subheader("📌 摘要")
     avg_cal = sum(v["calorie"] for v in daily.values()) / max(days_count, 1)
     avg_pro = sum(v["protein"] for v in daily.values()) / max(days_count, 1)
     avg_water = sum(v["water"] for v in daily.values()) / max(days_count, 1)
@@ -974,104 +985,19 @@ def page_coach_student_history():
             st.metric("目前體重", "%.1f kg" % last_w, d_str)
         else:
             st.metric("目前體重", "-")
-    # 統一的高質感深夜底色
-    CARD_BG = '#2a2850'
-    # 統一強制套用系統原生高質感字型
-    FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif")
-
-    # ==========================================
-    # 體重趨勢圖
-    # ==========================================
+    st.subheader("⚖️ 體重變化")
     if weights:
-        # 準備體重數據
-        def parse_weight_date(ts):
-            ts_str = str(ts)
-            # 嘗試解析 ISO 格式: 2026-07-15T10:30:00
-            if "T" in ts_str:
-                try:
-                    dt = datetime.strptime(ts_str[:19], "%Y-%m-%dT%H:%M:%S")
-                    return dt.strftime("%m/%d")
-                except:
-                    pass
-            # 回退：直接取日期部分
-            if "-" in ts_str:
-                parts = ts_str.split(" ")[0].split("-")
-                if len(parts) >= 3:
-                    return f"{int(parts[1]):02d}/{int(parts[2]):02d}"
-            return ts_str[:10]
-        
-        weight_xs = [parse_weight_date(r.get("timestamp", "")) for r in sorted_w]
-        weight_ys = [r.get("weight_kg", 0) for r in sorted_w]
-        # 自適應 Y軸範圍
-        min_w = min(weight_ys) if weight_ys else 0
-        max_w = max(weight_ys) if weight_ys else 100
-        weight_range = max_w - min_w
-        
-        # 根據範圍選擇刻度間隔
-        if weight_range < 5:
-            step = 1
-        elif weight_range < 10:
-            step = 2
-        elif weight_range < 20:
-            step = 5
-        else:
-            step = 10
-        
-        # 計算 Y軸範圍（加入緩衝）
-        y_min = int(min_w) - step
-        y_max = int(max_w) + step
-        # 確保不為負數
-        y_min = max(0, y_min)
-        
-        # 生成刻度列表
-        weight_ticks = list(range(y_min, y_max + 1, step))
-
-        last_weight = weight_ys[-1] if weight_ys else 0
-        first_weight = weight_ys[0] if weight_ys else 0
-        weight_change = last_weight - first_weight
-        
-        fig_weight = go.Figure()
-        
-        fig_weight.add_trace(go.Scatter(
-            x=weight_xs,
-            y=weight_ys,
-            mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
-            hovertemplate='日期: %{x}<br>體重: %{y:.1f} kg<extra></extra>'
-        ))
-        
-        change_str = f"{weight_change:+.1f}" if weight_change != 0 else "0.0"
-        
-        fig_weight.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
-            height=260,
-            font=FONT_SETTING,
-            annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>{last_weight:.1f}</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>kg</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text=f"<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>體重 {change_str} kg</span>",
-                    showarrow=False, align="left")
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor="rgba(255, 255, 255, 0.05)", tickfont=dict(color="#888888", size=11), zeroline=False, showline=False, ticks="", tickvals=weight_ticks, range=[y_min, y_max]),
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig_weight, use_container_width=True, config={'displayModeBar': False})
+        wchart = {
+            "日期": [r.get("timestamp", "")[:10] for r in sorted_w],
+            "體重 (kg)": [r.get("weight_kg", 0) for r in sorted_w],
+        }
+        st.line_chart(wchart, x="日期", y="體重 (kg)")
     else:
         st.info("此區間沒有體重記錄。")
 
 
 
-    # 統一的高質感深夜底色
-    st.subheader("今日完成率")
+    st.subheader("📈 每日攝取趨勢")
 
     # 深色卡片趨勢圖 CSS
     st.markdown("""<style>
@@ -1097,7 +1023,6 @@ def page_coach_student_history():
         total_pro = sum(pros)
         avg_pro = total_pro / len(sorted_days) if sorted_days else 0
 
-
         # ==========================================
         # CSS：Plotly 容器圓角與陰影
         # ==========================================
@@ -1106,155 +1031,114 @@ def page_coach_student_history():
             div[data-testid="stPlotlyChart"] {
                 border-radius: 24px !important;
                 overflow: hidden !important;
-                box-shadow: 0 12px 40px rgba(0,0,0,0.3) !important;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.25) !important;
                 margin: 15px 0 !important;
-                background-color: #16152b !important;
             }
         </style>
         """, unsafe_allow_html=True)
 
 
         # ==========================================
-        # 1. 一體化熱量趨勢圖
+        # 🔥 1. 一體化熱量趨勢圖
         # ==========================================
-        max_cal = max(cals) if cals else 0
-        cal_ticks = []
-        if max_cal > 0:
-            cal_ticks = [v for v in [1000, 1500, 2000, 2500, 3000, 3500, 4000] if v <= max_cal * 1.2]
-            if not cal_ticks or cal_ticks[-1] < max_cal:
-                cal_ticks.append(((max_cal // 500) + 1) * 500)
-
         fig_cal = go.Figure()
-
+        
         fig_cal.add_trace(go.Scatter(
             x=xs,
             y=cals,
             mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
+            line=dict(color='#FFA500', width=3, shape='spline'),
+            marker=dict(size=6, color='#ffffff', line=dict(color='#FFA500', width=2)),
             fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
+            fillcolor='rgba(255, 165, 0, 0.12)',
             hovertemplate='日期: %{x}<br>熱量: %{y:.0f} kcal<extra></extra>'
         ))
-
+        
         fig_cal.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
+            paper_bgcolor='#1e1e38',
+            plot_bgcolor='#1e1e38',
+            margin=dict(l=35, r=20, t=95, b=25),
             height=260,
-            font=FONT_SETTING,
             annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>" + f"{avg_cal:.1f}" + "</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>kcal</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>平均每日熱量</span>",
-                    showarrow=False, align="left")
+                dict(
+                    x=0.01, y=1.38, xref="paper", yref="paper",
+                    text=f"<b style='font-size:32px; color:#ffffff;'>{avg_cal:.0f}</b> <span style='font-size:14px; color:#a0a0a0;'>kcal</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.01, y=1.12, xref="paper", yref="paper",
+                    text="<span style='font-size:12px; color:#a0a0a0;'>平均每日熱量</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.98, y=1.35, xref="paper", yref="paper",
+                    text="<span style='font-size:28px;'>🔥</span>",
+                    showarrow=False, align="right"
+                )
             ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.05)', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks="", tickvals=cal_ticks if cal_ticks else None),
+            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=11), linecolor='#2a2a4a', ticks=""),
+            yaxis=dict(showgrid=True, gridcolor='#2a2a4a', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks=""),
             showlegend=False
         )
-
+        
         st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
-        # ==========================================
-        # 2. 一體化蛋白質趨勢圖
-        # ==========================================
-        max_pro = max(pros) if pros else 0
-        pro_ticks = []
-        if max_pro > 0:
-            pro_ticks = [v for v in [50, 100, 150, 200, 250] if v <= max_pro * 1.2]
-            if not pro_ticks or pro_ticks[-1] < max_pro:
-                pro_ticks.append(((max_pro // 25) + 1) * 25)
 
+        # ==========================================
+        # 🍗 2. 一體化蛋白質趨勢圖
+        # ==========================================
         fig_pro = go.Figure()
-
+        
         fig_pro.add_trace(go.Scatter(
             x=xs,
             y=pros,
             mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
+            line=dict(color='#38b6ff', width=3, shape='spline'),
+            marker=dict(size=6, color='#ffffff', line=dict(color='#38b6ff', width=2)),
             fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
+            fillcolor='rgba(56, 182, 255, 0.12)',
             hovertemplate='日期: %{x}<br>蛋白質: %{y:.0f} g<extra></extra>'
         ))
-
+        
         fig_pro.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
+            paper_bgcolor='#1e1e38',
+            plot_bgcolor='#1e1e38',
+            margin=dict(l=35, r=20, t=95, b=25),
             height=260,
-            font=FONT_SETTING,
             annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>" + f"{avg_pro:.1f}" + "</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>g</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>平均每日蛋白質</span>",
-                    showarrow=False, align="left")
+                dict(
+                    x=0.01, y=1.38, xref="paper", yref="paper",
+                    text=f"<b style='font-size:32px; color:#ffffff;'>{avg_pro:.0f}</b> <span style='font-size:14px; color:#a0a0a0;'>g</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.01, y=1.12, xref="paper", yref="paper",
+                    text="<span style='font-size:12px; color:#a0a0a0;'>平均每日蛋白質</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.98, y=1.35, xref="paper", yref="paper",
+                    text="<span style='font-size:28px;'>🍗</span>",
+                    showarrow=False, align="right"
+                )
             ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.05)', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks="", tickvals=pro_ticks if pro_ticks else None),
+            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=11), linecolor='#2a2a4a', ticks=""),
+            yaxis=dict(showgrid=True, gridcolor='#2a2a4a', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks=""),
             showlegend=False
         )
-
+        
         st.plotly_chart(fig_pro, use_container_width=True, config={'displayModeBar': False})
 
         # ----- 4. 水量趨勢圖 -----
-
-        # ==========================================
-        # 3. 一體化水量趨勢圖
-        # ==========================================
-        waters = [daily[d]["water"] for d in sorted_days]
-        max_water = max(waters) if waters else 0
-        water_ticks = []
-        if max_water > 0:
-            water_ticks = [v for v in [1000, 1500, 2000, 2500, 3000, 3500, 4000] if v <= max_water * 1.2]
-            if not water_ticks or water_ticks[-1] < max_water:
-                water_ticks.append(((max_water // 500) + 1) * 500)
-
-        fig_water = go.Figure()
-
-        fig_water.add_trace(go.Scatter(
-            x=xs,
-            y=waters,
-            mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
-            hovertemplate='日期: %{x}<br>水量: %{y:.0f} ml<extra></extra>'
-        ))
-
-        fig_water.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
-            height=260,
-            font=FONT_SETTING,
-            annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>{(sum(waters)/len(waters) if waters else 0):.1f}</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>ml</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>平均每日水量</span>",
-                    showarrow=False, align="left")
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.05)', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks="", tickvals=water_ticks if water_ticks else None),
-            showlegend=False
-        )
-
-        st.plotly_chart(fig_water, use_container_width=True, config={'displayModeBar': False})
-
+        st.subheader("💧 水量趨勢")
+        bar_data = {"date": xs, "water": [daily[d]["water"] for d in sorted_days]}
+        st.bar_chart(bar_data, x="date", y="water")
 
     else:
         st.info("此區間沒有飲食記錄。")
 
 
-    st.subheader("今日完成率")
+    st.subheader("🏋️ 訓練記錄")
     if trainings:
         rows = []
         for r in sorted(trainings, key=lambda x: x.get("timestamp", "")):
@@ -1272,14 +1156,90 @@ def page_coach_student_history():
     else:
         st.info("此區間沒有訓練記錄。")
 
+    st.subheader("📝 教練備註")
 
-    st.subheader("今日完成率")
+    # 初始化 session state for editing
+    if "editing_note_ts" not in st.session_state:
+        st.session_state.editing_note_ts = None
+
+    if notes:
+        sorted_notes = sorted(notes, key=lambda x: x.get("timestamp", ""), reverse=True)
+        for n in sorted_notes[:10]:
+            ts = n.get("timestamp", "")[:19]
+            cid = n.get("coach_id", "")
+            note = n.get("note", "")
+            note_key = ts.replace(':', '_').replace('-', '_').replace(' ', '_').replace('.', '_')
+
+            # 如果正在編輯這個備註
+            if st.session_state.editing_note_ts == ts:
+                st.markdown(f"**✏️ 編輯中：** {ts}")
+                edit_text = st.text_area("備註內容", value=note, key=f"edit_{note_key}", height=80, label_visibility="collapsed")
+                col_update, col_cancel = st.columns([1, 1])
+                with col_update:
+                    if st.button("💾 更新", key=f"save_{note_key}", use_container_width=True):
+                        if edit_text.strip():
+                            try:
+                                sheets.update_note(ts, uid, cid, edit_text.strip())
+                                _clear_analysis_cache()
+                                st.success("備註已更新！")
+                                st.session_state.editing_note_ts = None
+                                st.rerun()
+                            except Exception as exc:
+                                st.error("更新失敗：" + str(exc))
+                with col_cancel:
+                    if st.button("取消", key=f"cancel_{note_key}", use_container_width=True):
+                        st.session_state.editing_note_ts = None
+                        st.rerun()
+                st.divider()
+            else:
+                # 顯示備註 + 編輯/刪除按鈕
+                with st.container():
+                    col_text, col_actions = st.columns([4, 1])
+                    with col_text:
+                        st.markdown(f"**{ts}**  _{cid}_：" + note)
+                    with col_actions:
+                        if st.button("✏️", key=f"edit_btn_{note_key}", help="編輯"):
+                            st.session_state.editing_note_ts = ts
+                            st.rerun()
+                        if st.button("🗑️", key=f"del_btn_{note_key}", help="刪除"):
+                            try:
+                                sheets.delete_note(ts, uid, cid)
+                                _clear_analysis_cache()
+                                st.success("備註已刪除！")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error("刪除失敗：" + str(exc))
+                st.divider()
+    else:
+        st.caption("此區間尚無備註。")
+
+    # 新增備註（不在 form 內，方便與編輯共存）
+    st.markdown("**➕ 新增備註**")
+    new_note_input = st.text_area("新增備註", placeholder="輸入觀察意見...", key="coach_note_input", label_visibility="collapsed", height=80)
+    if st.button("💾 儲存備註", use_container_width=True):
+        if new_note_input and new_note_input.strip():
+            try:
+                sheets.append_note(
+                    timestamp=datetime.now().isoformat(timespec="seconds"),
+                    user_id=uid,
+                    coach_id=str(st.session_state.get("user_id", "")),
+                    note=new_note_input.strip(),
+                )
+                _clear_analysis_cache()
+                st.success("備註已儲存！")
+                st.rerun()
+            except Exception as exc:
+                st.error("儲存失敗：" + str(exc))
+        else:
+            st.warning("請輸入備註內容")
+
+    st.subheader("📤 匯出")
     csv_bytes = _build_history_csv(student, daily, weights, trainings, notes, start_date, end_date)
     pdf_bytes = _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date)
     ec1, ec2 = st.columns(2)
     with ec1:
         st.download_button(
-            "下載 CSV",
+            "📊 下載 CSV",
             data=csv_bytes,
             file_name=str(name) + "_歷史_" + start_date.isoformat() + "_" + end_date.isoformat() + ".csv",
             mime="text/csv",
@@ -1288,7 +1248,7 @@ def page_coach_student_history():
         )
     with ec2:
         st.download_button(
-            "下載 PDF",
+            "📄 下載 PDF",
             data=pdf_bytes,
             file_name=str(name) + "_歷史_" + start_date.isoformat() + "_" + end_date.isoformat() + ".pdf",
             mime="application/pdf",
@@ -1311,7 +1271,7 @@ def page_tdee_questionnaire() -> None:
 
     with st.form("tdee_form"):
 
-        st.subheader("今日完成率")
+        st.subheader("基本資料")
 
         col1, col2 = st.columns(2)
 
@@ -1327,15 +1287,15 @@ def page_tdee_questionnaire() -> None:
 
             gender = st.radio("性別", ["男", "女"], horizontal=True)
 
-        st.subheader("今日完成率")
+        st.subheader("運動習慣")
 
         exercise_level = st.selectbox("每週運動頻率", EXERCISE_LEVELS, index=1)
 
-        st.subheader("今日完成率")
+        st.subheader("飲食目標")
 
         goal_type = st.radio("你的目標是？", ["減脂", "維持", "增肌"], horizontal=True, index=1)
 
-        st.subheader("今日完成率")
+        st.subheader("記錄模式")
 
         record_mode = st.radio(
 
@@ -1443,7 +1403,7 @@ def page_login() -> None:
 
     else:
         # ==================== 註冊表單 ====================
-        st.subheader("今日完成率")
+        st.subheader("新學員註冊")
         st.info("填寫以下資料即可建立帳號")
 
         with st.form("signup_form"):
@@ -1529,27 +1489,6 @@ def page_login() -> None:
 
 def page_personal() -> None:
 
-    # ============================================================
-    # 👋 1. 個人化頭像歡迎區 (單行無縮排安全版)
-    # ============================================================
-    import base64
-    import os
-
-    user_name = st.session_state.get('username', '學員')
-    avatar_path = './static/avatar.jpg'
-
-    avatar_base64 = ""
-    if os.path.exists(avatar_path):
-        with open(avatar_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-            avatar_base64 = f"data:image/jpeg;base64,{encoded_string}"
-    else:
-        avatar_base64 = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200"
-
-    welcome_html = f'<div style="display: flex; align-items: center; gap: 16px; margin-top: 10px; margin-bottom: 25px; width: 100%;"><img src="{avatar_base64}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" alt="avatar"><span style="font-size: 24px; font-weight: 700; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; white-space: nowrap;">Hello, {user_name}!</span></div>'
-
-    st.markdown(welcome_html, unsafe_allow_html=True)
-
     st.header("📊 今日摘要")
 
     uid = st.session_state.user_id
@@ -1590,9 +1529,9 @@ def page_personal() -> None:
 
     totals = metrics.sum_totals(today_records).as_dict()
 
-    st.subheader("今日完成率")
+    st.subheader("個人資訊")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
 
@@ -1602,467 +1541,153 @@ def page_personal() -> None:
 
         st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
 
+    with col3:
+
+        record_mode = sheets.get_user_record_mode(uid)
+
+        st.metric("記錄模式", "簡易" if record_mode == "simple" else "完整")
 
     st.divider()
 
-    st.subheader("今日完成率")
-
-    record_mode = sheets.get_user_record_mode(uid)
+    st.subheader("今日營養攝取")
 
     if record_mode == "full":
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
-            # CSS for calories chart
-            st.markdown("""
-<style>
-    .cal-chart-full div[data-testid="stPlotlyChart"] {
-        border-radius: 24px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
-        margin: 10px 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
-            # Calculate calorie percentage
-            cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
-            
-            FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
-            CAL_CARD_BG = "#ffffff"
-            
-            fig_cal = go.Figure()
-            fig_cal.add_trace(go.Pie(
-                values=[cal_pct, 100 - cal_pct],
-                hole=0.76,
-                domain=dict(x=[0, 1], y=[0, 1]),
-                marker=dict(colors=['#ffbfa3', '#f0f0f0']),
-                sort=False,
-                direction='clockwise',
-                showlegend=False,
-                hoverinfo='none',
-                textinfo='none'
-            ))
-            fig_cal.update_layout(
-                paper_bgcolor=CAL_CARD_BG,
-                plot_bgcolor=CAL_CARD_BG,
-                margin=dict(l=10, r=10, t=50, b=10),
-                height=180,
-                font=FONT_SETTING,
-                annotations=[
-                    dict(
-                        x=0.02, y=1.22, xref="paper", yref="paper",
-                        text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
-                        showarrow=False, align="left"
-                    ),
-                    dict(
-                        x=0.5, y=0.5, xref="paper", yref="paper",
-                        text=f"<b style='font-size:28px; color:#1a1a1a;'>{totals.get('calories', 0):.0f}</b>",
-                        showarrow=False, align="center"
-                    ),
-                    dict(
-                        x=0.5, y=0.22, xref="paper", yref="paper",
-                        text="<span style='font-size:12px; color:#666666; font-weight:500;'>Kcal</span>",
-                        showarrow=False, align="center"
-                    )
-                ]
-            )
-            st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
+            cal = totals.get("calories", 0)
+
+            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
 
         with col2:
+
+            pro = totals.get("protein", 0)
+
+            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
+
+        with col3:
 
             carb = totals.get("carb", 0)
 
             st.metric("碳水", f"{carb:.0f}g", f"{goals.get('carb', 0) - carb:.0f}g")
 
-        with col3:
+        with col4:
 
             fat = totals.get("fat", 0)
 
             st.metric("脂肪", f"{fat:.0f}g", f"{goals.get('fat', 0) - fat:.0f}g")
+
+        with col5:
+
+            water = totals.get("water", 0)
+
+            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
 
     else:
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            # CSS for calories chart
-            st.markdown("""
-<style>
-    .cal-chart-simple div[data-testid="stPlotlyChart"] {
-        border-radius: 24px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
-        margin: 10px 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
-            # Calculate calorie percentage
-            cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
-            
-            FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
-            CAL_CARD_BG = "#ffffff"
-            
-            fig_cal = go.Figure()
-            fig_cal.add_trace(go.Pie(
-                values=[cal_pct, 100 - cal_pct],
-                hole=0.76,
-                domain=dict(x=[0, 1], y=[0, 1]),
-                marker=dict(colors=['#ffbfa3', '#f0f0f0']),
-                sort=False,
-                direction='clockwise',
-                showlegend=False,
-                hoverinfo='none',
-                textinfo='none'
-            ))
-            fig_cal.update_layout(
-                paper_bgcolor=CAL_CARD_BG,
-                plot_bgcolor=CAL_CARD_BG,
-                margin=dict(l=10, r=10, t=50, b=10),
-                height=180,
-                font=FONT_SETTING,
-                annotations=[
-                    dict(
-                        x=0.02, y=1.22, xref="paper", yref="paper",
-                        text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
-                        showarrow=False, align="left"
-                    ),
-                    dict(
-                        x=0.5, y=0.5, xref="paper", yref="paper",
-                        text=f"<b style='font-size:28px; color:#1a1a1a;'>{totals.get('calories', 0):.0f}</b>",
-                        showarrow=False, align="center"
-                    ),
-                    dict(
-                        x=0.5, y=0.22, xref="paper", yref="paper",
-                        text="<span style='font-size:12px; color:#666666; font-weight:500;'>Kcal</span>",
-                        showarrow=False, align="center"
-                    )
-                ]
-            )
-            st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
+            cal = totals.get("calories", 0)
+
+            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
+
+        with col2:
+
+            pro = totals.get("protein", 0)
+
+            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
+
+        with col3:
+
+            water = totals.get("water", 0)
+
+            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
 
     st.divider()
 
-    # CSS for pie charts
-    st.markdown("""
-<style>
-    div[data-testid="stPlotlyChart"] {
-        border-radius: 24px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 24px rgba(199, 237, 246, 0.3) !important;
-        margin: 10px 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+    st.subheader("✅ 今日完成率")
 
-    st.subheader("今日完成率")
-
-    # 定義比由變参
     cal_ratio = min(totals.get("calories", 0) / calorie_goal, 1.5) if calorie_goal > 0 else 0
+
     pro_ratio = min(totals.get("protein", 0) / goals.get("protein", 1), 1.5) if goals.get("protein", 0) > 0 else 0
+
     water_ratio = min(totals.get("water", 0) / goals.get("water", 1), 1.5) if goals.get("water", 0) > 0 else 0
 
-    # 建立三欄，將 食飼、水量、蛋質膜質 橫向並排
-    cal_pct = min(cal_ratio * 100, 100)
-    water_pct = min(water_ratio * 100, 100)
-    pro_pct = min(pro_ratio * 100, 100)
-    
-    # 取得今日日期字串
-    today_str = date.today().strftime("%d %B")
+    today = date.today()
 
-    # 定義统一的卡粉色胊背景背能
-    CARD_BG_COLOR = "#c7edf6"
+    has_training = sheets.has_training_today(uid, today)
 
-    # ?????? ????????? ????
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
-    # ?????? ????????? ????
     with col1:
-        fig_cal = go.Figure()
-        fig_cal.add_trace(go.Pie(
-            values=[cal_pct, 100 - cal_pct],
-            hole=0.75,
-            marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
-            sort=False,
-            direction='clockwise',
-            showlegend=False,
-            hoverinfo='none',
-            textinfo='none'
-        ))
-        fig_cal.update_layout(
-            paper_bgcolor=CARD_BG_COLOR,
-            plot_bgcolor=CARD_BG_COLOR,
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=160,
-            annotations=[
-                dict(
-                    x=0.75, y=0.5, xref="paper", yref="paper",
-                    text=f"<b style='font-size:20px; color:#1a2530;'>{totals.get('calories', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>kcal</span>",
-                    showarrow=False, align="center"
-                ),
-                dict(
-                    x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>飲食進度</span>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.50, xref="paper", yref="paper",
-                    text=f"<b style='font-size:36px; color:#1a2530;'>{cal_pct:.0f}%</b>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.10, xref="paper", yref="paper",
-                    text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
-                    showarrow=False, align="left"
-                )
-            ]
-        )
-        st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
-    # 
+        st.markdown("**🍽️ 飲食**")
+
+        pct = cal_ratio * 100
+
+        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
+
+        st.markdown(f"{emoji} {pct:.0f}%")
+
+        st.progress(min(cal_ratio, 1.0))
+
     with col2:
-        fig_water = go.Figure()
-        fig_water.add_trace(go.Pie(
-            values=[water_pct, 100 - water_pct],
-            hole=0.75,
-            marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
-            sort=False,
-            direction='clockwise',
-            showlegend=False,
-            hoverinfo='none',
-            textinfo='none'
-        ))
-        fig_water.update_layout(
-            paper_bgcolor=CARD_BG_COLOR,
-            plot_bgcolor=CARD_BG_COLOR,
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=160,
-            annotations=[
-                dict(
-                    x=0.75, y=0.5, xref="paper", yref="paper",
-                    text=f"<b style='font-size:18px; color:#1a2530;'>{totals.get('water', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>ml</span>",
-                    showarrow=False, align="center"
-                ),
-                dict(
-                    x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>水量進度</span>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.50, xref="paper", yref="paper",
-                    text=f"<b style='font-size:36px; color:#1a2530;'>{water_pct:.0f}%</b>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.10, xref="paper", yref="paper",
-                    text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
-                    showarrow=False, align="left"
-                )
-            ]
-        )
-        st.plotly_chart(fig_water, use_container_width=True, config={'displayModeBar': False})
 
-    # 水量圓環卡區
+        st.markdown("**💧 水量**")
+
+        pct = water_ratio * 100
+
+        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
+
+        st.markdown(f"{emoji} {pct:.0f}%")
+
+        st.progress(min(water_ratio, 1.0))
+
     with col3:
-        fig_pro = go.Figure()
-        fig_pro.add_trace(go.Pie(
-            values=[pro_pct, 100 - pro_pct],
-            hole=0.75,
-            marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
-            sort=False,
-            direction='clockwise',
-            showlegend=False,
-            hoverinfo='none',
-            textinfo='none'
-        ))
-        fig_pro.update_layout(
-            paper_bgcolor=CARD_BG_COLOR,
-            plot_bgcolor=CARD_BG_COLOR,
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=160,
-            annotations=[
-                dict(
-                    x=0.75, y=0.5, xref="paper", yref="paper",
-                    text=f"<b style='font-size:20px; color:#1a2530;'>{totals.get('protein', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>g</span>",
-                    showarrow=False, align="center"
-                ),
-                dict(
-                    x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>蛋白質進度</span>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.50, xref="paper", yref="paper",
-                    text=f"<b style='font-size:36px; color:#1a2530;'>{pro_pct:.0f}%</b>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.10, xref="paper", yref="paper",
-                    text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
-                    showarrow=False, align="left"
-                )
-            ]
-        )
-        st.plotly_chart(fig_pro, use_container_width=True, config={'displayModeBar': False})
+
+        st.markdown("**🏋️ 訓練**")
+
+        emoji = "✅" if has_training else "❌"
+
+        st.markdown(f"{emoji} {'已訓練' if has_training else '未訓練'}")
+
+        st.progress(1.0 if has_training else 0.0)
+
+    with col4:
+
+        st.markdown("**🥩 蛋白質**")
+
+        pct = pro_ratio * 100
+
+        emoji = "✅" if pct >= 80 else "⚠️" if pct >= 50 else "❌"
+
+        st.markdown(f"{emoji} {pct:.0f}%")
+
+        st.progress(min(pro_ratio, 1.0))
 
     st.divider()
 
-    # ============================================================
     st.subheader("⚖️ 體重")
 
-    # 注入精確定位與排版的 CSS
-    st.markdown("""
-    <style>
-        .weight-card-container {
-            position: relative !important;
-            width: 100% !important;
-            margin-bottom: 20px !important;
-        }
-
-        .weight-card {
-            background-color: #f8f8f8 !important;
-            border-radius: 24px !important;
-            padding: 24px !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
-            box-sizing: border-box !important;
-        }
-        
-        .weight-title {
-            font-size: 16px !important;
-            font-weight: 500 !important;
-            color: #1a1a1a !important;
-            margin-bottom: 12px !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
-        }
-        
-        .weight-value {
-            font-size: 36px !important;
-            font-weight: 700 !important;
-            color: #1a1a1a !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
-            line-height: 1 !important;
-        }
-        
-        .weight-unit {
-            font-size: 18px !important;
-            font-weight: normal !important;
-            color: #a0a0a0 !important;
-            margin-left: 6px !important;
-        }
-
-        .weight-trend {
-            font-size: 14px !important;
-            color: #1a1a1a !important;
-            font-weight: 500 !important;
-            margin-top: 12px !important;
-            display: flex !important;
-            align-items: center !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
-        }
-
-        .stApp div[data-testid="element-container"]:has(button[key="weight_lightning_btn"]) {
-            position: absolute !important;
-            top: 24px !important;
-            right: 24px !important;
-            width: 44px !important;
-            height: 44px !important;
-            z-index: 999 !important;
-        }
-
-        .stApp button[key="weight_lightning_btn"] {
-            width: 44px !important;
-            height: 44px !important;
-            min-width: 44px !important;
-            max-width: 44px !important;
-            border-radius: 50% !important;
-            background-color: #ffffff !important;
-            color: #1a1a1a !important;
-            border: none !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
-            font-size: 18px !important;
-            padding: 0 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-        }
-
-        .stApp button[key="weight_lightning_btn"]:hover {
-            transform: scale(1.08) !important;
-            background-color: #f3f3f3 !important;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
     latest_weight = sheets.get_latest_weight(uid)
-    weight_display_str = f"{latest_weight:.1f}" if latest_weight else "--.-"
-    
-    # 歷史紀錄與變動計算
-    weight_history = []
-    if "records" in dir() and records:
-        for r in records:
-            w = r.get("weight") if isinstance(r, dict) else getattr(r, "weight", None)
-            if w is not None:
-                try:
-                    w_val = float(w)
-                    if w_val > 0:
-                        weight_history.append(w_val)
-                except (ValueError, TypeError):
-                    continue
 
-    # 計算趨勢
-    trend_content = ""
-    if latest_weight and len(weight_history) >= 2:
-        prev_weight = weight_history[-2]
-        diff = latest_weight - prev_weight
-        diff_pct = (diff / prev_weight) * 100
-        
-        if diff < 0:
-            trend_content = f"⇩ {abs(diff):.1f} Kg ({diff_pct:.1f}%)"
-        elif diff > 0:
-            trend_content = f"⇧ {abs(diff):.1f} Kg (+{diff_pct:.1f}%)"
-        else:
-            trend_content = "⬌ 體重維持持平"
+    if latest_weight:
+
+        st.metric("最新體重", f"{latest_weight:.1f} kg")
+
     else:
-        trend_content = ""
 
-    st.markdown('<div class="weight-card-container">', unsafe_allow_html=True)
+        st.info("尚未記錄體重")
 
-    card_html = f"""
-    <div class="weight-card">
-        <div class="weight-title">Current Weight</div>
-        <div class="weight-value">
-            {weight_display_str}<span class="weight-unit">Kg</span>
-        </div>"""
-    
-    if trend_content:
-        card_html += f"""
-        <div class="weight-trend">
-            {trend_content}
-        </div>"""
-    
-    card_html += """
-    </div>"""
-    
-    st.markdown(card_html, unsafe_allow_html=True)
+    if st.button("記錄今日體重"):
 
-    if st.button("⚡", key="weight_lightning_btn"):
         st.session_state.page = "體重記錄"
+
         st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.write("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-
 
 # =============================================================================
 
@@ -2106,7 +1731,7 @@ def page_weight() -> None:
 
     st.divider()
 
-    st.subheader("今日完成率")
+    st.subheader("📈 體重趨勢")
 
     weight_records = sheets.get_weight_records(uid)
 
@@ -2204,7 +1829,7 @@ def page_training() -> None:
 
     st.divider()
 
-    st.subheader("今日完成率")
+    st.subheader("📅 本週訓練回顧")
 
     ws, we = _week_range()
 
@@ -2246,7 +1871,7 @@ def page_log_meal() -> None:
 
     meal_type = st.selectbox("餐點類型", MEAL_TYPES)
 
-    st.subheader("今日完成率")
+    st.subheader("選擇輸入方式")
 
     input_mode = st.radio(
 
@@ -2323,7 +1948,7 @@ def page_log_meal() -> None:
 
         st.divider()
 
-        st.subheader("今日完成率")
+        st.subheader("📋 分析結果")
 
         cal = analysis_result.get("calories", 0)
 
@@ -2455,7 +2080,7 @@ def page_history() -> None:
 
     days = (we - ws).days + 1
 
-    st.subheader("今日完成率")
+    st.subheader("本週每日達成率")
 
     daily_data = []
 
@@ -2497,7 +2122,7 @@ def page_history() -> None:
 
     st.dataframe(daily_data, use_container_width=True, hide_index=True)
 
-    st.subheader("今日完成率")
+    st.subheader("本週熱量達成率")
 
     calorie_chart = {"日期": [], "達成率(%)": []}
 
@@ -3077,7 +2702,3 @@ def main() -> None:
 if __name__ == "__main__":
 
     main()
-
-
-
-
