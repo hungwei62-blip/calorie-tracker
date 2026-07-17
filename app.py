@@ -425,7 +425,7 @@ def page_coach_student_detail() -> None:
 
     st.subheader("今日完成率")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
 
     with col1:
 
@@ -434,18 +434,6 @@ def page_coach_student_detail() -> None:
         st.metric("熱量", f"{cal:.0f}", f"{goals.get('calorie', 0) - cal:.0f}")
 
     with col2:
-
-        pro = totals.get("protein", 0)
-
-        st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
-
-    with col3:
-
-        water = totals.get("water", 0)
-
-        st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
-
-    with col4:
 
         weight = sheets.get_latest_weight(uid)
 
@@ -1583,7 +1571,7 @@ def page_personal() -> None:
 
     st.subheader("今日完成率")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
 
@@ -1593,19 +1581,16 @@ def page_personal() -> None:
 
         st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
 
-    with col3:
-
-        record_mode = sheets.get_user_record_mode(uid)
-
-        st.metric("記錄模式", "簡易" if record_mode == "simple" else "完整")
 
     st.divider()
 
     st.subheader("今日完成率")
 
+    record_mode = sheets.get_user_record_mode(uid)
+
     if record_mode == "full":
 
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             # CSS for calories chart
@@ -1666,27 +1651,15 @@ def page_personal() -> None:
 
         with col2:
 
-            pro = totals.get("protein", 0)
-
-            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
-
-        with col3:
-
             carb = totals.get("carb", 0)
 
             st.metric("碳水", f"{carb:.0f}g", f"{goals.get('carb', 0) - carb:.0f}g")
 
-        with col4:
+        with col3:
 
             fat = totals.get("fat", 0)
 
             st.metric("脂肪", f"{fat:.0f}g", f"{goals.get('fat', 0) - fat:.0f}g")
-
-        with col5:
-
-            water = totals.get("water", 0)
-
-            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
 
     else:
 
