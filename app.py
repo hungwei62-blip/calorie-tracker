@@ -1722,18 +1722,6 @@ def page_personal() -> None:
             )
             st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
-        with col2:
-
-            pro = totals.get("protein", 0)
-
-            st.metric("蛋白質", f"{pro:.0f}g", f"{goals.get('protein', 0) - pro:.0f}g")
-
-        with col3:
-
-            water = totals.get("water", 0)
-
-            st.metric("水量", f"{water:.0f}ml", f"{goals.get('water', 0) - water:.0f}ml")
-
     st.divider()
 
     # CSS for pie charts
