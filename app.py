@@ -3,12 +3,27 @@ from __future__ import annotations
 import streamlit as st
 from services import sheets
 from pages.common import init_session
+from ui.navigation import render_bottom_navigation
 from ui.styles import apply_global_styles
 from pages.coach import page_coach_overview, page_coach_student_detail, page_coach_student_history
 from pages.student import (
     page_history, page_log_meal, page_login, page_personal, page_tdee,
-    page_tdee_questionnaire, page_training, page_weight,
+    page_tdee_questionnaire,
 )
+
+
+LEGACY_STUDENT_RECORD_PAGES = {
+    "體重記錄": "⚖️ 體重",
+    "訓練記錄": "🏋️ 訓練",
+}
+
+
+def normalize_student_page(page: str) -> tuple[str, str | None]:
+    """將舊版獨立紀錄頁導向整合頁及對應分頁。"""
+    tab = LEGACY_STUDENT_RECORD_PAGES.get(page)
+    return ("記錄飲食", tab) if tab else (page, None)
+
+
 def main() -> None:
 
     st.set_page_config(page_title="飲食控制管理系統", layout="wide")
@@ -29,7 +44,13 @@ def main() -> None:
 
     coach_pages = ["學員狀態", "學員歷史"]
 
-    student_pages = ["個人", "記錄飲食", "歷史", "體重記錄", "訓練記錄", "TDEE", "TDEE 問卷"]
+    student_pages = ["個人", "記錄飲食", "歷史", "TDEE", "TDEE 問卷"]
+
+    if not is_coach:
+        normalized_page, target_tab = normalize_student_page(st.session_state.page)
+        st.session_state.page = normalized_page
+        if target_tab:
+            st.session_state.daily_record_tab_target = target_tab
 
     if is_coach:
         _available_pages = list(coach_pages) + ["學員資料"]
@@ -39,9 +60,8 @@ def main() -> None:
     if st.session_state.page not in _available_pages:
         st.session_state.page = "學員狀態" if is_coach else "個人"
 
-    # ----- 暫時定義 page 以維持向下相容 -----
-    # ----- 路由：直接使用 st.session_state.page（Stage 2-6 簡化） -----
-
+    # 先渲染固定導覽，確保頁面警告或提前停止內容時仍可切換頁面。
+    render_bottom_navigation(role, st.session_state.page)
 
     if is_coach:
 
@@ -56,6 +76,7 @@ def main() -> None:
         elif st.session_state.page == "學員歷史":
             page_coach_student_history()
     else:
+        can_render_page = True
 
         if st.session_state.page not in ["TDEE 問卷", "個人"]:
 
@@ -71,70 +92,27 @@ def main() -> None:
 
                     st.rerun()
 
-                return
+                can_render_page = False
 
-        if st.session_state.page == "個人":
+        if can_render_page and st.session_state.page == "個人":
 
             page_personal()
 
-        elif st.session_state.page == "記錄飲食":
+        elif can_render_page and st.session_state.page == "記錄飲食":
 
             page_log_meal()
 
-        elif st.session_state.page == "歷史":
+        elif can_render_page and st.session_state.page == "歷史":
 
             page_history()
 
-        elif st.session_state.page == "體重記錄":
-
-            page_weight()
-
-        elif st.session_state.page == "訓練記錄":
-
-            page_training()
-
-        elif st.session_state.page == "TDEE":
+        elif can_render_page and st.session_state.page == "TDEE":
 
             page_tdee()
 
-        elif st.session_state.page == "TDEE 問卷":
+        elif can_render_page and st.session_state.page == "TDEE 問卷":
 
             page_tdee_questionnaire()
-
-
-
-
-    # ==========================================
-    # 底部導航 - 角色自適應版（教練 2 顆、學員 7 顆）
-    # ==========================================
-    if is_coach:
-        _nav_items = [
-            ("學員狀態", "👤"),
-            ("學員歷史", "📅"),
-        ]
-        _pad_l, _nav_outer, _pad_r = st.columns([3, 1, 3])
-    else:
-        _nav_items = [
-            ("個人", "👤"),
-            ("記錄飲食", "🍴"),
-            ("歷史", "🕐"),
-            ("體重記錄", "⚖️"),
-            ("訓練記錄", "🏋️"),
-            ("TDEE", "📊"),
-            ("TDEE 問卷", "📋"),
-        ]
-        _pad_l, _nav_outer, _pad_r = st.columns([1, 7, 1])
-
-    with _nav_outer:
-        _btn_cols = st.columns(len(_nav_items))
-        for _i, (_page_name, _emoji) in enumerate(_nav_items):
-            with _btn_cols[_i]:
-                if st.button(_emoji, key=f"nav_{_page_name}", help=_page_name):
-                    st.session_state.page = _page_name
-                    st.rerun()
-
-
-    # ==========================================
 if __name__ == "__main__":
 
     main()

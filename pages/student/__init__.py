@@ -12,6 +12,19 @@ from pages.common import (
     TRAINING_EMOJI, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
     _fetch_records_cached, _today_range, _week_range, do_logout,
 )
+
+DAILY_RECORD_TABS = ("🍴 飲食", "⚖️ 體重", "🏋️ 訓練")
+DAILY_RECORD_TAB_TARGET_KEY = "daily_record_tab_target"
+
+
+def open_daily_record_tab(tab: str) -> None:
+    """將學員導向日常紀錄頁的指定分頁。"""
+    if tab not in DAILY_RECORD_TABS:
+        raise ValueError("未知的日常紀錄分頁")
+    st.session_state.page = "記錄飲食"
+    st.session_state[DAILY_RECORD_TAB_TARGET_KEY] = tab
+
+
 def page_tdee_questionnaire() -> None:
 
     st.header("📋 設定你的營養目標")
@@ -762,7 +775,7 @@ def page_personal() -> None:
     st.markdown(card_html, unsafe_allow_html=True)
 
     if st.button("⚡", key="weight_lightning_btn"):
-        st.session_state.page = "體重記錄"
+        open_daily_record_tab("⚖️ 體重")
         st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -781,9 +794,9 @@ def page_personal() -> None:
 
 # =============================================================================
 
-def page_weight() -> None:
+def _render_weight_records() -> None:
 
-    st.header("⚖️ 體重記錄")
+    st.subheader("⚖️ 體重記錄")
 
     uid = st.session_state.user_id
 
@@ -851,9 +864,9 @@ def page_weight() -> None:
 
 # =============================================================================
 
-def page_training() -> None:
+def _render_training_records() -> None:
 
-    st.header("🏋️ 訓練記錄")
+    st.subheader("🏋️ 訓練記錄")
 
     uid = st.session_state.user_id
 
@@ -947,9 +960,9 @@ def page_training() -> None:
 
 # =============================================================================
 
-def page_log_meal() -> None:
+def _render_meal_records() -> None:
 
-    st.header("🍽️ 記錄飲食")
+    st.subheader("🍽️ 記錄飲食")
 
     uid = st.session_state.user_id
 
@@ -1127,6 +1140,34 @@ def page_log_meal() -> None:
             except Exception as exc:
 
                 st.error("儲存失敗: " + str(exc))
+
+
+def page_log_meal() -> None:
+    """學員日常紀錄入口，只渲染目前開啟的頁內分頁。"""
+    target_tab = st.session_state.pop(DAILY_RECORD_TAB_TARGET_KEY, None)
+    current_tab = target_tab or st.session_state.get("daily_record_tab", DAILY_RECORD_TABS[0])
+    if current_tab not in DAILY_RECORD_TABS:
+        current_tab = DAILY_RECORD_TABS[0]
+    if target_tab:
+        st.session_state.pop("daily_record_tab", None)
+
+    st.header("📝 日常紀錄")
+    meal_tab, weight_tab, training_tab = st.tabs(
+        DAILY_RECORD_TABS,
+        default=current_tab,
+        key="daily_record_tab",
+        on_change="rerun",
+    )
+
+    if meal_tab.open:
+        with meal_tab:
+            _render_meal_records()
+    elif weight_tab.open:
+        with weight_tab:
+            _render_weight_records()
+    elif training_tab.open:
+        with training_tab:
+            _render_training_records()
 
 # =============================================================================
 

@@ -330,30 +330,106 @@ def apply_global_styles() -> None:
             /* ========================================== */
 
             /* 按鈕樣式 - 48x48 圓形白色按鈕 */
-            button[data-testid="baseButton-nav_status"],
-            button[data-testid="baseButton-nav_history"] {
-                width: 48px !important;
-                height: 48px !important;
-                border-radius: 50% !important;
-                padding: 0 !important;
-                min-width: 0 !important;
-                font-size: 20px !important;
-                background: #ffffff !important;
-                color: #9CA3AF !important;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
-                transition: all 0.2s ease !important;
+            .st-key-bottom_navigation {
+                position: fixed !important;
+                left: 50% !important;
+                bottom: max(12px, env(safe-area-inset-bottom)) !important;
+                transform: translateX(-50%) !important;
+                z-index: 1000 !important;
+                width: max-content !important;
+                max-width: calc(100vw - 24px) !important;
+                padding: 8px !important;
+                overflow-x: auto !important;
+                overflow-y: hidden !important;
+                overscroll-behavior-x: contain;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                background: rgba(255, 255, 255, 0.92) !important;
+                border: 1px solid rgba(229, 231, 235, 0.9) !important;
+                border-radius: 20px !important;
+                box-shadow: 0 12px 32px rgba(31, 41, 55, 0.16) !important;
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
             }
 
             /* Hover 效果 */
-            button[data-testid="baseButton-nav_status"]:hover,
-            button[data-testid="baseButton-nav_history"]:hover {
-                transform: scale(1.05) !important;
+            .st-key-bottom_navigation::-webkit-scrollbar {
+                display: none;
+            }
+
+            .st-key-bottom_navigation > div,
+            .st-key-bottom_navigation [data-testid="stHorizontalBlock"],
+            .st-key-bottom_navigation [data-testid="stColumn"] {
+                background: transparent !important;
+            }
+
+            .st-key-bottom_navigation [data-testid="stHorizontalBlock"] {
+                min-width: max-content !important;
+                flex-wrap: nowrap !important;
+                justify-content: center !important;
+                gap: 8px !important;
+            }
+
+            .st-key-bottom_navigation [data-testid="stColumn"] {
+                flex: 0 0 auto !important;
+                width: auto !important;
+                min-width: 88px !important;
+            }
+
+            .st-key-bottom_navigation div.stButton > button {
+                min-width: 88px !important;
+                height: 48px !important;
+                padding: 0.5rem 0.75rem !important;
+                border-radius: 14px !important;
+                white-space: nowrap !important;
+                font-size: 0.86rem !important;
+                font-weight: 600 !important;
+                line-height: 1 !important;
+                transition: transform 0.18s ease, background-color 0.18s ease,
+                            color 0.18s ease, box-shadow 0.18s ease !important;
+            }
+
+            .st-key-bottom_navigation button[data-testid="stBaseButton-secondary"] {
+                color: #4B5563 !important;
+                background: rgba(255, 255, 255, 0.72) !important;
+                border: 1px solid transparent !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-bottom_navigation button[data-testid="stBaseButton-primary"] {
+                color: #FFFFFF !important;
+                background: #4A7C59 !important;
+                border: 1px solid #4A7C59 !important;
+                box-shadow: 0 5px 12px rgba(74, 124, 89, 0.24) !important;
+            }
+
+            .st-key-bottom_navigation div.stButton > button:hover {
+                transform: translateY(-1px) !important;
+            }
+
+            .st-key-bottom_navigation div.stButton > button:focus-visible {
+                outline: 3px solid rgba(74, 124, 89, 0.28) !important;
+                outline-offset: 2px !important;
             }
 
 
             /* 內容不被導航列遮住 */
             .main .block-container {
-                padding-bottom: 120px !important;
+                padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+            }
+
+            @media (max-width: 768px) {
+                .st-key-bottom_navigation {
+                    left: 12px !important;
+                    right: 12px !important;
+                    transform: none !important;
+                    width: auto !important;
+                    max-width: none !important;
+                }
+
+                .st-key-bottom_navigation [data-testid="stHorizontalBlock"] {
+                    justify-content: safe center !important;
+                }
             }
 
 
