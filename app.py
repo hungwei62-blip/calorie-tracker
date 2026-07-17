@@ -985,18 +985,103 @@ def page_coach_student_history():
             st.metric("目前體重", "%.1f kg" % last_w, d_str)
         else:
             st.metric("目前體重", "-")
-    st.subheader("⚖️ 體重變化")
+    # 統一的高質感深夜底色
+    CARD_BG = '#2a2850'
+    # 統一強制套用系統原生高質感字型
+    FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif")
+
+    # ==========================================
+    # ⚖️ 體重趨勢圖
+    # ==========================================
     if weights:
-        wchart = {
-            "日期": [r.get("timestamp", "")[:10] for r in sorted_w],
-            "體重 (kg)": [r.get("weight_kg", 0) for r in sorted_w],
-        }
-        st.line_chart(wchart, x="日期", y="體重 (kg)")
+        # 準備體重數據
+        def parse_weight_date(ts):
+            ts_str = str(ts)
+            # 嘗試解析 ISO 格式: 2026-07-15T10:30:00
+            if "T" in ts_str:
+                try:
+                    dt = datetime.strptime(ts_str[:19], "%Y-%m-%dT%H:%M:%S")
+                    return dt.strftime("%m/%d")
+                except:
+                    pass
+            # 回退：直接取日期部分
+            if "-" in ts_str:
+                parts = ts_str.split(" ")[0].split("-")
+                if len(parts) >= 3:
+                    return f"{int(parts[1]):02d}/{int(parts[2]):02d}"
+            return ts_str[:10]
+        
+        weight_xs = [parse_weight_date(r.get("timestamp", "")) for r in sorted_w]
+        weight_ys = [r.get("weight_kg", 0) for r in sorted_w]
+        # 自適應 Y軸範圍
+        min_w = min(weight_ys) if weight_ys else 0
+        max_w = max(weight_ys) if weight_ys else 100
+        weight_range = max_w - min_w
+        
+        # 根據範圍選擇刻度間隔
+        if weight_range < 5:
+            step = 1
+        elif weight_range < 10:
+            step = 2
+        elif weight_range < 20:
+            step = 5
+        else:
+            step = 10
+        
+        # 計算 Y軸範圍（加入緩衝）
+        y_min = int(min_w) - step
+        y_max = int(max_w) + step
+        # 確保不為負數
+        y_min = max(0, y_min)
+        
+        # 生成刻度列表
+        weight_ticks = list(range(y_min, y_max + 1, step))
+
+        last_weight = weight_ys[-1] if weight_ys else 0
+        first_weight = weight_ys[0] if weight_ys else 0
+        weight_change = last_weight - first_weight
+        
+        fig_weight = go.Figure()
+        
+        fig_weight.add_trace(go.Scatter(
+            x=weight_xs,
+            y=weight_ys,
+            mode='lines+markers',
+            line=dict(color='#ffffff', width=3, shape='spline'),
+            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
+            fill='tozeroy',
+            fillcolor='rgba(255, 255, 255, 0.04)',
+            hovertemplate='日期: %{x}<br>體重: %{y:.1f} kg<extra></extra>'
+        ))
+        
+        change_str = f"{weight_change:+.1f}" if weight_change != 0 else "0.0"
+        
+        fig_weight.update_layout(
+            paper_bgcolor=CARD_BG,
+            plot_bgcolor=CARD_BG,
+            margin=dict(l=40, r=25, t=90, b=25),
+            height=260,
+            font=FONT_SETTING,
+            annotations=[
+                dict(x=0.01, y=1.40, xref="paper", yref="paper",
+                    text=f"<b style='font-size:32px; color:#ffffff;'>{last_weight:.1f}</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>kg</span>",
+                    showarrow=False, align="left"),
+                dict(x=0.01, y=1.12, xref="paper", yref="paper",
+                    text=f"<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>體重 {change_str} kg</span>",
+                    showarrow=False, align="left")
+            ],
+            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
+            yaxis=dict(showgrid=True, gridcolor="rgba(255, 255, 255, 0.05)", tickfont=dict(color="#888888", size=11), zeroline=False, showline=False, ticks="", tickvals=weight_ticks, range=[y_min, y_max]),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_weight, use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("此區間沒有體重記錄。")
 
 
 
+    # 統一的高質感深夜底色
     st.subheader("📈 每日攝取趨勢")
 
     # 深色卡片趨勢圖 CSS
@@ -1039,10 +1124,6 @@ def page_coach_student_history():
         </style>
         """, unsafe_allow_html=True)
 
-        # 統一的高質感深夜底色
-        CARD_BG = '#2a2850'
-        # 統一強制套用系統原生高質感字型
-        FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif")
 
         # ==========================================
         # 1. 一體化熱量趨勢圖
