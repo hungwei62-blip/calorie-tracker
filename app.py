@@ -780,7 +780,7 @@ def page_coach_student_history():
         except Exception as exc:
             st.error("取得學員列表失敗：" + str(exc))
             return
-        st.header("📚 學員歷史")
+        st.header("學員歷史")
         if not students:
             st.info("目前沒有學員。")
             return
