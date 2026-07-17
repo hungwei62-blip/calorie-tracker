@@ -1927,23 +1927,160 @@ def page_personal() -> None:
 
     st.divider()
 
-    st.subheader("今日完成率")
+    # ============================================================
+    st.subheader("⚖️ 體重")
+
+    # 注入精確定位與排版的 CSS
+    st.markdown("""
+    <style>
+        .weight-card-container {
+            position: relative !important;
+            width: 100% !important;
+            margin-bottom: 20px !important;
+        }
+
+        .weight-card {
+            background-color: #f8f8f8 !important;
+            border-radius: 24px !important;
+            padding: 24px !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
+            box-sizing: border-box !important;
+        }
+        
+        .weight-title {
+            font-size: 16px !important;
+            font-weight: 500 !important;
+            color: #1a1a1a !important;
+            margin-bottom: 12px !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+        }
+        
+        .weight-value {
+            font-size: 36px !important;
+            font-weight: 700 !important;
+            color: #1a1a1a !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+            line-height: 1 !important;
+        }
+        
+        .weight-unit {
+            font-size: 18px !important;
+            font-weight: normal !important;
+            color: #a0a0a0 !important;
+            margin-left: 6px !important;
+        }
+
+        .weight-trend {
+            font-size: 14px !important;
+            color: #1a1a1a !important;
+            font-weight: 500 !important;
+            margin-top: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+        }
+
+        .stApp div[data-testid="element-container"]:has(button[key="weight_lightning_btn"]) {
+            position: absolute !important;
+            top: 24px !important;
+            right: 24px !important;
+            width: 44px !important;
+            height: 44px !important;
+            z-index: 999 !important;
+        }
+
+        .stApp button[key="weight_lightning_btn"] {
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            max-width: 44px !important;
+            border-radius: 50% !important;
+            background-color: #ffffff !important;
+            color: #1a1a1a !important;
+            border: none !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+            font-size: 18px !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .stApp button[key="weight_lightning_btn"]:hover {
+            transform: scale(1.08) !important;
+            background-color: #f3f3f3 !important;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
     latest_weight = sheets.get_latest_weight(uid)
+    weight_display_str = f"{latest_weight:.1f}" if latest_weight else "--.-"
+    
+    # 歷史紀錄與變動計算
+    weight_history = []
+    if "records" in dir() and records:
+        for r in records:
+            w = r.get("weight") if isinstance(r, dict) else getattr(r, "weight", None)
+            if w is not None:
+                try:
+                    w_val = float(w)
+                    if w_val > 0:
+                        weight_history.append(w_val)
+                except (ValueError, TypeError):
+                    continue
 
-    if latest_weight:
-
-        st.metric("最新體重", f"{latest_weight:.1f} kg")
-
+    # 計算趨勢
+    trend_content = ""
+    if latest_weight and len(weight_history) >= 2:
+        prev_weight = weight_history[-2]
+        diff = latest_weight - prev_weight
+        diff_pct = (diff / prev_weight) * 100
+        
+        if diff < 0:
+            trend_content = f"⇩ {abs(diff):.1f} Kg ({diff_pct:.1f}%)"
+        elif diff > 0:
+            trend_content = f"⇧ {abs(diff):.1f} Kg (+{diff_pct:.1f}%)"
+        else:
+            trend_content = "⬌ 體重維持持平"
     else:
+        trend_content = ""
 
-        st.info("尚未記錄體重")
+    st.markdown('<div class="weight-card-container">', unsafe_allow_html=True)
 
-    if st.button("記錄今日體重"):
+    card_html = f"""
+    <div class="weight-card">
+        <div class="weight-title">Current Weight</div>
+        <div class="weight-value">
+            {weight_display_str}<span class="weight-unit">Kg</span>
+        </div>"""
+    
+    if trend_content:
+        card_html += f"""
+        <div class="weight-trend">
+            {trend_content}
+        </div>"""
+    
+    card_html += """
+    </div>"""
+    
+    st.markdown(card_html, unsafe_allow_html=True)
 
+    if st.button("⚡", key="weight_lightning_btn"):
         st.session_state.page = "體重記錄"
-
         st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.write("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+
 
 # =============================================================================
 
