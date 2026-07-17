@@ -338,23 +338,14 @@ def apply_global_styles() -> None:
                 z-index: 1000 !important;
                 width: max-content !important;
                 max-width: calc(100vw - 24px) !important;
-                padding: 8px !important;
-                overflow-x: auto !important;
-                overflow-y: hidden !important;
-                overscroll-behavior-x: contain;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
-                background: rgba(255, 255, 255, 0.92) !important;
-                border: 1px solid rgba(229, 231, 235, 0.9) !important;
-                border-radius: 20px !important;
-                box-shadow: 0 12px 32px rgba(31, 41, 55, 0.16) !important;
-                backdrop-filter: blur(14px);
-                -webkit-backdrop-filter: blur(14px);
-            }
-
-            /* Hover 效果 */
-            .st-key-bottom_navigation::-webkit-scrollbar {
-                display: none;
+                padding: 6px !important;
+                overflow: visible !important;
+                background: rgba(250, 250, 250, 0.96) !important;
+                border: 1px solid rgba(238, 238, 238, 0.95) !important;
+                border-radius: 999px !important;
+                box-shadow: 0 4px 16px rgba(31, 41, 55, 0.09) !important;
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
             }
 
             .st-key-bottom_navigation > div,
@@ -367,69 +358,70 @@ def apply_global_styles() -> None:
                 min-width: max-content !important;
                 flex-wrap: nowrap !important;
                 justify-content: center !important;
-                gap: 8px !important;
+                gap: 6px !important;
             }
 
             .st-key-bottom_navigation [data-testid="stColumn"] {
                 flex: 0 0 auto !important;
                 width: auto !important;
-                min-width: 88px !important;
+                min-width: 56px !important;
             }
 
             .st-key-bottom_navigation div.stButton > button {
-                min-width: 88px !important;
-                height: 48px !important;
-                padding: 0.5rem 0.75rem !important;
-                border-radius: 14px !important;
-                white-space: nowrap !important;
-                font-size: 0.86rem !important;
-                font-weight: 600 !important;
-                line-height: 1 !important;
-                transition: transform 0.18s ease, background-color 0.18s ease,
-                            color 0.18s ease, box-shadow 0.18s ease !important;
-            }
-
-            .st-key-bottom_navigation button[data-testid="stBaseButton-secondary"] {
-                color: #4B5563 !important;
-                background: rgba(255, 255, 255, 0.72) !important;
+                width: 56px !important;
+                min-width: 56px !important;
+                max-width: 56px !important;
+                height: 56px !important;
+                min-height: 56px !important;
+                padding: 0 !important;
+                border-radius: 50% !important;
+                color: #242424 !important;
+                background: #FAFAFA !important;
                 border: 1px solid transparent !important;
-                box-shadow: none !important;
+                box-shadow: 0 1px 5px rgba(31, 41, 55, 0.04) !important;
+                transition: transform 0.12s ease, background-color 0.12s ease,
+                            box-shadow 0.12s ease !important;
             }
 
-            .st-key-bottom_navigation button[data-testid="stBaseButton-primary"] {
-                color: #FFFFFF !important;
-                background: #4A7C59 !important;
-                border: 1px solid #4A7C59 !important;
-                box-shadow: 0 5px 12px rgba(74, 124, 89, 0.24) !important;
+            /* 視覺隱藏文字，保留按鈕名稱供螢幕閱讀器辨識。 */
+            .st-key-bottom_navigation div.stButton [data-testid="stMarkdownContainer"] {
+                position: absolute !important;
+                width: 1px !important;
+                height: 1px !important;
+                padding: 0 !important;
+                margin: -1px !important;
+                overflow: hidden !important;
+                clip: rect(0, 0, 0, 0) !important;
+                white-space: nowrap !important;
+                border: 0 !important;
+            }
+
+            .st-key-bottom_navigation [data-testid="stIconMaterial"] {
+                margin: 0 !important;
+                font-size: 22px !important;
+                line-height: 1 !important;
             }
 
             .st-key-bottom_navigation div.stButton > button:hover {
-                transform: translateY(-1px) !important;
+                background: #F4F4F4 !important;
+                box-shadow: 0 2px 8px rgba(31, 41, 55, 0.07) !important;
+            }
+
+            .st-key-bottom_navigation div.stButton > button:active {
+                background: #FFF08A !important;
+                transform: scale(0.94) !important;
+                box-shadow: 0 1px 4px rgba(31, 41, 55, 0.06) !important;
             }
 
             .st-key-bottom_navigation div.stButton > button:focus-visible {
-                outline: 3px solid rgba(74, 124, 89, 0.28) !important;
+                outline: 3px solid rgba(36, 36, 36, 0.18) !important;
                 outline-offset: 2px !important;
             }
 
 
             /* 內容不被導航列遮住 */
             .main .block-container {
-                padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
-            }
-
-            @media (max-width: 768px) {
-                .st-key-bottom_navigation {
-                    left: 12px !important;
-                    right: 12px !important;
-                    transform: none !important;
-                    width: auto !important;
-                    max-width: none !important;
-                }
-
-                .st-key-bottom_navigation [data-testid="stHorizontalBlock"] {
-                    justify-content: safe center !important;
-                }
+                padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
             }
 
 

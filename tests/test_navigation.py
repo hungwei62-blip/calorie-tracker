@@ -14,7 +14,10 @@ def test_manager_navigation_has_two_items():
     for role in ("coach", "admin"):
         items = get_navigation_items(role, "學員狀態")
         assert [item.page for item in items] == expected_pages
-        assert sum(item.active for item in items) == 1
+        assert [item.icon for item in items] == [
+            ":material/groups:",
+            ":material/calendar_month:",
+        ]
 
 
 def test_student_navigation_has_three_mapped_items():
@@ -27,23 +30,20 @@ def test_student_navigation_has_three_mapped_items():
 
     assert [item.page for item in items] == expected_pages
     assert len({item.key for item in items}) == 3
-    assert [item.page for item in items if item.active] == ["個人"]
+    assert [item.icon for item in items] == [
+        ":material/person:",
+        ":material/restaurant:",
+        ":material/history:",
+    ]
 
 
-def test_each_student_page_can_be_selected():
-    pages = [item.page for item in get_navigation_items("student", "")]
-
-    for page in pages:
-        items = get_navigation_items("student", page)
-        assert [item.page for item in items if item.active] == [page]
+def test_current_page_does_not_create_a_persistent_selected_item():
+    personal_items = get_navigation_items("student", "個人")
+    history_items = get_navigation_items("student", "歷史")
+    assert personal_items == history_items
 
 
-def test_student_detail_keeps_students_navigation_selected():
-    items = get_navigation_items("coach", "學員資料")
-    assert [item.page for item in items if item.active] == ["學員狀態"]
-
-
-def test_rendered_navigation_click_updates_page_and_active_button():
+def test_rendered_navigation_click_updates_page_without_persistent_selection():
     navigation_app = AppTest.from_string(
         """
 import streamlit as st
@@ -55,12 +55,18 @@ render_bottom_navigation("student", st.session_state.page)
     ).run(timeout=20)
 
     assert len(navigation_app.button) == 3
-    assert navigation_app.button[0].proto.type == "primary"
+    assert all(button.proto.type == "secondary" for button in navigation_app.button)
+    assert [button.proto.icon for button in navigation_app.button] == [
+        ":material/person:",
+        ":material/restaurant:",
+        ":material/history:",
+    ]
+    assert [button.label for button in navigation_app.button] == ["個人", "飲食", "歷史"]
 
     navigation_app.button[1].click().run(timeout=20)
 
     assert navigation_app.session_state["page"] == "記錄飲食"
-    assert navigation_app.button[1].proto.type == "primary"
+    assert all(button.proto.type == "secondary" for button in navigation_app.button)
 
 
 @pytest.mark.parametrize(

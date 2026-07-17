@@ -1,7 +1,7 @@
 """角色自適應的固定底部導覽。"""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import streamlit as st
 
@@ -13,28 +13,33 @@ class NavigationItem:
     key: str
     page: str
     label: str
+    icon: str
     help_text: str
-    active: bool = False
 
 
 _COACH_ITEMS = (
-    NavigationItem("students", "學員狀態", "👤 學員", "查看學員狀態"),
-    NavigationItem("student_history", "學員歷史", "📅 歷史", "查看學員歷史"),
+    NavigationItem("students", "學員狀態", "學員", ":material/groups:", "查看學員狀態"),
+    NavigationItem(
+        "student_history",
+        "學員歷史",
+        "學員歷史",
+        ":material/calendar_month:",
+        "查看學員歷史",
+    ),
 )
 
 _STUDENT_ITEMS = (
-    NavigationItem("personal", "個人", "👤 個人", "個人首頁"),
-    NavigationItem("meal", "記錄飲食", "🍴 飲食", "記錄飲食"),
-    NavigationItem("history", "歷史", "🕐 歷史", "飲食歷史"),
+    NavigationItem("personal", "個人", "個人", ":material/person:", "個人首頁"),
+    NavigationItem("meal", "記錄飲食", "飲食", ":material/restaurant:", "記錄飲食"),
+    NavigationItem("history", "歷史", "歷史", ":material/history:", "飲食歷史"),
 )
 
 
 def get_navigation_items(role: str, current_page: str) -> tuple[NavigationItem, ...]:
-    """回傳角色可用的導覽項目，並標記目前所在頁面。"""
+    """回傳角色可用的導覽項目；目前頁面不影響按鈕外觀。"""
+    del current_page
     is_manager = (role or "student").strip().lower() in ("coach", "admin")
-    items = _COACH_ITEMS if is_manager else _STUDENT_ITEMS
-    active_page = "學員狀態" if is_manager and current_page == "學員資料" else current_page
-    return tuple(replace(item, active=item.page == active_page) for item in items)
+    return _COACH_ITEMS if is_manager else _STUDENT_ITEMS
 
 
 def render_bottom_navigation(role: str, current_page: str) -> None:
@@ -49,7 +54,8 @@ def render_bottom_navigation(role: str, current_page: str) -> None:
                     item.label,
                     key=f"bottom_nav_{item.key}",
                     help=item.help_text,
-                    type="primary" if item.active else "secondary",
+                    type="secondary",
+                    icon=item.icon,
                     width="stretch",
                 ):
                     st.session_state.page = item.page
