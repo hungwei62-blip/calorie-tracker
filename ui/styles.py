@@ -250,6 +250,41 @@ def apply_global_styles() -> None:
             }
 
 
+            /* ===== 學員每日進度卡：桌面三欄、手機雙欄 ===== */
+            .st-key-daily_progress_cards [data-testid="stHorizontalBlock"] {
+                align-items: stretch !important;
+            }
+
+            .st-key-daily_progress_cards [data-testid="stColumn"] {
+                min-width: 0 !important;
+            }
+
+            .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
+                margin: 0 !important;
+                overflow: hidden !important;
+                border-radius: 24px !important;
+                box-shadow: 0 8px 24px rgba(199, 237, 246, 0.30) !important;
+            }
+
+            @media (max-width: 768px) {
+                .st-key-daily_progress_cards [data-testid="stHorizontalBlock"] {
+                    flex-wrap: wrap !important;
+                    gap: 10px !important;
+                }
+
+                .st-key-daily_progress_cards [data-testid="stColumn"] {
+                    flex: 0 0 calc(50% - 5px) !important;
+                    width: calc(50% - 5px) !important;
+                    min-width: 0 !important;
+                    max-width: calc(50% - 5px) !important;
+                }
+
+                .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
+                    border-radius: 18px !important;
+                }
+            }
+
+
             /* ===== Dashboard Styles (教練端) ===== */
 
             /* 狀態指示燈 */

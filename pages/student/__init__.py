@@ -17,6 +17,108 @@ DAILY_RECORD_TABS = ("🍴 飲食", "⚖️ 體重", "🏋️ 訓練")
 DAILY_RECORD_TAB_TARGET_KEY = "daily_record_tab_target"
 
 
+def _to_float(value: object) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _progress_percentage(actual: object, goal: object) -> float:
+    actual_value = max(_to_float(actual), 0.0)
+    goal_value = _to_float(goal)
+    if goal_value <= 0:
+        return 0.0
+    return min(actual_value / goal_value * 100, 100.0)
+
+
+def build_daily_progress_figure(
+    label: str,
+    actual: object,
+    goal: object,
+    unit: str,
+    display_date: date | None = None,
+) -> go.Figure:
+    """建立適合桌面三欄與手機雙欄的緊湊 Plotly 圓環圖。"""
+    actual_value = max(_to_float(actual), 0.0)
+    percentage = _progress_percentage(actual_value, goal)
+    date_label = (display_date or date.today()).strftime("%d %B")
+
+    figure = go.Figure(
+        data=[
+            go.Pie(
+                values=[percentage, 100 - percentage],
+                hole=0.68,
+                marker={"colors": ["#ffffff", "rgba(255, 255, 255, 0.30)"]},
+                domain={"x": [0.48, 1.0], "y": [0.08, 0.92]},
+                sort=False,
+                direction="clockwise",
+                showlegend=False,
+                hoverinfo="none",
+                textinfo="none",
+            )
+        ]
+    )
+    figure.update_layout(
+        paper_bgcolor="#c7edf6",
+        plot_bgcolor="#c7edf6",
+        height=150,
+        margin={"l": 8, "r": 8, "t": 8, "b": 8},
+        showlegend=False,
+        annotations=[
+            {
+                "x": 0.03,
+                "y": 0.84,
+                "xref": "paper",
+                "yref": "paper",
+                "text": f"<b>{label}</b>",
+                "font": {"size": 10, "color": "#5a6e7f"},
+                "showarrow": False,
+                "xanchor": "left",
+            },
+            {
+                "x": 0.03,
+                "y": 0.50,
+                "xref": "paper",
+                "yref": "paper",
+                "text": f"<b>{percentage:.0f}%</b>",
+                "font": {"size": 22, "color": "#1a2530"},
+                "showarrow": False,
+                "xanchor": "left",
+            },
+            {
+                "x": 0.03,
+                "y": 0.14,
+                "xref": "paper",
+                "yref": "paper",
+                "text": date_label,
+                "font": {"size": 9, "color": "#5a6e7f"},
+                "showarrow": False,
+                "xanchor": "left",
+            },
+            {
+                "x": 0.74,
+                "y": 0.55,
+                "xref": "paper",
+                "yref": "paper",
+                "text": f"<b>{actual_value:.0f}</b>",
+                "font": {"size": 14, "color": "#1a2530"},
+                "showarrow": False,
+            },
+            {
+                "x": 0.74,
+                "y": 0.40,
+                "xref": "paper",
+                "yref": "paper",
+                "text": unit,
+                "font": {"size": 8, "color": "#5a6e7f"},
+                "showarrow": False,
+            },
+        ],
+    )
+    return figure
+
+
 def open_daily_record_tab(tab: str) -> None:
     """將學員導向日常紀錄頁的指定分頁。"""
     if tab not in DAILY_RECORD_TABS:
@@ -469,167 +571,41 @@ def page_personal() -> None:
 
     st.divider()
 
-    # CSS for pie charts
-    st.markdown("""
-<style>
-    div[data-testid="stPlotlyChart"] {
-        border-radius: 24px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 24px rgba(199, 237, 246, 0.3) !important;
-        margin: 10px 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
     st.subheader("今日目標進度")
 
-    # 定義比由變参
-    cal_ratio = min(totals.get("calories", 0) / calorie_goal, 1.5) if calorie_goal > 0 else 0
-    pro_ratio = min(totals.get("protein", 0) / goals.get("protein", 1), 1.5) if goals.get("protein", 0) > 0 else 0
-    water_ratio = min(totals.get("water", 0) / goals.get("water", 1), 1.5) if goals.get("water", 0) > 0 else 0
-
-    # 建立三欄，將 食飼、水量、蛋質膜質 橫向並排
-    cal_pct = min(cal_ratio * 100, 100)
-    water_pct = min(water_ratio * 100, 100)
-    pro_pct = min(pro_ratio * 100, 100)
-
-    # 取得今日日期字串
-    today_str = date.today().strftime("%d %B")
-
-    # 定義统一的卡粉色胊背景背能
-    CARD_BG_COLOR = "#c7edf6"
-
-    # ?????? ????????? ????
-    col1, col2, col3 = st.columns(3)
-
-    # ?????? ????????? ????
-    with col1:
-        fig_cal = go.Figure()
-        fig_cal.add_trace(go.Pie(
-            values=[cal_pct, 100 - cal_pct],
-            hole=0.75,
-            marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
-            sort=False,
-            direction='clockwise',
-            showlegend=False,
-            hoverinfo='none',
-            textinfo='none'
-        ))
-        fig_cal.update_layout(
-            paper_bgcolor=CARD_BG_COLOR,
-            plot_bgcolor=CARD_BG_COLOR,
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=160,
-            annotations=[
-                dict(
-                    x=0.75, y=0.5, xref="paper", yref="paper",
-                    text=f"<b style='font-size:20px; color:#1a2530;'>{totals.get('calories', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>kcal</span>",
-                    showarrow=False, align="center"
-                ),
-                dict(
-                    x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>飲食進度</span>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.50, xref="paper", yref="paper",
-                    text=f"<b style='font-size:36px; color:#1a2530;'>{cal_pct:.0f}%</b>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.10, xref="paper", yref="paper",
-                    text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
-                    showarrow=False, align="left"
+    progress_cards = (
+        (
+            "calories",
+            "飲食進度",
+            totals.get("calories", 0),
+            goals.get("calorie", 0),
+            "kcal",
+        ),
+        (
+            "water",
+            "水量進度",
+            totals.get("water", 0),
+            goals.get("water", 0),
+            "ml",
+        ),
+        (
+            "protein",
+            "蛋白質進度",
+            totals.get("protein", 0),
+            goals.get("protein", 0),
+            "g",
+        ),
+    )
+    with st.container(key="daily_progress_cards"):
+        columns = st.columns(3, gap="small")
+        for column, (key, label, actual, goal, unit) in zip(columns, progress_cards):
+            with column:
+                st.plotly_chart(
+                    build_daily_progress_figure(label, actual, goal, unit),
+                    key=f"daily_progress_{key}",
+                    width="stretch",
+                    config={"displayModeBar": False, "responsive": True},
                 )
-            ]
-        )
-        st.plotly_chart(fig_cal, width="stretch", config={'displayModeBar': False})
-
-    #
-    with col2:
-        fig_water = go.Figure()
-        fig_water.add_trace(go.Pie(
-            values=[water_pct, 100 - water_pct],
-            hole=0.75,
-            marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
-            sort=False,
-            direction='clockwise',
-            showlegend=False,
-            hoverinfo='none',
-            textinfo='none'
-        ))
-        fig_water.update_layout(
-            paper_bgcolor=CARD_BG_COLOR,
-            plot_bgcolor=CARD_BG_COLOR,
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=160,
-            annotations=[
-                dict(
-                    x=0.75, y=0.5, xref="paper", yref="paper",
-                    text=f"<b style='font-size:18px; color:#1a2530;'>{totals.get('water', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>ml</span>",
-                    showarrow=False, align="center"
-                ),
-                dict(
-                    x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>水量進度</span>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.50, xref="paper", yref="paper",
-                    text=f"<b style='font-size:36px; color:#1a2530;'>{water_pct:.0f}%</b>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.10, xref="paper", yref="paper",
-                    text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
-                    showarrow=False, align="left"
-                )
-            ]
-        )
-        st.plotly_chart(fig_water, width="stretch", config={'displayModeBar': False})
-
-    # 水量圓環卡區
-    with col3:
-        fig_pro = go.Figure()
-        fig_pro.add_trace(go.Pie(
-            values=[pro_pct, 100 - pro_pct],
-            hole=0.75,
-            marker=dict(colors=['#ffffff', 'rgba(255, 255, 255, 0.3)']),
-            sort=False,
-            direction='clockwise',
-            showlegend=False,
-            hoverinfo='none',
-            textinfo='none'
-        ))
-        fig_pro.update_layout(
-            paper_bgcolor=CARD_BG_COLOR,
-            plot_bgcolor=CARD_BG_COLOR,
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=160,
-            annotations=[
-                dict(
-                    x=0.75, y=0.5, xref="paper", yref="paper",
-                    text=f"<b style='font-size:20px; color:#1a2530;'>{totals.get('protein', 0):.0f}</b><br><span style='font-size:10px; color:#5a6e7f;'>g</span>",
-                    showarrow=False, align="center"
-                ),
-                dict(
-                    x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>蛋白質進度</span>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.50, xref="paper", yref="paper",
-                    text=f"<b style='font-size:36px; color:#1a2530;'>{pro_pct:.0f}%</b>",
-                    showarrow=False, align="left"
-                ),
-                dict(
-                    x=0.05, y=0.10, xref="paper", yref="paper",
-                    text=f"<span style='font-size:11px; color:#5a6e7f;'>{today_str}</span>",
-                    showarrow=False, align="left"
-                )
-            ]
-        )
-        st.plotly_chart(fig_pro, width="stretch", config={'displayModeBar': False})
 
     st.divider()
 
