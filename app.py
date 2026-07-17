@@ -1608,10 +1608,60 @@ def page_personal() -> None:
         col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
+            # CSS for calories chart
+            st.markdown("""
+<style>
+    .cal-chart-full div[data-testid="stPlotlyChart"] {
+        border-radius: 24px !important;
+        overflow: hidden !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
+        margin: 10px 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-            cal = totals.get("calories", 0)
-
-            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
+            # Calculate calorie percentage
+            cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
+            
+            FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
+            CAL_CARD_BG = "#f8f8f8"
+            
+            fig_cal = go.Figure()
+            fig_cal.add_trace(go.Pie(
+                values=[cal_pct, 100 - cal_pct],
+                hole=0.76,
+                marker=dict(colors=['#ffbfa3', '#f0f0f0']),
+                sort=False,
+                direction='clockwise',
+                showlegend=False,
+                hoverinfo='none',
+                textinfo='none'
+            ))
+            fig_cal.update_layout(
+                paper_bgcolor=CAL_CARD_BG,
+                plot_bgcolor=CAL_CARD_BG,
+                margin=dict(l=25, r=25, t=55, b=25),
+                height=180,
+                font=FONT_SETTING,
+                annotations=[
+                    dict(
+                        x=0.01, y=1.28, xref="paper", yref="paper",
+                        text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
+                        showarrow=False, align="left"
+                    ),
+                    dict(
+                        x=0.5, y=0.5, xref="paper", yref="paper",
+                        text=f"<b style='font-size:28px; color:#1a1a1a;'>{totals.get('calories', 0):.0f}</b>",
+                        showarrow=False, align="center"
+                    ),
+                    dict(
+                        x=0.5, y=0.22, xref="paper", yref="paper",
+                        text="<span style='font-size:12px; color:#666666; font-weight:500;'>Kcal</span>",
+                        showarrow=False, align="center"
+                    )
+                ]
+            )
+            st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
         with col2:
 
@@ -1642,10 +1692,60 @@ def page_personal() -> None:
         col1, col2, col3 = st.columns(3)
 
         with col1:
+            # CSS for calories chart
+            st.markdown("""
+<style>
+    .cal-chart-simple div[data-testid="stPlotlyChart"] {
+        border-radius: 24px !important;
+        overflow: hidden !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
+        margin: 10px 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-            cal = totals.get("calories", 0)
-
-            st.metric("熱量", f"{cal:.0f}", f"{calorie_goal - cal:.0f}")
+            # Calculate calorie percentage
+            cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
+            
+            FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
+            CAL_CARD_BG = "#f8f8f8"
+            
+            fig_cal = go.Figure()
+            fig_cal.add_trace(go.Pie(
+                values=[cal_pct, 100 - cal_pct],
+                hole=0.76,
+                marker=dict(colors=['#ffbfa3', '#f0f0f0']),
+                sort=False,
+                direction='clockwise',
+                showlegend=False,
+                hoverinfo='none',
+                textinfo='none'
+            ))
+            fig_cal.update_layout(
+                paper_bgcolor=CAL_CARD_BG,
+                plot_bgcolor=CAL_CARD_BG,
+                margin=dict(l=25, r=25, t=55, b=25),
+                height=180,
+                font=FONT_SETTING,
+                annotations=[
+                    dict(
+                        x=0.01, y=1.28, xref="paper", yref="paper",
+                        text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
+                        showarrow=False, align="left"
+                    ),
+                    dict(
+                        x=0.5, y=0.5, xref="paper", yref="paper",
+                        text=f"<b style='font-size:28px; color:#1a1a1a;'>{totals.get('calories', 0):.0f}</b>",
+                        showarrow=False, align="center"
+                    ),
+                    dict(
+                        x=0.5, y=0.22, xref="paper", yref="paper",
+                        text="<span style='font-size:12px; color:#666666; font-weight:500;'>Kcal</span>",
+                        showarrow=False, align="center"
+                    )
+                ]
+            )
+            st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
         with col2:
 
