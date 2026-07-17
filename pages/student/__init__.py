@@ -470,11 +470,11 @@ def page_personal() -> None:
     else:
         avatar_base64 = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200"
 
-    welcome_html = f'<div style="display: flex; align-items: center; gap: 16px; margin-top: 10px; margin-bottom: 25px; width: 100%;"><img src="{avatar_base64}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" alt="avatar"><span style="font-size: 24px; font-weight: 700; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; white-space: nowrap;">Hello, {user_name}!</span></div>'
+    welcome_html = f'<div class="student-home-welcome" style="display: flex; align-items: center; gap: 16px; margin-top: 0; margin-bottom: 25px; width: 100%;"><img src="{avatar_base64}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" alt="avatar"><span style="font-size: 24px; font-weight: 700; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; white-space: nowrap;">Hello, {user_name}!</span></div>'
 
-    st.markdown(welcome_html, unsafe_allow_html=True)
-
-    st.header("📊 今日摘要")
+    with st.container(key="student_home_header"):
+        st.markdown(welcome_html, unsafe_allow_html=True)
+        st.header("Overview")
 
     uid = st.session_state.user_id
 
@@ -514,8 +514,6 @@ def page_personal() -> None:
 
     totals = metrics.sum_totals(today_records).as_dict()
 
-    st.subheader("今日概況")
-
     latest_weight, trend_content = _weight_summary(sheets.get_weight_records(uid))
     weight_display_str = f"{latest_weight:.1f}" if latest_weight else "--.-"
 
@@ -551,10 +549,6 @@ def page_personal() -> None:
                 width="stretch",
                 config={"displayModeBar": False, "responsive": True},
             )
-
-    st.divider()
-
-    st.subheader("今日目標進度")
 
     progress_cards = (
         (

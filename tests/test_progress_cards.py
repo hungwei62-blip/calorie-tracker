@@ -122,6 +122,20 @@ def test_daily_summary_cards_have_scoped_equal_height_two_column_styles():
     assert '.st-key-daily_summary_cards .st-key-weight_lightning_btn button' in stylesheet
 
 
+def test_student_home_has_scoped_desktop_and_mobile_top_spacing():
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-student_home_header" in value
+    )
+
+    assert '.block-container:has(.st-key-student_home_header)' in stylesheet
+    assert '[data-testid="stMainBlockContainer"]:has(.st-key-student_home_header)' in stylesheet
+    assert stylesheet.count('padding-top: 32px !important;') == 2
+    assert 'padding-top: 16px !important;' not in stylesheet
+    assert '.st-key-student_home_header .student-home-welcome' in stylesheet
+
+
 def test_raw_html_progress_card_renderer_was_removed():
     assert not hasattr(student_pages, "build_daily_progress_cards_html")
     assert not hasattr(student_pages, "render_daily_progress_cards")
@@ -130,6 +144,11 @@ def test_raw_html_progress_card_renderer_was_removed():
 def test_personal_page_is_simplified_and_orders_summary_before_progress():
     source = inspect.getsource(student_pages.page_personal)
 
+    assert 'key="student_home_header"' in source
+    assert 'class="student-home-welcome"' in source
+    assert 'margin-top: 0;' in source
+    assert 'st.header("Overview")' in source
+    assert '"📊 今日摘要"' not in source
     assert '"今日建議"' not in source
     assert '"基礎代謝率 (BMR)"' not in source
     assert '"建議熱量攝取"' not in source
@@ -140,10 +159,13 @@ def test_personal_page_is_simplified_and_orders_summary_before_progress():
     assert '"飲食進度"' not in source
     assert '"水量進度"' in source
     assert '"蛋白質進度"' in source
+    assert 'st.subheader("今日概況")' not in source
+    assert 'st.subheader("今日目標進度")' not in source
+    assert "st.divider()" not in source
     assert 'key="daily_summary_calories"' in source
     assert source.count("build_calorie_figure(") == 1
-    assert source.index('st.subheader("今日概況")') < source.index(
-        'st.subheader("今日目標進度")'
+    assert source.index('key="daily_summary_cards"') < source.index(
+        'key="daily_progress_cards"'
     )
 
 

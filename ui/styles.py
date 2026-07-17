@@ -260,6 +260,23 @@ def apply_global_styles() -> None:
             }
 
 
+            /* ===== 學員首頁：縮小頂部留白且不影響其他頁面 ===== */
+            .main .block-container:has(.st-key-student_home_header),
+            [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header) {
+                padding-top: 32px !important;
+            }
+
+            .st-key-student_home_header .student-home-welcome {
+                margin-top: 0 !important;
+            }
+
+            @media (max-width: 768px) {
+                .main .block-container:has(.st-key-student_home_header),
+                [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header) {
+                    padding-top: 32px !important;
+                }
+            }
+
             /* ===== 學員每日進度卡：所有尺寸固定雙欄 ===== */
             .st-key-daily_progress_cards [data-testid="stHorizontalBlock"] {
                 display: flex !important;
@@ -534,7 +551,7 @@ def apply_global_styles() -> None:
                 z-index: 2147483000 !important;
                 width: max-content !important;
                 max-width: calc(100vw - 24px) !important;
-                padding: 6px !important;
+                padding: 6px 16px !important;
                 overflow: visible !important;
                 background: #f7f7f7 !important;
                 border: 1px solid rgba(238, 238, 238, 0.95) !important;

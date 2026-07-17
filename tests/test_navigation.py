@@ -79,6 +79,8 @@ def test_bottom_navigation_uses_compact_circular_button_styles():
     )
 
     assert "background: #f7f7f7 !important;" in stylesheet
+    assert "padding: 6px 16px !important;" in stylesheet
+    assert "gap: 6px !important;" in stylesheet
     assert "width: 48px !important;" in stylesheet
     assert "height: 48px !important;" in stylesheet
     assert "aspect-ratio: 1 / 1 !important;" in stylesheet
