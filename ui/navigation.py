@@ -56,7 +56,7 @@ def render_bottom_navigation(role: str, current_page: str) -> None:
                     help=item.help_text,
                     type="secondary",
                     icon=item.icon,
-                    width="stretch",
+                    width="content",
                 ):
                     st.session_state.page = item.page
                     st.rerun()

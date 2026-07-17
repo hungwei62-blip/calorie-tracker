@@ -340,7 +340,7 @@ def apply_global_styles() -> None:
                 max-width: calc(100vw - 24px) !important;
                 padding: 6px !important;
                 overflow: visible !important;
-                background: rgba(250, 250, 250, 0.96) !important;
+                background: #f7f7f7 !important;
                 border: 1px solid rgba(238, 238, 238, 0.95) !important;
                 border-radius: 999px !important;
                 box-shadow: 0 4px 16px rgba(31, 41, 55, 0.09) !important;
@@ -363,24 +363,46 @@ def apply_global_styles() -> None:
 
             .st-key-bottom_navigation [data-testid="stColumn"] {
                 flex: 0 0 auto !important;
-                width: auto !important;
-                min-width: 56px !important;
+                width: 48px !important;
+                min-width: 48px !important;
+                max-width: 48px !important;
             }
 
-            .st-key-bottom_navigation div.stButton > button {
-                width: 56px !important;
-                min-width: 56px !important;
-                max-width: 56px !important;
-                height: 56px !important;
-                min-height: 56px !important;
+            .st-key-bottom_navigation div.stButton {
+                width: 48px !important;
+                min-width: 48px !important;
+                max-width: 48px !important;
+                height: 48px !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-bottom_navigation div.stButton > button,
+            .st-key-bottom_navigation button[data-testid^="stBaseButton"] {
+                width: 48px !important;
+                min-width: 48px !important;
+                max-width: 48px !important;
+                height: 48px !important;
+                min-height: 48px !important;
+                max-height: 48px !important;
+                aspect-ratio: 1 / 1 !important;
                 padding: 0 !important;
                 border-radius: 50% !important;
                 color: #242424 !important;
-                background: #FAFAFA !important;
-                border: 1px solid transparent !important;
-                box-shadow: 0 1px 5px rgba(31, 41, 55, 0.04) !important;
+                background: #ffffff !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
                 transition: transform 0.12s ease, background-color 0.12s ease,
                             box-shadow 0.12s ease !important;
+            }
+
+            .st-key-bottom_navigation button::before,
+            .st-key-bottom_navigation button::after {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
             }
 
             /* 視覺隱藏文字，保留按鈕名稱供螢幕閱讀器辨識。 */
@@ -402,20 +424,35 @@ def apply_global_styles() -> None:
                 line-height: 1 !important;
             }
 
-            .st-key-bottom_navigation div.stButton > button:hover {
-                background: #F4F4F4 !important;
-                box-shadow: 0 2px 8px rgba(31, 41, 55, 0.07) !important;
+            .st-key-bottom_navigation div.stButton > button:hover,
+            .st-key-bottom_navigation button[data-testid^="stBaseButton"]:hover {
+                background: #ffffff !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
             }
 
-            .st-key-bottom_navigation div.stButton > button:active {
+            .st-key-bottom_navigation div.stButton > button:active,
+            .st-key-bottom_navigation button[data-testid^="stBaseButton"]:active {
                 background: #FFF08A !important;
+                border: none !important;
+                outline: none !important;
                 transform: scale(0.94) !important;
-                box-shadow: 0 1px 4px rgba(31, 41, 55, 0.06) !important;
+                box-shadow: none !important;
             }
 
-            .st-key-bottom_navigation div.stButton > button:focus-visible {
-                outline: 3px solid rgba(36, 36, 36, 0.18) !important;
-                outline-offset: 2px !important;
+            .st-key-bottom_navigation div.stButton > button:focus,
+            .st-key-bottom_navigation button[data-testid^="stBaseButton"]:focus {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-bottom_navigation div.stButton > button:focus-visible,
+            .st-key-bottom_navigation button[data-testid^="stBaseButton"]:focus-visible {
+                border: none !important;
+                outline: none !important;
+                box-shadow: 0 0 0 3px rgba(255, 240, 138, 0.85) !important;
             }
 
 

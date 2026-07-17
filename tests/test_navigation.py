@@ -6,6 +6,7 @@ import app
 from streamlit.testing.v1 import AppTest
 
 from ui.navigation import get_navigation_items
+from ui import styles
 
 
 def test_manager_navigation_has_two_items():
@@ -67,6 +68,30 @@ render_bottom_navigation("student", st.session_state.page)
 
     assert navigation_app.session_state["page"] == "記錄飲食"
     assert all(button.proto.type == "secondary" for button in navigation_app.button)
+
+
+def test_bottom_navigation_uses_compact_circular_button_styles():
+    style_constants = styles.apply_global_styles.__code__.co_consts
+    stylesheet = next(
+        value
+        for value in style_constants
+        if isinstance(value, str) and ".st-key-bottom_navigation" in value
+    )
+
+    assert "background: #f7f7f7 !important;" in stylesheet
+    assert "width: 48px !important;" in stylesheet
+    assert "height: 48px !important;" in stylesheet
+    assert "aspect-ratio: 1 / 1 !important;" in stylesheet
+    assert "border-radius: 50% !important;" in stylesheet
+    assert "background: #ffffff !important;" in stylesheet
+    assert "background: #FFF08A !important;" in stylesheet
+    assert "border: none !important;" in stylesheet
+    assert "outline: none !important;" in stylesheet
+    assert "0 0 0 3px rgba(255, 240, 138, 0.85)" in stylesheet
+    assert "border: 1px solid transparent !important;" not in stylesheet
+    assert 'button[data-testid^="stBaseButton"]' in stylesheet
+    assert ".st-key-bottom_navigation button::before" in stylesheet
+    assert "box-shadow: none !important;" in stylesheet
 
 
 @pytest.mark.parametrize(
