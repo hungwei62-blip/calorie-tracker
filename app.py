@@ -1822,7 +1822,7 @@ def page_personal() -> None:
                 ),
                 dict(
                     x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>飥餩郋度</span>",
+                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>飲食進度</span>",
                     showarrow=False, align="left"
                 ),
                 dict(
@@ -1865,7 +1865,7 @@ def page_personal() -> None:
                 ),
                 dict(
                     x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>水量郋度</span>",
+                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>水量進度</span>",
                     showarrow=False, align="left"
                 ),
                 dict(
@@ -1908,7 +1908,7 @@ def page_personal() -> None:
                 ),
                 dict(
                     x=0.05, y=0.90, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>艸质郋度</span>",
+                    text="<span style='font-size:12px; color:#5a6e7f; font-weight:600;'>蛋白質進度</span>",
                     showarrow=False, align="left"
                 ),
                 dict(
@@ -2958,4 +2958,5 @@ def main() -> None:
 if __name__ == "__main__":
 
     main()
+
 
