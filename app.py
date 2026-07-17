@@ -31,7 +31,7 @@ from services import auth, firebase, gemini, metrics, sheets
 
 MEAL_TYPES = ["早餐", "午餐", "晚餐", "宵夜", "喝水"]
 
-MEAL_EMOJI = {"早餐": "🌅", "午餐": "☀️", "晚餐": "🌙", "宵夜": "🌛", "喝水": "💧"}
+MEAL_EMOJI = {"早餐": "🌅", "午餐": "☀️", "晚餐": "🌙", "宵夜": "🌛", "喝水": ""}
 
 NUTRIENT_KEYS = ("calorie", "protein", "carb", "fat")
 
@@ -60,7 +60,7 @@ EXERCISE_LEVELS = list(TDEE_MULTIPLIERS.keys())
 
 TRAINING_TYPES = ["背", "胸", "腿", "核心", "有氧"]
 
-TRAINING_EMOJI = {"背": "🏋️", "胸": "🏋️", "腿": "🦵", "核心": "🎯", "有氧": "🏃"}
+TRAINING_EMOJI = {"背": "", "胸": "", "腿": "🦵", "核心": "🎯", "有氧": "🏃"}
 
 # ---------- TDEE 計算 ----------
 
@@ -500,7 +500,7 @@ def page_coach_student_detail() -> None:
 
     st.divider()
 
-    st.subheader("📈 體重趨勢")
+    st.subheader(" 體重趨勢")
 
     weight_records = sheets.get_weight_records(uid)
 
@@ -818,7 +818,7 @@ def page_coach_student_history():
     with col_title:
         st.header("📚 " + str(name) + " 的歷史記錄")
     st.divider()
-    st.subheader("⏱️ 時間範圍")
+    st.subheader(" 時間範圍")
 
     # ============================================================
     # Excel 匯入功能
@@ -959,7 +959,7 @@ def page_coach_student_history():
         d = _parse_record_date(r.get("timestamp", ""))
         if start_date <= d <= end_date:
             notes.append(r)
-    st.subheader("📌 摘要")
+    st.subheader(" 摘要")
     avg_cal = sum(v["calorie"] for v in daily.values()) / max(days_count, 1)
     avg_pro = sum(v["protein"] for v in daily.values()) / max(days_count, 1)
     avg_water = sum(v["water"] for v in daily.values()) / max(days_count, 1)
@@ -991,7 +991,7 @@ def page_coach_student_history():
     FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif")
 
     # ==========================================
-    # ⚖️ 體重趨勢圖
+    #  體重趨勢圖
     # ==========================================
     if weights:
         # 準備體重數據
@@ -1082,7 +1082,7 @@ def page_coach_student_history():
 
 
     # 統一的高質感深夜底色
-    st.subheader("📈 每日攝取趨勢")
+    st.subheader(" 每日攝取趨勢")
 
     # 深色卡片趨勢圖 CSS
     st.markdown("""<style>
@@ -1216,7 +1216,7 @@ def page_coach_student_history():
         # ----- 4. 水量趨勢圖 -----
 
         # ==========================================
-        # 💧 3. 一體化水量趨勢圖
+        #  3. 一體化水量趨勢圖
         # ==========================================
         waters = [daily[d]["water"] for d in sorted_days]
         max_water = max(waters) if waters else 0
@@ -1265,7 +1265,7 @@ def page_coach_student_history():
         st.info("此區間沒有飲食記錄。")
 
 
-    st.subheader("🏋️ 訓練記錄")
+    st.subheader(" 訓練記錄")
     if trainings:
         rows = []
         for r in sorted(trainings, key=lambda x: x.get("timestamp", "")):
@@ -1283,84 +1283,7 @@ def page_coach_student_history():
     else:
         st.info("此區間沒有訓練記錄。")
 
-    st.subheader("📝 教練備註")
-
-    # 初始化 session state for editing
-    if "editing_note_ts" not in st.session_state:
-        st.session_state.editing_note_ts = None
-
-    if notes:
-        sorted_notes = sorted(notes, key=lambda x: x.get("timestamp", ""), reverse=True)
-        for n in sorted_notes[:10]:
-            ts = n.get("timestamp", "")[:19]
-            cid = n.get("coach_id", "")
-            note = n.get("note", "")
-            note_key = ts.replace(':', '_').replace('-', '_').replace(' ', '_').replace('.', '_')
-
-            # 如果正在編輯這個備註
-            if st.session_state.editing_note_ts == ts:
-                st.markdown(f"**✏️ 編輯中：** {ts}")
-                edit_text = st.text_area("備註內容", value=note, key=f"edit_{note_key}", height=80, label_visibility="collapsed")
-                col_update, col_cancel = st.columns([1, 1])
-                with col_update:
-                    if st.button("💾 更新", key=f"save_{note_key}", use_container_width=True):
-                        if edit_text.strip():
-                            try:
-                                sheets.update_note(ts, uid, cid, edit_text.strip())
-                                _clear_analysis_cache()
-                                st.success("備註已更新！")
-                                st.session_state.editing_note_ts = None
-                                st.rerun()
-                            except Exception as exc:
-                                st.error("更新失敗：" + str(exc))
-                with col_cancel:
-                    if st.button("取消", key=f"cancel_{note_key}", use_container_width=True):
-                        st.session_state.editing_note_ts = None
-                        st.rerun()
-                st.divider()
-            else:
-                # 顯示備註 + 編輯/刪除按鈕
-                with st.container():
-                    col_text, col_actions = st.columns([4, 1])
-                    with col_text:
-                        st.markdown(f"**{ts}**  _{cid}_：" + note)
-                    with col_actions:
-                        if st.button("✏️", key=f"edit_btn_{note_key}", help="編輯"):
-                            st.session_state.editing_note_ts = ts
-                            st.rerun()
-                        if st.button("🗑️", key=f"del_btn_{note_key}", help="刪除"):
-                            try:
-                                sheets.delete_note(ts, uid, cid)
-                                _clear_analysis_cache()
-                                st.success("備註已刪除！")
-                                st.rerun()
-                            except Exception as exc:
-                                st.error("刪除失敗：" + str(exc))
-                st.divider()
-    else:
-        st.caption("此區間尚無備註。")
-
-    # 新增備註（不在 form 內，方便與編輯共存）
-    st.markdown("**➕ 新增備註**")
-    new_note_input = st.text_area("新增備註", placeholder="輸入觀察意見...", key="coach_note_input", label_visibility="collapsed", height=80)
-    if st.button("💾 儲存備註", use_container_width=True):
-        if new_note_input and new_note_input.strip():
-            try:
-                sheets.append_note(
-                    timestamp=datetime.now().isoformat(timespec="seconds"),
-                    user_id=uid,
-                    coach_id=str(st.session_state.get("user_id", "")),
-                    note=new_note_input.strip(),
-                )
-                _clear_analysis_cache()
-                st.success("備註已儲存！")
-                st.rerun()
-            except Exception as exc:
-                st.error("儲存失敗：" + str(exc))
-        else:
-            st.warning("請輸入備註內容")
-
-    st.subheader("📤 匯出")
+    st.subheader(" 匯出")
     csv_bytes = _build_history_csv(student, daily, weights, trainings, notes, start_date, end_date)
     pdf_bytes = _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date)
     ec1, ec2 = st.columns(2)
@@ -1764,7 +1687,7 @@ def page_personal() -> None:
 
     with col2:
 
-        st.markdown("**💧 水量**")
+        st.markdown("** 水量**")
 
         pct = water_ratio * 100
 
@@ -1776,7 +1699,7 @@ def page_personal() -> None:
 
     with col3:
 
-        st.markdown("**🏋️ 訓練**")
+        st.markdown("** 訓練**")
 
         emoji = "✅" if has_training else "❌"
 
@@ -1798,7 +1721,7 @@ def page_personal() -> None:
 
     st.divider()
 
-    st.subheader("⚖️ 體重")
+    st.subheader(" 體重")
 
     latest_weight = sheets.get_latest_weight(uid)
 
@@ -1824,7 +1747,7 @@ def page_personal() -> None:
 
 def page_weight() -> None:
 
-    st.header("⚖️ 體重記錄")
+    st.header(" 體重記錄")
 
     uid = st.session_state.user_id
 
@@ -1858,7 +1781,7 @@ def page_weight() -> None:
 
     st.divider()
 
-    st.subheader("📈 體重趨勢")
+    st.subheader(" 體重趨勢")
 
     weight_records = sheets.get_weight_records(uid)
 
@@ -1894,7 +1817,7 @@ def page_weight() -> None:
 
 def page_training() -> None:
 
-    st.header("🏋️ 訓練記錄")
+    st.header(" 訓練記錄")
 
     uid = st.session_state.user_id
 
@@ -2809,8 +2732,8 @@ def main() -> None:
             ("個人", "👤"),
             ("記錄飲食", "🍴"),
             ("歷史", "🕐"),
-            ("體重記錄", "⚖️"),
-            ("訓練記錄", "🏋️"),
+            ("體重記錄", ""),
+            ("訓練記錄", ""),
             ("TDEE", "📊"),
             ("TDEE 問卷", "📋"),
         ]
