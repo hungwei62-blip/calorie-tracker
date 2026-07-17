@@ -9,6 +9,4 @@ firebase-admin>=6.0.0
 matplotlib>=3.5.0
 plotly>=5.0.0
 openpyxl>=3.0.0
-plotly-orca>=5.0.0
-reportlab>=4.0.0
 

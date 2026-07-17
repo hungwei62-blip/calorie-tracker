@@ -605,239 +605,170 @@ def _build_history_csv(student, daily, weights, trainings, notes, start_date, en
     return ("\ufeff" + buf.getvalue()).encode("utf-8")
 
 def _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date):
-    from PIL import Image as _PILImage
-    from io import BytesIO as _BytesIO
-    import matplotlib.pyplot as _plt
-    import matplotlib.backends.backend_pdf as _pdf
-    from reportlab.lib.pagesizes import A4 as _A4
-    from reportlab.lib.units import cm as _cm
-    from reportlab.pdfgen import canvas as _canvas
-    
-    name = student.get("name", student.get("username", "未知"))
-    sorted_days = sorted(daily.keys()) if daily else []
-    xs = [d.strftime("%Y-%m-%d") for d in sorted_days]
-    cals = [daily[d]["calorie"] for d in sorted_days]
-    pros = [daily[d]["protein"] for d in sorted_days]
-    waters = [daily[d]["water"] for d in sorted_days]
-    sorted_weights = sorted(
-        [r for r in weights if start_date <= _parse_record_date(r.get("timestamp", "")) <= end_date],
-        key=lambda r: r.get("timestamp", ""),
-    )
-    
-    buf = _BytesIO()
-    c = _canvas.Canvas(buf, pagesize=_A4)
-    width, height = _A4
-    
-    def draw_text(text, x, y, size=12, bold=False):
-        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
-        c.drawString(x, y, text)
-    
-    def draw_centered_text(text, y, size=16, bold=True):
-        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
-        c.drawCentredString(width/2, y, text)
-    
-    # ===== Page 1: 摘要 =====
-    draw_centered_text(str(name) + " 歷史紀錄", height - 2*_cm, 20, True)
-    draw_text("區間：" + start_date.strftime("%Y-%m-%d") + " ~ " + end_date.strftime("%Y-%m-%d"), 2*_cm, height - 4*_cm, 11)
-    
-    days_count = (end_date - start_date).days + 1
-    avg_cal = sum(cals) / max(len(cals), 1)
-    avg_pro = sum(pros) / max(len(pros), 1)
-    total_water = sum(waters)
-    
-    first_w = sorted_weights[0].get("weight_kg") if sorted_weights else None
-    last_w = sorted_weights[-1].get("weight_kg") if sorted_weights else None
-    weight_delta = (last_w - first_w) if (first_w and last_w) else None
-    
-    y = height - 6*_cm
-    draw_text("平均熱量：%.0f kcal/天" % avg_cal, 2*_cm, y, 12)
-    y -= 1.2*_cm
-    draw_text("平均蛋白質：%.0f g/天" % avg_pro, 2*_cm, y, 12)
-    y -= 1.2*_cm
-    draw_text("總飲水量：%.0f ml" % total_water, 2*_cm, y, 12)
-    y -= 1.2*_cm
-    if first_w and last_w:
-        draw_text("體重：%.1f kg -> %.1f kg (%+.1f kg)" % (first_w, last_w, weight_delta or 0), 2*_cm, y, 12)
-    
-    c.showPage()
-    
-    # ===== Helper function to add Plotly chart as image =====
-    def add_plotly_chart(fig, y_pos, chart_height=8*_cm, title=""):
-        try:
-            img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
-            img = _PILImage.open(_BytesIO(img_bytes))
-            img_width = width - 4*_cm
-            img_height = chart_height
-            aspect = img.width / img.height
-            actual_height = img_width / aspect
-            img = img.resize((int(img_width), int(actual_height)), _PILImage.LANCZOS)
-            img_buffer = _BytesIO()
-            img.save(img_buffer, format="PNG")
-            img_buffer.seek(0)
-            c.drawImage(img_buffer, 2*_cm, y_pos - actual_height, width=img_width, height=actual_height)
-            return y_pos - actual_height - 1*_cm
-        except Exception as e:
-            draw_text("圖表生成失敗: " + str(e), 2*_cm, y_pos - 1*_cm, 10)
-            return y_pos - 2*_cm
-    
-    # ===== Page 2: 熱量趨勢 =====
-    if xs:
-        draw_centered_text("熱量趨勢", height - 2*_cm, 16, True)
-        
-        fig_cal = go.Figure()
-        fig_cal.add_trace(go.Scatter(
-            x=xs, y=cals, mode="lines+markers",
-            line=dict(color="#ffffff", width=3, shape="spline"),
-            marker=dict(size=6, color="#16152b", line=dict(color="#ffffff", width=2)),
-            fill="tozeroy", fillcolor="rgba(255,255,255,0.04)"
-        ))
-        fig_cal.update_layout(
-            paper_bgcolor="#2a2850", plot_bgcolor="#2a2850",
-            margin=dict(l=40, r=25, t=60, b=40), height=300,
-            annotations=[
-                dict(x=0.01, y=1.25, xref="paper", yref="paper",
-                    text=f"<b style='font-size:28px;color:#fff'>" + f"{avg_cal:.0f}" + f"</b> <span style='font-size:12px;color:#aaa'>kcal</span>",
-                    showarrow=False),
-                dict(x=0.01, y=1.02, xref="paper", yref="paper",
-                    text="<span style='font-size:11px;color:#aaa'>平均每日熱量</span>",
-                    showarrow=False)
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color="#888", size=10), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(color="#888", size=10), zeroline=False, showline=False, ticks=""),
-            showlegend=False
-        )
-        
-        add_plotly_chart(fig_cal, height - 3*_cm, chart_height=10*_cm)
-    
-    c.showPage()
-    
-    # ===== Page 3: 蛋白質趨勢 =====
-    if xs:
-        draw_centered_text("蛋白質趨勢", height - 2*_cm, 16, True)
-        
-        avg_pro = sum(pros) / max(len(pros), 1)
-        fig_pro = go.Figure()
-        fig_pro.add_trace(go.Scatter(
-            x=xs, y=pros, mode="lines+markers",
-            line=dict(color="#ffffff", width=3, shape="spline"),
-            marker=dict(size=6, color="#16152b", line=dict(color="#ffffff", width=2)),
-            fill="tozeroy", fillcolor="rgba(255,255,255,0.04)"
-        ))
-        fig_pro.update_layout(
-            paper_bgcolor="#2a2850", plot_bgcolor="#2a2850",
-            margin=dict(l=40, r=25, t=60, b=40), height=300,
-            annotations=[
-                dict(x=0.01, y=1.25, xref="paper", yref="paper",
-                    text=f"<b style='font-size:28px;color:#fff'>" + f"{avg_pro:.0f}" + f"</b> <span style='font-size:12px;color:#aaa'>g</span>",
-                    showarrow=False),
-                dict(x=0.01, y=1.02, xref="paper", yref="paper",
-                    text="<span style='font-size:11px;color:#aaa'>平均每日蛋白質</span>",
-                    showarrow=False)
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color="#888", size=10), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(color="#888", size=10), zeroline=False, showline=False, ticks=""),
-            showlegend=False
-        )
-        
-        add_plotly_chart(fig_pro, height - 3*_cm, chart_height=10*_cm)
-    
-    c.showPage()
-    
-    # ===== Page 4: 水量趨勢 =====
-    if xs:
-        draw_centered_text("水量趨勢", height - 2*_cm, 16, True)
-        
-        avg_water = sum(waters) / max(len(waters), 1)
-        fig_water = go.Figure()
-        fig_water.add_trace(go.Scatter(
-            x=xs, y=waters, mode="lines+markers",
-            line=dict(color="#ffffff", width=3, shape="spline"),
-            marker=dict(size=6, color="#16152b", line=dict(color="#ffffff", width=2)),
-            fill="tozeroy", fillcolor="rgba(255,255,255,0.04)"
-        ))
-        fig_water.update_layout(
-            paper_bgcolor="#2a2850", plot_bgcolor="#2a2850",
-            margin=dict(l=40, r=25, t=60, b=40), height=300,
-            annotations=[
-                dict(x=0.01, y=1.25, xref="paper", yref="paper",
-                    text=f"<b style='font-size:28px;color:#fff'>" + f"{avg_water:.0f}" + f"</b> <span style='font-size:12px;color:#aaa'>ml</span>",
-                    showarrow=False),
-                dict(x=0.01, y=1.02, xref="paper", yref="paper",
-                    text="<span style='font-size:11px;color:#aaa'>平均每日水量</span>",
-                    showarrow=False)
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color="#888", size=10), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(color="#888", size=10), zeroline=False, showline=False, ticks=""),
-            showlegend=False
-        )
-        
-        add_plotly_chart(fig_water, height - 3*_cm, chart_height=10*_cm)
-    
-    c.showPage()
-    
-    # ===== Page 5: 體重變化 =====
-    if sorted_weights:
-        draw_centered_text("體重變化", height - 2*_cm, 16, True)
-        
-        weight_xs = [r.get("timestamp", "")[:10] for r in sorted_weights]
-        weight_ys = [r.get("weight_kg", 0) for r in sorted_weights]
-        last_weight = weight_ys[-1] if weight_ys else 0
-        first_weight = weight_ys[0] if weight_ys else 0
-        weight_change = last_weight - first_weight
-        
-        fig_weight = go.Figure()
-        fig_weight.add_trace(go.Scatter(
-            x=weight_xs, y=weight_ys, mode="lines+markers",
-            line=dict(color="#ffffff", width=3, shape="spline"),
-            marker=dict(size=6, color="#16152b", line=dict(color="#ffffff", width=2)),
-            fill="tozeroy", fillcolor="rgba(255,255,255,0.04)"
-        ))
-        fig_weight.update_layout(
-            paper_bgcolor="#2a2850", plot_bgcolor="#2a2850",
-            margin=dict(l=40, r=25, t=60, b=40), height=300,
-            annotations=[
-                dict(x=0.01, y=1.25, xref="paper", yref="paper",
-                    text=f"<b style='font-size:28px;color:#fff'>" + f"{last_weight:.1f}" + f"</b> <span style='font-size:12px;color:#aaa'>kg</span>",
-                    showarrow=False),
-                dict(x=0.01, y=1.02, xref="paper", yref="paper",
-                    text=f"<span style='font-size:11px;color:#aaa'>體重 {weight_change:+.1f} kg</span>",
-                    showarrow=False)
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color="#888", size=10), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(color="#888", size=10), zeroline=False, showline=False, ticks=""),
-            showlegend=False
-        )
-        
-        add_plotly_chart(fig_weight, height - 3*_cm, chart_height=10*_cm)
-    
-    c.showPage()
-    
-    # ===== Page 6: 訓練記錄 =====
-    draw_centered_text("訓練記錄", height - 2*_cm, 16, True)
-    y = height - 4*_cm
-    
-    if trainings:
-        for r in sorted(trainings, key=lambda x: x.get("timestamp", ""))[-15:]:
-            items = []
-            if r.get("training_back"): items.append("背")
-            if r.get("training_chest"): items.append("胸")
-            if r.get("training_legs"): items.append("腿")
-            if r.get("training_core"): items.append("核心")
-            if r.get("training_cardio"): items.append("有氧")
-            ts = r.get("timestamp", "")[:10]
-            text = ts + "  " + ("、".join(items) if items else "-")
-            draw_text(text, 2*_cm, y, 10)
-            y -= 0.8*_cm
-            if y < 2*_cm:
-                c.showPage()
-                y = height - 2*_cm
-    else:
-        draw_text("（無訓練記錄）", 2*_cm, y, 11)
-    
-    c.save()
-    buf.seek(0)
-    return buf.getvalue()
+    # 中文字型設定
+    # 中文字型設定
+    import matplotlib.font_manager as fm
+    # 嘗試使用系統中文字型
+    # 內嵌中文字型（放在 assets/fonts/ 目錄）
+    # 嘗試載入內嵌中文字型
+    font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "NotoSansTC-Regular.otf")
 
+    if os.path.exists(font_path):
+        # 使用 addfont 註冊字型
+        try:
+            fm.fontManager.addfont(font_path)
+            _plt.rcParams["font.family"] = "sans-serif"
+            _plt.rcParams["font.sans-serif"] = ["Noto Sans TC", "DejaVu Sans"]
+        except Exception:
+            prop = fm.FontProperties(fname=font_path)
+            _plt.rcParams["font.family"] = prop.get_family()
+            _plt.rcParams["font.sans-serif"] = [font_path]
+    else:
+        # Fallback 到系統字型
+        font_paths = [
+            "C:/Windows/Fonts/msjh.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        ]
+        for fp in font_paths:
+            if os.path.exists(fp):
+                try:
+                    fm.fontManager.addfont(fp)
+                    _plt.rcParams["font.family"] = "sans-serif"
+                    _plt.rcParams["font.sans-serif"] = ["Noto Sans CJK TC", "DejaVu Sans"]
+                except Exception:
+                    prop = fm.FontProperties(fname=fp)
+                    _plt.rcParams["font.family"] = prop.get_family()
+                    _plt.rcParams["font.sans-serif"] = [fp]
+                break
+        else:
+            _plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
+            _plt.rcParams["font.family"] = "sans-serif"
+
+    _plt.rcParams["axes.unicode_minus"] = False
+    name = student.get("name", student.get("username", "未知"))
+    buf = _io.BytesIO()
+    with _PdfPages(buf) as pdf:
+        # Page 1: 摘要
+        fig = _plt.figure(figsize=(8.27, 11.69))
+        fig.suptitle(str(name) + " 歷史紀錄", fontsize=18, fontweight="bold")
+        ax = fig.add_subplot(111)
+        ax.axis("off")
+        days_count = (end_date - start_date).days + 1
+        total_cal = sum(v["calorie"] for v in daily.values())
+        total_pro = sum(v["protein"] for v in daily.values())
+        total_water = sum(v["water"] for v in daily.values())
+        avg_cal = total_cal / max(days_count, 1)
+        avg_pro = total_pro / max(days_count, 1)
+        sorted_weights = sorted(
+            [r for r in weights if start_date <= _parse_record_date(r.get("timestamp", "")) <= end_date],
+            key=lambda r: r.get("timestamp", ""),
+        )
+        first_w = sorted_weights[0].get("weight_kg") if sorted_weights else None
+        last_w  = sorted_weights[-1].get("weight_kg") if sorted_weights else None
+        weight_delta = (last_w - first_w) if (first_w is not None and last_w is not None) else None
+        first_s = ("%.1f kg" % first_w) if first_w is not None else "-"
+        last_s  = ("%.1f kg" % last_w)  if last_w  is not None else "-"
+        delta_s = ""
+        if weight_delta is not None:
+            delta_s = "（%+.1f kg）" % weight_delta
+        lines = [
+            "區間：" + start_date.isoformat() + " ~ " + end_date.isoformat() + "（" + str(days_count) + " 天）",
+            "",
+            "平均熱量：%.0f kcal / 天" % avg_cal,
+            "平均蛋白質：%.0f g / 天" % avg_pro,
+            "總飲水量：%.0f ml" % total_water,
+            "體重：" + first_s + " -> " + last_s + delta_s,
+            "備註數：" + str(len(notes)) + " 筆",
+        ]
+        ax.text(0.05, 0.95, "\n".join(lines), va="top", ha="left", fontsize=12)
+        pdf.savefig(fig, bbox_inches="tight")
+        _plt.close(fig)
+
+        # Page 2: 飲食組成圓餅
+        total_pro2 = sum(v["protein"] for v in daily.values())
+        total_carb = sum(v["carb"] for v in daily.values())
+        total_fat = sum(v["fat"] for v in daily.values())
+        if total_pro2 + total_carb + total_fat > 0:
+            fig, ax = _plt.subplots(figsize=(8.27, 11.69))
+            fig.suptitle("飲食組成（區間總和）", fontsize=16, fontweight="bold")
+            ax.pie(
+                [total_carb, total_pro2, total_fat],
+                labels=[
+                    "醣類\n%.0fg" % total_carb,
+                    "蛋白質\n%.0fg" % total_pro2,
+                    "脂質\n%.0fg" % total_fat,
+                ],
+                autopct="%1.1f%%",
+                startangle=90,
+                colors=["#FFD166", "#06D6A0", "#EF476F"],
+            )
+            ax.axis("equal")
+            pdf.savefig(fig, bbox_inches="tight")
+            _plt.close(fig)
+
+        # Page 3: 熱量 / 蛋白質 / 水量
+        if daily:
+            xs = [d.strftime("%m/%d") for d in sorted(daily.keys())]
+            cals = [daily[d]["calorie"] for d in sorted(daily.keys())]
+            pros = [daily[d]["protein"] for d in sorted(daily.keys())]
+            wats = [daily[d]["water"] for d in sorted(daily.keys())]
+            fig, axes = _plt.subplots(3, 1, figsize=(8.27, 11.69))
+            fig.suptitle("每日攝取趨勢", fontsize=16, fontweight="bold")
+            axes[0].plot(xs, cals, marker="o", color="#118AB2")
+            axes[0].set_title("熱量 (kcal)")
+            axes[0].grid(True, alpha=0.3)
+            axes[1].plot(xs, pros, marker="o", color="#06D6A0")
+            axes[1].set_title("蛋白質 (g)")
+            axes[1].grid(True, alpha=0.3)
+            axes[2].bar(xs, wats, color="#073B4C")
+            axes[2].set_title("水量 (ml)")
+            axes[2].grid(True, alpha=0.3, axis="y")
+            for a in axes:
+                a.tick_params(axis="x", rotation=45)
+            fig.tight_layout(rect=[0, 0, 1, 0.96])
+            pdf.savefig(fig, bbox_inches="tight")
+            _plt.close(fig)
+
+        # Page 4: 體重
+        if sorted_weights:
+            fig, ax = _plt.subplots(figsize=(8.27, 11.69))
+            fig.suptitle("體重變化", fontsize=16, fontweight="bold")
+            xs = [r.get("timestamp", "")[:10] for r in sorted_weights]
+            ys = [r.get("weight_kg", 0) for r in sorted_weights]
+            ax.plot(xs, ys, marker="o", color="#EF476F")
+            ax.set_ylabel("kg")
+            ax.grid(True, alpha=0.3)
+            ax.tick_params(axis="x", rotation=45)
+            fig.tight_layout(rect=[0, 0, 1, 0.96])
+            pdf.savefig(fig, bbox_inches="tight")
+            _plt.close(fig)
+
+        # Page 5: 訓練 + 備註
+        fig, ax = _plt.subplots(figsize=(8.27, 11.69))
+        ax.axis("off")
+        fig.suptitle("訓練記錄與教練備註", fontsize=16, fontweight="bold")
+        text_lines = ["【訓練記錄】"]
+        if trainings:
+            for r in sorted(trainings, key=lambda x: x.get("timestamp", ""))[-20:]:
+                items = []
+                if r.get("training_back"):   items.append("背")
+                if r.get("training_chest"):  items.append("胸")
+                if r.get("training_legs"):   items.append("腿")
+                if r.get("training_core"):   items.append("核心")
+                if r.get("training_cardio"): items.append("有氧")
+                text_lines.append("  " + r.get("timestamp", "")[:10] + "  " + ("、".join(items) if items else "-"))
+        else:
+            text_lines.append("  （無）")
+        text_lines += ["", "【教練備註】"]
+        if notes:
+            for n in notes[-20:]:
+                text_lines.append("  " + n.get("timestamp", "")[:19] + "  " + str(n.get("coach_id", "")) + "：" + str(n.get("note", "")))
+        else:
+            text_lines.append("  （無）")
+        ax.text(0.05, 0.95, "\n".join(text_lines), va="top", ha="left", fontsize=10)
+        pdf.savefig(fig, bbox_inches="tight")
+        _plt.close(fig)
+    return buf.getvalue()
 
 def page_coach_student_history():
     """教練端：檢視單一學員的歷史記錄（圖表 / 備註 / 匯出）。"""
