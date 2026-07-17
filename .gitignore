@@ -9,3 +9,9 @@ venv/
 # local backup folder (do not push)
 _backup/
 _test_restore/
+backups/
+.pytest_cache/
+htmlcov/
+.coverage
+archive/
+streamlit.*.log

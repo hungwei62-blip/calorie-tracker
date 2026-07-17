@@ -29,6 +29,7 @@ from google.oauth2.service_account import Credentials
 import streamlit as st
 
 CACHE_TTL = 60  # 快取 TTL（秒）
+_VERIFIED_WORKSHEET_SCHEMAS: set[tuple[str, str]] = set()
 
 # ---------- Headers ----------
 
@@ -47,6 +48,7 @@ USERS_HEADERS = [
     "role",
     "weekly_training_goal",
     "record_mode",          # "simple" 或 "full"，學員的飲食記錄模式
+    "coach_id",            # 所屬教練 ID；教練帳號與未分配學員留空
 ]
 
 RECORDS_HEADERS = [
@@ -122,12 +124,28 @@ def _get_sheet() -> gspread.Spreadsheet:
 
 
 def _ensure_worksheet(sh: gspread.Spreadsheet, title: str, headers: list[str]) -> gspread.Worksheet:
-    """確保工作表存在，若不存在則自動建立並寫入 header。"""
+    """確保工作表及新增於尾端的欄位存在。"""
     try:
         ws = sh.worksheet(title)
     except gspread.WorksheetNotFound:
         ws = sh.add_worksheet(title=title, rows=1000, cols=len(headers))
         ws.append_row(headers)
+        return ws
+
+    schema_key = (str(getattr(sh, "id", id(sh))), title)
+    if schema_key in _VERIFIED_WORKSHEET_SCHEMAS:
+        return ws
+    existing_headers = ws.row_values(1)
+    if not existing_headers:
+        ws.append_row(headers)
+        return ws
+    if existing_headers != headers[:len(existing_headers)]:
+        raise RuntimeError(f"{title} 工作表欄位順序與程式定義不一致，請先執行資料檢查工具")
+    if ws.col_count < len(headers):
+        ws.add_cols(len(headers) - ws.col_count)
+    for col, header in enumerate(headers[len(existing_headers):], start=len(existing_headers) + 1):
+        ws.update_cell(1, col, header)
+    _VERIFIED_WORKSHEET_SCHEMAS.add(schema_key)
     return ws
 
 
@@ -168,6 +186,33 @@ def _to_int(val: Any, default: int) -> int:
         return default
 
 
+def _validated_non_negative(value: Any, field_name: str) -> float:
+    """將營養數值轉成非負浮點數；無效值直接拒絕，避免污染試算表。"""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} 必須是數字") from exc
+    if parsed < 0:
+        raise ValueError(f"{field_name} 不可小於 0")
+    return round(parsed, 2)
+
+
+def clear_read_caches() -> None:
+    """集中清除所有 Sheets 讀取快取；每個寫入操作完成後呼叫。"""
+    for fn_name in (
+        "get_users_rows",
+        "get_records",
+        "get_weight_records",
+        "get_latest_weight",
+        "get_training_records",
+        "get_notes",
+    ):
+        fn = globals().get(fn_name)
+        clear = getattr(fn, "clear", None)
+        if clear is not None:
+            clear()
+
+
 # =============================================================================
 # Users
 # =============================================================================
@@ -187,6 +232,7 @@ def append_user(
     password_hash: str,
     created_at: str,
     goals: dict[str, float],
+    coach_id: str,
     record_mode: str = "simple",
     weekly_training: int = 4,
 ) -> None:
@@ -199,6 +245,7 @@ def append_user(
         created_at: 創建時間（ISO 字串）
         goals: 營養目標字典，含 calorie/protein/carb/fat/water
         record_mode: "simple" 或 "full"，飲食記錄模式
+        coach_id: 所屬教練 ID
         weekly_training: 每週訓練目標次數，預設 4
     """
     sh = _get_sheet()
@@ -218,12 +265,14 @@ def append_user(
         "student",
         weekly_training,
         record_mode,
+        coach_id,
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+    clear_read_caches()
 
 
 def get_user_role(user_id: str) -> str:
-    """查詢使用者的 role，回傳 "coach" 或 "student"（預設）。"""
+    """查詢使用者的 role，回傳 admin、coach 或 student（預設）。"""
     for row in get_users_rows():
         if row.get("user_id") == user_id:
             val = str(row.get("role", "student") or "student")
@@ -231,11 +280,21 @@ def get_user_role(user_id: str) -> str:
     return "student"
 
 
+def get_primary_coach_id() -> str:
+    """取得並驗證新學員預設歸屬的主教練。"""
+    coach_id = str(st.secrets.get("PRIMARY_COACH_ID", "")).strip()
+    if not coach_id:
+        raise EnvironmentError("缺少 PRIMARY_COACH_ID，請由管理員完成設定")
+    if get_user_role(coach_id) != "coach":
+        raise EnvironmentError("PRIMARY_COACH_ID 必須指向 role=coach 的帳號")
+    return coach_id
+
+
 def set_user_role(user_id: str, role: str) -> None:
-    """將指定 user_id 的 role 設為 "coach" 或 "student"。"""
+    """將指定 user_id 的 role 設為 admin、coach 或 student。"""
     role = (role or "student").strip().lower()
-    if role not in ("student", "coach"):
-        raise ValueError("role 只能是 student 或 coach")
+    if role not in ("student", "coach", "admin"):
+        raise ValueError("role 只能是 student、coach 或 admin")
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     cell = ws.find(user_id)
@@ -243,6 +302,7 @@ def set_user_role(user_id: str, role: str) -> None:
         raise LookupError("找不到此 user_id")
     role_col = USERS_HEADERS.index("role") + 1
     ws.update_cell(cell.row, role_col, role)
+    clear_read_caches()
 
 
 def get_user_record_mode(user_id: str) -> str:
@@ -266,6 +326,7 @@ def set_user_record_mode(user_id: str, mode: str) -> None:
         raise LookupError("找不到此 user_id")
     col = USERS_HEADERS.index("record_mode") + 1
     ws.update_cell(cell.row, col, mode)
+    clear_read_caches()
 
 
 def get_user_goals(user_id: str) -> dict[str, float]:
@@ -289,9 +350,12 @@ def update_user_bmr(user_id: str, bmr: float) -> bool:
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     rows = get_users_rows()
+    bmr_value = _validated_non_negative(bmr, "bmr")
+    bmr_col = USERS_HEADERS.index("bmr") + 1
     for idx, row in enumerate(rows, start=2):
         if row.get("user_id") == user_id:
-            ws.update_cell(idx, 5, round(bmr, 2))  # BMR 在第 5 欄
+            ws.update_cell(idx, bmr_col, bmr_value)
+            clear_read_caches()
             return True
     return False
 
@@ -302,38 +366,63 @@ def update_user_goals(user_id: str, goals: dict[str, float]) -> bool:
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     rows = get_users_rows()
 
-    # 欄位對應 (1-based)：calorie=6, protein=7, carb=8, fat=9, water=10
-    field_map = {
-        "calorie": 6,
-        "protein": 7,
-        "carb": 8,
-        "fat": 9,
-        "water": 10,
+    field_headers = {
+        "calorie": "daily_calorie_goal",
+        "protein": "daily_protein_goal",
+        "carb": "daily_carb_goal",
+        "fat": "daily_fat_goal",
+        "water": "daily_water_goal",
     }
 
     found = False
     for idx, row in enumerate(rows, start=2):
         if row.get("user_id") == user_id:
             found = True
-            for key, col in field_map.items():
+            updates = []
+            for key, header in field_headers.items():
                 if key in goals:
-                    val = goals[key]
-                    if isinstance(val, float):
-                        val = round(val, 2)
-                    ws.update_cell(idx, col, val)
+                    col = USERS_HEADERS.index(header) + 1
+                    value = _validated_non_negative(goals[key], key)
+                    updates.append(gspread.Cell(idx, col, value))
+            if updates:
+                ws.update_cells(updates, value_input_option="USER_ENTERED")
+                clear_read_caches()
             break
 
     return found
 
 
-def get_all_students() -> list[dict[str, Any]]:
-    """取得所有學員（role=student）的資料。"""
-    return [row for row in get_users_rows() if row.get("role", "").strip().lower() == "student"]
+def get_students_for_coach(coach_id: str) -> list[dict[str, Any]]:
+    """取得指定教練所屬學員；未分配學員不會出現在清單中。"""
+    return [
+        row
+        for row in get_users_rows()
+        if row.get("role", "").strip().lower() == "student"
+        and row.get("coach_id", "").strip() == coach_id
+    ]
 
 
-def get_student_by_id(user_id: str) -> dict[str, Any] | None:
-    """依 user_id 取得學員資料，找不到回傳 None。"""
-    for row in get_users_rows():
+def get_students_for_manager(manager_id: str) -> list[dict[str, Any]]:
+    """管理員可查看全部學員；教練只能查看歸屬自己的學員。"""
+    role = get_user_role(manager_id)
+    if role == "admin":
+        return [row for row in get_users_rows() if row.get("role", "").strip().lower() == "student"]
+    if role == "coach":
+        return get_students_for_coach(manager_id)
+    return []
+
+
+def get_student_for_coach(user_id: str, coach_id: str) -> dict[str, Any] | None:
+    """取得屬於指定教練的學員，不符合歸屬時回傳 None。"""
+    for row in get_students_for_coach(coach_id):
+        if row.get("user_id") == user_id:
+            return row
+    return None
+
+
+def get_student_for_manager(user_id: str, manager_id: str) -> dict[str, Any] | None:
+    """依管理者角色及歸屬取得學員。"""
+    for row in get_students_for_manager(manager_id):
         if row.get("user_id") == user_id:
             return row
     return None
@@ -373,6 +462,7 @@ def append_record(
         round(portion, 2),
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+    clear_read_caches()
 
 
 @st.cache_data(ttl=CACHE_TTL)
@@ -426,6 +516,7 @@ def update_record(record_timestamp: str, user_id: str, updates: dict[str, Any]) 
                     if isinstance(val, float):
                         val = round(val, 2)
                     ws.update_cell(row_idx, col, val)
+            clear_read_caches()
             return True
     return False
 
@@ -439,6 +530,7 @@ def delete_record(record_timestamp: str, user_id: str) -> bool:
     for row_idx, raw_row in enumerate(raw_records[1:], start=2):
         if raw_row and raw_row[0] == record_timestamp and raw_row[1] == user_id:
             ws.delete_rows(row_idx)
+            clear_read_caches()
             return True
     return False
 
@@ -457,6 +549,7 @@ def append_weight(timestamp: str, user_id: str, weight_kg: float) -> None:
         round(weight_kg, 1),
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+    clear_read_caches()
 
 
 @st.cache_data(ttl=CACHE_TTL)
@@ -518,6 +611,7 @@ def append_training(
         training_cardio,
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+    clear_read_caches()
 
 
 @st.cache_data(ttl=CACHE_TTL)
@@ -579,9 +673,15 @@ def update_training(
     # 先找看看有沒有該日期的記錄
     for row_idx, raw_row in enumerate(raw_records[1:], start=2):
         if raw_row and raw_row[0] == timestamp and raw_row[1] == user_id:
-            # 更新現有列
-            for col, val in enumerate([training_back, training_chest, training_legs, training_core, training_cardio], start=3):
-                ws.update_cell(row_idx, col, val)
+            cells = [
+                gspread.Cell(row_idx, col, val)
+                for col, val in enumerate(
+                    [training_back, training_chest, training_legs, training_core, training_cardio],
+                    start=3,
+                )
+            ]
+            ws.update_cells(cells, value_input_option="USER_ENTERED")
+            clear_read_caches()
             return True
 
     # 沒找到就新增
@@ -604,6 +704,7 @@ def append_note(timestamp: str, user_id: str, coach_id: str, note: str) -> None:
         note,
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+    clear_read_caches()
 
 
 @st.cache_data(ttl=CACHE_TTL)
@@ -634,6 +735,7 @@ def update_note(timestamp: str, user_id: str, coach_id: str, new_note: str) -> b
     for row_idx, raw_row in enumerate(raw_records[1:], start=2):
         if raw_row and raw_row[0] == timestamp and raw_row[1] == user_id and raw_row[2] == coach_id:
             ws.update_cell(row_idx, 4, new_note)  # note 在第 4 欄
+            clear_read_caches()
             return True
     return False
 
@@ -646,6 +748,7 @@ def delete_note(timestamp: str, user_id: str, coach_id: str) -> bool:
     for row_idx, raw_row in enumerate(raw_records[1:], start=2):
         if raw_row and raw_row[0] == timestamp and raw_row[1] == user_id and raw_row[2] == coach_id:
             ws.delete_rows(row_idx)
+            clear_read_caches()
             return True
     return False
 

@@ -50,7 +50,7 @@ def _get_api_key() -> str:
             return str(st.secrets[ENV_VAR])
     except Exception:
         pass
-    # 2) 環境變數 (本機開發 / CLI 走 gemini_nutrition.py)
+    # 2) 環境變數（本機開發或 CLI）
     import os
 
     val = os.environ.get("GEMINI_API_KEY")

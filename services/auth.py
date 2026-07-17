@@ -48,9 +48,9 @@ def find_user(rows: list[dict[str, Any]], username: str) -> dict[str, Any] | Non
     return None
 
 def is_coach(user_id: str) -> bool:
-    """判斷該使用者是否為教練 (role == coach)。"""
+    """判斷該使用者是否具有教練端管理權限。"""
     try:
         from services import sheets
-        return sheets.get_user_role(user_id) == "coach"
+        return sheets.get_user_role(user_id) in ("coach", "admin")
     except Exception:
         return False
