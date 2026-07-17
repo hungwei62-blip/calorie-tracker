@@ -1624,7 +1624,7 @@ def page_personal() -> None:
             cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
             
             FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
-            CAL_CARD_BG = "#f8f8f8"
+            CAL_CARD_BG = "#ffffff"
             
             fig_cal = go.Figure()
             fig_cal.add_trace(go.Pie(
@@ -1708,7 +1708,7 @@ def page_personal() -> None:
             cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
             
             FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
-            CAL_CARD_BG = "#f8f8f8"
+            CAL_CARD_BG = "#ffffff"
             
             fig_cal = go.Figure()
             fig_cal.add_trace(go.Pie(
