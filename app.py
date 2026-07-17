@@ -1630,6 +1630,7 @@ def page_personal() -> None:
             fig_cal.add_trace(go.Pie(
                 values=[cal_pct, 100 - cal_pct],
                 hole=0.76,
+                domain=dict(x=[0, 1], y=[0, 1]),
                 marker=dict(colors=['#ffbfa3', '#f0f0f0']),
                 sort=False,
                 direction='clockwise',
@@ -1640,12 +1641,12 @@ def page_personal() -> None:
             fig_cal.update_layout(
                 paper_bgcolor=CAL_CARD_BG,
                 plot_bgcolor=CAL_CARD_BG,
-                margin=dict(l=25, r=25, t=55, b=25),
+                margin=dict(l=10, r=10, t=50, b=10),
                 height=180,
                 font=FONT_SETTING,
                 annotations=[
                     dict(
-                        x=0.01, y=1.28, xref="paper", yref="paper",
+                        x=0.02, y=1.22, xref="paper", yref="paper",
                         text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
                         showarrow=False, align="left"
                     ),
@@ -1714,6 +1715,7 @@ def page_personal() -> None:
             fig_cal.add_trace(go.Pie(
                 values=[cal_pct, 100 - cal_pct],
                 hole=0.76,
+                domain=dict(x=[0, 1], y=[0, 1]),
                 marker=dict(colors=['#ffbfa3', '#f0f0f0']),
                 sort=False,
                 direction='clockwise',
@@ -1724,12 +1726,12 @@ def page_personal() -> None:
             fig_cal.update_layout(
                 paper_bgcolor=CAL_CARD_BG,
                 plot_bgcolor=CAL_CARD_BG,
-                margin=dict(l=25, r=25, t=55, b=25),
+                margin=dict(l=10, r=10, t=50, b=10),
                 height=180,
                 font=FONT_SETTING,
                 annotations=[
                     dict(
-                        x=0.01, y=1.28, xref="paper", yref="paper",
+                        x=0.02, y=1.22, xref="paper", yref="paper",
                         text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
                         showarrow=False, align="left"
                     ),
