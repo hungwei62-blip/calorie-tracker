@@ -1133,9 +1133,52 @@ def page_coach_student_history():
         st.plotly_chart(fig_pro, use_container_width=True, config={'displayModeBar': False})
 
         # ----- 4. 水量趨勢圖 -----
-        st.subheader("💧 水量趨勢")
-        bar_data = {"date": xs, "water": [daily[d]["water"] for d in sorted_days]}
-        st.bar_chart(bar_data, x="date", y="water")
+
+        # ==========================================
+        # 💧 3. 一體化水量趨勢圖
+        # ==========================================
+        waters = [daily[d]["water"] for d in sorted_days]
+        max_water = max(waters) if waters else 0
+        water_ticks = []
+        if max_water > 0:
+            water_ticks = [v for v in [1000, 1500, 2000, 2500, 3000, 3500, 4000] if v <= max_water * 1.2]
+            if not water_ticks or water_ticks[-1] < max_water:
+                water_ticks.append(((max_water // 500) + 1) * 500)
+
+        fig_water = go.Figure()
+
+        fig_water.add_trace(go.Scatter(
+            x=xs,
+            y=waters,
+            mode='lines+markers',
+            line=dict(color='#ffffff', width=3, shape='spline'),
+            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
+            fill='tozeroy',
+            fillcolor='rgba(255, 255, 255, 0.04)',
+            hovertemplate='日期: %{x}<br>水量: %{y:.0f} ml<extra></extra>'
+        ))
+
+        fig_water.update_layout(
+            paper_bgcolor=CARD_BG,
+            plot_bgcolor=CARD_BG,
+            margin=dict(l=40, r=25, t=90, b=25),
+            height=260,
+            font=FONT_SETTING,
+            annotations=[
+                dict(x=0.01, y=1.40, xref="paper", yref="paper",
+                    text=f"<b style='font-size:32px; color:#ffffff;'>{(sum(waters)/len(waters) if waters else 0):.1f}</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>ml</span>",
+                    showarrow=False, align="left"),
+                dict(x=0.01, y=1.12, xref="paper", yref="paper",
+                    text="<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>平均每日水量</span>",
+                    showarrow=False, align="left")
+            ],
+            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
+            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.05)', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks="", tickvals=water_ticks if water_ticks else None),
+            showlegend=False
+        )
+
+        st.plotly_chart(fig_water, use_container_width=True, config={'displayModeBar': False})
+
 
     else:
         st.info("此區間沒有飲食記錄。")
