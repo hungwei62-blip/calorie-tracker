@@ -1023,22 +1023,111 @@ def page_coach_student_history():
         total_pro = sum(pros)
         avg_pro = total_pro / len(sorted_days) if sorted_days else 0
 
-        # ----- 2. 熱量趨勢圖 (Plotly 版) -----
-        st.markdown(f"""<div class="chart-card" style="margin-bottom: -10px;"><div class="chart-header"><div><div class="chart-value">{avg_cal:.0f} <span class="chart-unit">kcal</span></div><div style="color:#a0a0a0;font-size:12px;font-family:sans-serif;">平均每日熱量</div></div></div></div>""", unsafe_allow_html=True)
+        # ==========================================
+        # CSS：Plotly 容器圓角與陰影
+        # ==========================================
+        st.markdown("""
+        <style>
+            div[data-testid="stPlotlyChart"] {
+                border-radius: 24px !important;
+                overflow: hidden !important;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.25) !important;
+                margin: 15px 0 !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
+
+        # ==========================================
+        # 🔥 1. 一體化熱量趨勢圖
+        # ==========================================
         fig_cal = go.Figure()
-        fig_cal.add_trace(go.Scatter(x=xs, y=cals, mode="lines+markers", line=dict(color="#FFA500", width=3, shape="spline"), marker=dict(size=8, color="#FFA500"), fill="tozeroy", fillcolor="rgba(255, 165, 0, 0.15)", hovertemplate="日期: %{x}<br>熱量: %{y:.0f} kcal<extra></extra>"))
-        fig_cal.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=5, r=5, t=5, b=5), height=180, xaxis=dict(showgrid=False, tickfont=dict(color="#888888"), linecolor="#2a2a4a"), yaxis=dict(showgrid=True, gridcolor="#2a2a4a", tickfont=dict(color="#888888"), zeroline=False), showlegend=False)
-        st.plotly_chart(fig_cal, use_container_width=True, config={"displayModeBar": False})
+        
+        fig_cal.add_trace(go.Scatter(
+            x=xs,
+            y=cals,
+            mode='lines+markers',
+            line=dict(color='#FFA500', width=3, shape='spline'),
+            marker=dict(size=6, color='#ffffff', line=dict(color='#FFA500', width=2)),
+            fill='tozeroy',
+            fillcolor='rgba(255, 165, 0, 0.12)',
+            hovertemplate='日期: %{x}<br>熱量: %{y:.0f} kcal<extra></extra>'
+        ))
+        
+        fig_cal.update_layout(
+            paper_bgcolor='#1e1e38',
+            plot_bgcolor='#1e1e38',
+            margin=dict(l=35, r=20, t=95, b=25),
+            height=260,
+            annotations=[
+                dict(
+                    x=0.01, y=1.38, xref="paper", yref="paper",
+                    text=f"<b style='font-size:32px; color:#ffffff;'>{avg_cal:.0f}</b> <span style='font-size:14px; color:#a0a0a0;'>kcal</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.01, y=1.12, xref="paper", yref="paper",
+                    text="<span style='font-size:12px; color:#a0a0a0;'>平均每日熱量</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.98, y=1.35, xref="paper", yref="paper",
+                    text="<span style='font-size:28px;'>🔥</span>",
+                    showarrow=False, align="right"
+                )
+            ],
+            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=11), linecolor='#2a2a4a', ticks=""),
+            yaxis=dict(showgrid=True, gridcolor='#2a2a4a', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks=""),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_cal, use_container_width=True, config={'displayModeBar': False})
 
 
-        # ----- 3. 蛋白質趨勢圖 (Plotly 版) -----
-        st.markdown(f"""<div class="chart-card" style="margin-top: 15px; margin-bottom: -10px;"><div class="chart-header"><div><div class="chart-value">{avg_pro:.0f} <span class="chart-unit">g</span></div><div style="color:#a0a0a0;font-size:12px;font-family:sans-serif;">平均每日蛋白質</div></div></div></div>""", unsafe_allow_html=True)
-
+        # ==========================================
+        # 🍗 2. 一體化蛋白質趨勢圖
+        # ==========================================
         fig_pro = go.Figure()
-        fig_pro.add_trace(go.Scatter(x=xs, y=pros, mode="lines+markers", line=dict(color="#38b6ff", width=3, shape="spline"), marker=dict(size=8, color="#38b6ff"), fill="tozeroy", fillcolor="rgba(56, 182, 255, 0.15)", hovertemplate="日期: %{x}<br>蛋白質: %{y:.0f} g<extra></extra>"))
-        fig_pro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=5, r=5, t=5, b=5), height=180, xaxis=dict(showgrid=False, tickfont=dict(color="#888888"), linecolor="#2a2a4a"), yaxis=dict(showgrid=True, gridcolor="#2a2a4a", tickfont=dict(color="#888888"), zeroline=False), showlegend=False)
-        st.plotly_chart(fig_pro, use_container_width=True, config={"displayModeBar": False})
+        
+        fig_pro.add_trace(go.Scatter(
+            x=xs,
+            y=pros,
+            mode='lines+markers',
+            line=dict(color='#38b6ff', width=3, shape='spline'),
+            marker=dict(size=6, color='#ffffff', line=dict(color='#38b6ff', width=2)),
+            fill='tozeroy',
+            fillcolor='rgba(56, 182, 255, 0.12)',
+            hovertemplate='日期: %{x}<br>蛋白質: %{y:.0f} g<extra></extra>'
+        ))
+        
+        fig_pro.update_layout(
+            paper_bgcolor='#1e1e38',
+            plot_bgcolor='#1e1e38',
+            margin=dict(l=35, r=20, t=95, b=25),
+            height=260,
+            annotations=[
+                dict(
+                    x=0.01, y=1.38, xref="paper", yref="paper",
+                    text=f"<b style='font-size:32px; color:#ffffff;'>{avg_pro:.0f}</b> <span style='font-size:14px; color:#a0a0a0;'>g</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.01, y=1.12, xref="paper", yref="paper",
+                    text="<span style='font-size:12px; color:#a0a0a0;'>平均每日蛋白質</span>",
+                    showarrow=False, align="left"
+                ),
+                dict(
+                    x=0.98, y=1.35, xref="paper", yref="paper",
+                    text="<span style='font-size:28px;'>🍗</span>",
+                    showarrow=False, align="right"
+                )
+            ],
+            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=11), linecolor='#2a2a4a', ticks=""),
+            yaxis=dict(showgrid=True, gridcolor='#2a2a4a', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks=""),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_pro, use_container_width=True, config={'displayModeBar': False})
 
         # ----- 4. 水量趨勢圖 -----
         st.subheader("💧 水量趨勢")
