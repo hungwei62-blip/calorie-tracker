@@ -260,13 +260,19 @@ def apply_global_styles() -> None:
             }
 
 
-            /* ===== 學員每日進度卡：桌面三欄、手機雙欄 ===== */
+            /* ===== 學員每日進度卡：所有尺寸固定雙欄 ===== */
             .st-key-daily_progress_cards [data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                gap: 10px !important;
                 align-items: stretch !important;
             }
 
             .st-key-daily_progress_cards [data-testid="stColumn"] {
+                flex: 0 0 calc(50% - 5px) !important;
+                width: calc(50% - 5px) !important;
                 min-width: 0 !important;
+                max-width: calc(50% - 5px) !important;
             }
 
             .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
@@ -277,20 +283,158 @@ def apply_global_styles() -> None:
             }
 
             @media (max-width: 768px) {
-                .st-key-daily_progress_cards [data-testid="stHorizontalBlock"] {
-                    flex-wrap: wrap !important;
-                    gap: 10px !important;
-                }
-
-                .st-key-daily_progress_cards [data-testid="stColumn"] {
-                    flex: 0 0 calc(50% - 5px) !important;
-                    width: calc(50% - 5px) !important;
-                    min-width: 0 !important;
-                    max-width: calc(50% - 5px) !important;
-                }
-
                 .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
                     border-radius: 18px !important;
+                }
+            }
+
+            /* ===== 學員今日概況：體重與 Calories 固定雙欄 ===== */
+            .st-key-daily_summary_cards [data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                gap: 10px !important;
+                align-items: stretch !important;
+            }
+
+            .st-key-daily_summary_cards [data-testid="stColumn"] {
+                flex: 0 0 calc(50% - 5px) !important;
+                width: calc(50% - 5px) !important;
+                min-width: 0 !important;
+                max-width: calc(50% - 5px) !important;
+            }
+
+            .st-key-daily_summary_cards [data-testid="stColumn"]:first-child {
+                position: relative !important;
+            }
+
+            .st-key-daily_summary_cards div[data-testid="stPlotlyChart"] {
+                height: 180px !important;
+                margin: 0 !important;
+                overflow: hidden !important;
+                border-radius: 24px !important;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
+            }
+
+            .st-key-daily_summary_cards .weight-card {
+                width: 100% !important;
+                height: 180px !important;
+                min-height: 180px !important;
+                padding: 24px !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                background-color: #f8f8f8 !important;
+                border-radius: 24px !important;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
+            }
+
+            .st-key-daily_summary_cards .weight-title {
+                margin-bottom: 12px !important;
+                color: #1a1a1a !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+                font-size: 16px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-daily_summary_cards .weight-value {
+                color: #1a1a1a !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+                font-size: 36px !important;
+                font-weight: 700 !important;
+                line-height: 1 !important;
+            }
+
+            .st-key-daily_summary_cards .weight-unit {
+                margin-left: 6px !important;
+                color: #a0a0a0 !important;
+                font-size: 18px !important;
+                font-weight: 400 !important;
+            }
+
+            .st-key-daily_summary_cards .weight-trend {
+                display: flex !important;
+                align-items: center !important;
+                margin-top: 12px !important;
+                color: #1a1a1a !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-daily_summary_cards .st-key-weight_lightning_btn {
+                position: absolute !important;
+                top: 16px !important;
+                right: 16px !important;
+                width: 40px !important;
+                height: 40px !important;
+                z-index: 10 !important;
+            }
+
+            .st-key-daily_summary_cards .st-key-weight_lightning_btn button {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 40px !important;
+                min-width: 40px !important;
+                max-width: 40px !important;
+                height: 40px !important;
+                min-height: 40px !important;
+                padding: 0 !important;
+                color: #1a1a1a !important;
+                background-color: #ffffff !important;
+                border: none !important;
+                border-radius: 50% !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+                font-size: 18px !important;
+            }
+
+            .st-key-daily_summary_cards .st-key-weight_lightning_btn button:hover {
+                background-color: #f3f3f3 !important;
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.10) !important;
+                transform: scale(1.06) !important;
+            }
+
+            @media (max-width: 768px) {
+                .st-key-daily_summary_cards div[data-testid="stPlotlyChart"],
+                .st-key-daily_summary_cards .weight-card {
+                    border-radius: 18px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-card {
+                    padding: 18px 14px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-title {
+                    max-width: calc(100% - 38px) !important;
+                    font-size: 13px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-value {
+                    font-size: 28px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-unit {
+                    margin-left: 4px !important;
+                    font-size: 14px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-trend {
+                    font-size: 11px !important;
+                }
+
+                .st-key-daily_summary_cards .st-key-weight_lightning_btn {
+                    top: 12px !important;
+                    right: 12px !important;
+                    width: 34px !important;
+                    height: 34px !important;
+                }
+
+                .st-key-daily_summary_cards .st-key-weight_lightning_btn button {
+                    width: 34px !important;
+                    min-width: 34px !important;
+                    max-width: 34px !important;
+                    height: 34px !important;
+                    min-height: 34px !important;
+                    font-size: 15px !important;
                 }
             }
 

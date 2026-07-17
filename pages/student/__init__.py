@@ -119,6 +119,104 @@ def build_daily_progress_figure(
     return figure
 
 
+def build_calorie_figure(actual: object, goal: object) -> go.Figure:
+    """建立學員首頁使用的白色 Calories 圓環卡。"""
+    actual_value = max(_to_float(actual), 0.0)
+    percentage = _progress_percentage(actual_value, goal)
+
+    figure = go.Figure(
+        data=[
+            go.Pie(
+                values=[percentage, 100 - percentage],
+                hole=0.76,
+                domain={"x": [0, 1], "y": [0, 1]},
+                marker={"colors": ["#ffbfa3", "#f0f0f0"]},
+                sort=False,
+                direction="clockwise",
+                showlegend=False,
+                hoverinfo="none",
+                textinfo="none",
+            )
+        ]
+    )
+    figure.update_layout(
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin={"l": 10, "r": 10, "t": 50, "b": 10},
+        height=180,
+        font={
+            "family": (
+                "system-ui, -apple-system, BlinkMacSystemFont, "
+                "'Segoe UI', Roboto, sans-serif"
+            )
+        },
+        showlegend=False,
+        annotations=[
+            {
+                "x": 0.02,
+                "y": 1.22,
+                "xref": "paper",
+                "yref": "paper",
+                "text": (
+                    "<span style='font-size:15px; color:#1a1a1a; "
+                    "font-weight:600; font-family:sans-serif;'>Calories</span>"
+                ),
+                "showarrow": False,
+                "align": "left",
+            },
+            {
+                "x": 0.5,
+                "y": 0.5,
+                "xref": "paper",
+                "yref": "paper",
+                "text": f"<b style='font-size:28px; color:#1a1a1a;'>{actual_value:.0f}</b>",
+                "showarrow": False,
+                "align": "center",
+            },
+            {
+                "x": 0.5,
+                "y": 0.22,
+                "xref": "paper",
+                "yref": "paper",
+                "text": (
+                    "<span style='font-size:12px; color:#666666; "
+                    "font-weight:500;'>Kcal</span>"
+                ),
+                "showarrow": False,
+                "align": "center",
+            },
+        ],
+    )
+    return figure
+
+
+def _weight_summary(weight_records: list[dict[str, object]]) -> tuple[float | None, str]:
+    """從 Weight 紀錄取得最新體重與相較前一筆的趨勢文字。"""
+    weights = [
+        value
+        for record in weight_records
+        if (value := _to_float(record.get("weight_kg"))) > 0
+    ]
+    if not weights:
+        return None, ""
+
+    latest_weight = weights[-1]
+    if len(weights) < 2:
+        return latest_weight, ""
+
+    previous_weight = weights[-2]
+    difference = latest_weight - previous_weight
+    difference_percentage = difference / previous_weight * 100
+
+    if difference < 0:
+        trend = f"⇩ {abs(difference):.1f} Kg ({difference_percentage:.1f}%)"
+    elif difference > 0:
+        trend = f"⇧ {abs(difference):.1f} Kg (+{difference_percentage:.1f}%)"
+    else:
+        trend = "⬌ 體重維持持平"
+    return latest_weight, trend
+
+
 def open_daily_record_tab(tab: str) -> None:
     """將學員導向日常紀錄頁的指定分頁。"""
     if tab not in DAILY_RECORD_TABS:
@@ -429,158 +527,26 @@ def page_personal() -> None:
         st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
 
 
-    st.divider()
-
-    st.subheader("營養攝取")
-
     record_mode = sheets.get_user_record_mode(uid)
 
     if record_mode == "full":
+        st.divider()
+        st.subheader("營養攝取")
+        carb_column, fat_column = st.columns(2)
 
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            # CSS for calories chart
-            st.markdown("""
-<style>
-    .cal-chart-full div[data-testid="stPlotlyChart"] {
-        border-radius: 24px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
-        margin: 10px 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-            # Calculate calorie percentage
-            cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
-
-            FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
-            CAL_CARD_BG = "#ffffff"
-
-            fig_cal = go.Figure()
-            fig_cal.add_trace(go.Pie(
-                values=[cal_pct, 100 - cal_pct],
-                hole=0.76,
-                domain=dict(x=[0, 1], y=[0, 1]),
-                marker=dict(colors=['#ffbfa3', '#f0f0f0']),
-                sort=False,
-                direction='clockwise',
-                showlegend=False,
-                hoverinfo='none',
-                textinfo='none'
-            ))
-            fig_cal.update_layout(
-                paper_bgcolor=CAL_CARD_BG,
-                plot_bgcolor=CAL_CARD_BG,
-                margin=dict(l=10, r=10, t=50, b=10),
-                height=180,
-                font=FONT_SETTING,
-                annotations=[
-                    dict(
-                        x=0.02, y=1.22, xref="paper", yref="paper",
-                        text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
-                        showarrow=False, align="left"
-                    ),
-                    dict(
-                        x=0.5, y=0.5, xref="paper", yref="paper",
-                        text=f"<b style='font-size:28px; color:#1a1a1a;'>{totals.get('calories', 0):.0f}</b>",
-                        showarrow=False, align="center"
-                    ),
-                    dict(
-                        x=0.5, y=0.22, xref="paper", yref="paper",
-                        text="<span style='font-size:12px; color:#666666; font-weight:500;'>Kcal</span>",
-                        showarrow=False, align="center"
-                    )
-                ]
-            )
-            st.plotly_chart(fig_cal, width="stretch", config={'displayModeBar': False})
-
-        with col2:
-
+        with carb_column:
             carb = totals.get("carb", 0)
-
             st.metric("碳水", f"{carb:.0f}g", f"{goals.get('carb', 0) - carb:.0f}g")
 
-        with col3:
-
+        with fat_column:
             fat = totals.get("fat", 0)
-
             st.metric("脂肪", f"{fat:.0f}g", f"{goals.get('fat', 0) - fat:.0f}g")
-
-    else:
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            # CSS for calories chart
-            st.markdown("""
-<style>
-    .cal-chart-simple div[data-testid="stPlotlyChart"] {
-        border-radius: 24px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
-        margin: 10px 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-            # Calculate calorie percentage
-            cal_pct = min(totals.get("calories", 0) / calorie_goal * 100, 100) if calorie_goal > 0 else 0
-
-            FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
-            CAL_CARD_BG = "#ffffff"
-
-            fig_cal = go.Figure()
-            fig_cal.add_trace(go.Pie(
-                values=[cal_pct, 100 - cal_pct],
-                hole=0.76,
-                domain=dict(x=[0, 1], y=[0, 1]),
-                marker=dict(colors=['#ffbfa3', '#f0f0f0']),
-                sort=False,
-                direction='clockwise',
-                showlegend=False,
-                hoverinfo='none',
-                textinfo='none'
-            ))
-            fig_cal.update_layout(
-                paper_bgcolor=CAL_CARD_BG,
-                plot_bgcolor=CAL_CARD_BG,
-                margin=dict(l=10, r=10, t=50, b=10),
-                height=180,
-                font=FONT_SETTING,
-                annotations=[
-                    dict(
-                        x=0.02, y=1.22, xref="paper", yref="paper",
-                        text="<span style='font-size:15px; color:#1a1a1a; font-weight:600; font-family: sans-serif;'>Calories</span>",
-                        showarrow=False, align="left"
-                    ),
-                    dict(
-                        x=0.5, y=0.5, xref="paper", yref="paper",
-                        text=f"<b style='font-size:28px; color:#1a1a1a;'>{totals.get('calories', 0):.0f}</b>",
-                        showarrow=False, align="center"
-                    ),
-                    dict(
-                        x=0.5, y=0.22, xref="paper", yref="paper",
-                        text="<span style='font-size:12px; color:#666666; font-weight:500;'>Kcal</span>",
-                        showarrow=False, align="center"
-                    )
-                ]
-            )
-            st.plotly_chart(fig_cal, width="stretch", config={'displayModeBar': False})
 
     st.divider()
 
     st.subheader("今日目標進度")
 
     progress_cards = (
-        (
-            "calories",
-            "飲食進度",
-            totals.get("calories", 0),
-            goals.get("calorie", 0),
-            "kcal",
-        ),
         (
             "water",
             "水量進度",
@@ -597,7 +563,7 @@ def page_personal() -> None:
         ),
     )
     with st.container(key="daily_progress_cards"):
-        columns = st.columns(3, gap="small")
+        columns = st.columns(2, gap="small")
         for column, (key, label, actual, goal, unit) in zip(columns, progress_cards):
             with column:
                 st.plotly_chart(
@@ -609,128 +575,10 @@ def page_personal() -> None:
 
     st.divider()
 
-    # ============================================================
-    st.subheader("⚖️ 體重")
+    st.subheader("今日概況")
 
-    # 注入精確定位與排版的 CSS
-    st.markdown("""
-    <style>
-        .weight-card-container {
-            position: relative !important;
-            width: 100% !important;
-            margin-bottom: 20px !important;
-        }
-
-        .weight-card {
-            background-color: #f8f8f8 !important;
-            border-radius: 24px !important;
-            padding: 24px !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
-            box-sizing: border-box !important;
-        }
-
-        .weight-title {
-            font-size: 16px !important;
-            font-weight: 500 !important;
-            color: #1a1a1a !important;
-            margin-bottom: 12px !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
-        }
-
-        .weight-value {
-            font-size: 36px !important;
-            font-weight: 700 !important;
-            color: #1a1a1a !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
-            line-height: 1 !important;
-        }
-
-        .weight-unit {
-            font-size: 18px !important;
-            font-weight: normal !important;
-            color: #a0a0a0 !important;
-            margin-left: 6px !important;
-        }
-
-        .weight-trend {
-            font-size: 14px !important;
-            color: #1a1a1a !important;
-            font-weight: 500 !important;
-            margin-top: 12px !important;
-            display: flex !important;
-            align-items: center !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
-        }
-
-        .stApp div[data-testid="element-container"]:has(button[key="weight_lightning_btn"]) {
-            position: absolute !important;
-            top: 24px !important;
-            right: 24px !important;
-            width: 44px !important;
-            height: 44px !important;
-            z-index: 999 !important;
-        }
-
-        .stApp button[key="weight_lightning_btn"] {
-            width: 44px !important;
-            height: 44px !important;
-            min-width: 44px !important;
-            max-width: 44px !important;
-            border-radius: 50% !important;
-            background-color: #ffffff !important;
-            color: #1a1a1a !important;
-            border: none !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
-            font-size: 18px !important;
-            padding: 0 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-        }
-
-        .stApp button[key="weight_lightning_btn"]:hover {
-            transform: scale(1.08) !important;
-            background-color: #f3f3f3 !important;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    latest_weight = sheets.get_latest_weight(uid)
+    latest_weight, trend_content = _weight_summary(sheets.get_weight_records(uid))
     weight_display_str = f"{latest_weight:.1f}" if latest_weight else "--.-"
-
-    # 歷史紀錄與變動計算
-    weight_history = []
-    if "records" in dir() and records:
-        for r in records:
-            w = r.get("weight") if isinstance(r, dict) else getattr(r, "weight", None)
-            if w is not None:
-                try:
-                    w_val = float(w)
-                    if w_val > 0:
-                        weight_history.append(w_val)
-                except (ValueError, TypeError):
-                    continue
-
-    # 計算趨勢
-    trend_content = ""
-    if latest_weight and len(weight_history) >= 2:
-        prev_weight = weight_history[-2]
-        diff = latest_weight - prev_weight
-        diff_pct = (diff / prev_weight) * 100
-
-        if diff < 0:
-            trend_content = f"⇩ {abs(diff):.1f} Kg ({diff_pct:.1f}%)"
-        elif diff > 0:
-            trend_content = f"⇧ {abs(diff):.1f} Kg (+{diff_pct:.1f}%)"
-        else:
-            trend_content = "⬌ 體重維持持平"
-    else:
-        trend_content = ""
-
-    st.markdown('<div class="weight-card-container">', unsafe_allow_html=True)
 
     card_html = f"""
     <div class="weight-card">
@@ -748,20 +596,24 @@ def page_personal() -> None:
     card_html += """
     </div>"""
 
-    st.markdown(card_html, unsafe_allow_html=True)
+    with st.container(key="daily_summary_cards"):
+        weight_column, calorie_column = st.columns(2, gap="small")
 
-    if st.button("⚡", key="weight_lightning_btn"):
-        open_daily_record_tab("⚖️ 體重")
-        st.rerun()
+        with weight_column:
+            st.markdown(card_html, unsafe_allow_html=True)
+            if st.button("⚡", key="weight_lightning_btn", help="記錄體重"):
+                open_daily_record_tab("⚖️ 體重")
+                st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
+        with calorie_column:
+            st.plotly_chart(
+                build_calorie_figure(totals.get("calories", 0), calorie_goal),
+                key="daily_summary_calories",
+                width="stretch",
+                config={"displayModeBar": False, "responsive": True},
+            )
 
     st.write("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
 
 
 # =============================================================================
