@@ -13,13 +13,14 @@
 
 ## 3. 建立主教練
 
-在 `Users` 加入一個 `role` 為 `coach` 的帳號，將其 `user_id` 設為 `PRIMARY_COACH_ID`。所有新註冊及首次遷移的既有學員都會歸屬該教練。
+在 `Users` 保留 `user_id` 為 `u_20260629165506_4b525f9c`、`role` 為
+`coach` 的帳號。所有透過註冊頁建立的新學員都會固定歸屬該教練；註冊流程不讀取
+`PRIMARY_COACH_ID`。資料遷移工具仍可使用 `--primary-coach-id` 明確指定遷移目標。
 
 ## 4. Secrets 範例
 
 ```toml
 GEMINI_API_KEY = "<Gemini API key>"
-PRIMARY_COACH_ID = "<Users 中的教練 user_id>"
 SPREADSHEET_ID = "<Google Sheet ID>"
 
 [gcp]

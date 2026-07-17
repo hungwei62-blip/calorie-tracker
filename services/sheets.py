@@ -29,6 +29,7 @@ from google.oauth2.service_account import Credentials
 import streamlit as st
 
 CACHE_TTL = 60  # 快取 TTL（秒）
+FIXED_PRIMARY_COACH_ID = "u_20260629165506_4b525f9c"
 _VERIFIED_WORKSHEET_SCHEMAS: set[tuple[str, str]] = set()
 
 # ---------- Headers ----------
@@ -281,13 +282,22 @@ def get_user_role(user_id: str) -> str:
 
 
 def get_primary_coach_id() -> str:
-    """取得並驗證新學員預設歸屬的主教練。"""
-    coach_id = str(st.secrets.get("PRIMARY_COACH_ID", "")).strip()
-    if not coach_id:
-        raise EnvironmentError("缺少 PRIMARY_COACH_ID，請由管理員完成設定")
-    if get_user_role(coach_id) != "coach":
-        raise EnvironmentError("PRIMARY_COACH_ID 必須指向 role=coach 的帳號")
-    return coach_id
+    """取得並驗證新學員固定歸屬的主教練。"""
+    coach = next(
+        (
+            row
+            for row in get_users_rows()
+            if str(row.get("user_id", "")).strip() == FIXED_PRIMARY_COACH_ID
+        ),
+        None,
+    )
+    if coach is None:
+        raise EnvironmentError("固定主教練帳號不存在，請由管理員檢查 Users")
+
+    role = str(coach.get("role", "")).strip().lower()
+    if role != "coach":
+        raise EnvironmentError("固定主教練帳號必須設定為 role=coach")
+    return FIXED_PRIMARY_COACH_ID
 
 
 def set_user_role(user_id: str, role: str) -> None:

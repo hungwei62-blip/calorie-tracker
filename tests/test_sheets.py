@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
+import pages.student as student_pages
 from services import sheets
 
 
@@ -74,5 +77,68 @@ def test_append_user_persists_coach_id(monkeypatch):
     monkeypatch.setattr(sheets, "_get_sheet", lambda: object())
     monkeypatch.setattr(sheets, "_ensure_worksheet", lambda *_args: ws)
     monkeypatch.setattr(sheets, "clear_read_caches", lambda: None)
-    sheets.append_user("u1", "account", "name", "hash", "now", {}, "coach_1")
-    assert ws.appended_rows[0][sheets.USERS_HEADERS.index("coach_id")] == "coach_1"
+    sheets.append_user(
+        "u1",
+        "account",
+        "name",
+        "hash",
+        "now",
+        {},
+        sheets.FIXED_PRIMARY_COACH_ID,
+    )
+    assert (
+        ws.appended_rows[0][sheets.USERS_HEADERS.index("coach_id")]
+        == "u_20260629165506_4b525f9c"
+    )
+
+
+def test_primary_coach_is_fixed_and_ignores_streamlit_secrets(monkeypatch):
+    monkeypatch.setattr(
+        sheets.st,
+        "secrets",
+        {"PRIMARY_COACH_ID": "different_coach"},
+    )
+    monkeypatch.setattr(
+        sheets,
+        "get_users_rows",
+        lambda: [
+            {
+                "user_id": sheets.FIXED_PRIMARY_COACH_ID,
+                "role": "coach",
+            }
+        ],
+    )
+
+    assert sheets.get_primary_coach_id() == "u_20260629165506_4b525f9c"
+    assert "st.secrets" not in inspect.getsource(sheets.get_primary_coach_id)
+
+
+def test_primary_coach_must_exist(monkeypatch):
+    monkeypatch.setattr(sheets, "get_users_rows", lambda: [])
+
+    with pytest.raises(EnvironmentError, match="固定主教練帳號不存在"):
+        sheets.get_primary_coach_id()
+
+
+@pytest.mark.parametrize("role", ["", "student", "admin"])
+def test_primary_coach_must_keep_coach_role(monkeypatch, role):
+    monkeypatch.setattr(
+        sheets,
+        "get_users_rows",
+        lambda: [
+            {
+                "user_id": sheets.FIXED_PRIMARY_COACH_ID,
+                "role": role,
+            }
+        ],
+    )
+
+    with pytest.raises(EnvironmentError, match="role=coach"):
+        sheets.get_primary_coach_id()
+
+
+def test_registration_uses_validated_fixed_primary_coach():
+    source = inspect.getsource(student_pages.page_login)
+
+    assert "primary_coach_id = sheets.get_primary_coach_id()" in source
+    assert "coach_id=primary_coach_id" in source

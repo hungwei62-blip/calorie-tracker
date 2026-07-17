@@ -5,7 +5,7 @@
 - [ ] `GEMINI_API_KEY` 是有效的新金鑰
 - [ ] `[gcp]` Service Account 欄位完整，`private_key` 使用三引號
 - [ ] `SPREADSHEET_ID` 不包含 `/d/` 或 `/edit`
-- [ ] `PRIMARY_COACH_ID` 指向 `Users.role=coach` 的帳號
+- [ ] `Users` 中的 `u_20260629165506_4b525f9c` 存在且 `role=coach`
 - [ ] Google Sheet 已分享給 Service Account
 
 ## 部署前
@@ -13,7 +13,7 @@
 ```bash
 python -m py_compile app.py pages/common.py pages/coach/__init__.py pages/student/__init__.py
 python -m pytest -q
-python tools/audit_and_migrate.py
+python tools/audit_and_migrate.py --primary-coach-id u_20260629165506_4b525f9c
 ```
 
 - [ ] 檢查 `audit_report.json`，確認主教練及預計修復資料
