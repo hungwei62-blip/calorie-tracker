@@ -1529,6 +1529,14 @@ def page_login() -> None:
 
 def page_personal() -> None:
 
+    # greeting
+    user_name = st.session_state.get('username', '學員')
+    avatar_url = './static/avatar.jpg'
+    col1, col2 = st.columns([1, 10])
+    with col1:
+        st.image(avatar_url, width=56)
+    with col2:
+        st.markdown(f'**Hello, {user_name}!**')
     st.header("📊 今日摘要")
 
     uid = st.session_state.user_id
