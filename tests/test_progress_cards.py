@@ -127,14 +127,24 @@ def test_raw_html_progress_card_renderer_was_removed():
     assert not hasattr(student_pages, "render_daily_progress_cards")
 
 
-def test_personal_page_uses_two_progress_cards_and_one_summary_calorie_card():
+def test_personal_page_is_simplified_and_orders_summary_before_progress():
     source = inspect.getsource(student_pages.page_personal)
 
+    assert '"今日建議"' not in source
+    assert '"基礎代謝率 (BMR)"' not in source
+    assert '"建議熱量攝取"' not in source
+    assert '"營養攝取"' not in source
+    assert 'st.metric("碳水"' not in source
+    assert 'st.metric("脂肪"' not in source
+    assert "get_user_record_mode" not in source
     assert '"飲食進度"' not in source
     assert '"水量進度"' in source
     assert '"蛋白質進度"' in source
     assert 'key="daily_summary_calories"' in source
     assert source.count("build_calorie_figure(") == 1
+    assert source.index('st.subheader("今日概況")') < source.index(
+        'st.subheader("今日目標進度")'
+    )
 
 
 def test_progress_container_renders_two_plotly_components():

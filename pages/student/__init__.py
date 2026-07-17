@@ -514,67 +514,6 @@ def page_personal() -> None:
 
     totals = metrics.sum_totals(today_records).as_dict()
 
-    st.subheader("今日建議")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        st.metric("基礎代謝率 (BMR)", f"{bmr:.0f} 大卡")
-
-    with col2:
-
-        st.metric("建議熱量攝取", f"{calorie_goal:.0f} 大卡")
-
-
-    record_mode = sheets.get_user_record_mode(uid)
-
-    if record_mode == "full":
-        st.divider()
-        st.subheader("營養攝取")
-        carb_column, fat_column = st.columns(2)
-
-        with carb_column:
-            carb = totals.get("carb", 0)
-            st.metric("碳水", f"{carb:.0f}g", f"{goals.get('carb', 0) - carb:.0f}g")
-
-        with fat_column:
-            fat = totals.get("fat", 0)
-            st.metric("脂肪", f"{fat:.0f}g", f"{goals.get('fat', 0) - fat:.0f}g")
-
-    st.divider()
-
-    st.subheader("今日目標進度")
-
-    progress_cards = (
-        (
-            "water",
-            "水量進度",
-            totals.get("water", 0),
-            goals.get("water", 0),
-            "ml",
-        ),
-        (
-            "protein",
-            "蛋白質進度",
-            totals.get("protein", 0),
-            goals.get("protein", 0),
-            "g",
-        ),
-    )
-    with st.container(key="daily_progress_cards"):
-        columns = st.columns(2, gap="small")
-        for column, (key, label, actual, goal, unit) in zip(columns, progress_cards):
-            with column:
-                st.plotly_chart(
-                    build_daily_progress_figure(label, actual, goal, unit),
-                    key=f"daily_progress_{key}",
-                    width="stretch",
-                    config={"displayModeBar": False, "responsive": True},
-                )
-
-    st.divider()
-
     st.subheader("今日概況")
 
     latest_weight, trend_content = _weight_summary(sheets.get_weight_records(uid))
@@ -612,6 +551,37 @@ def page_personal() -> None:
                 width="stretch",
                 config={"displayModeBar": False, "responsive": True},
             )
+
+    st.divider()
+
+    st.subheader("今日目標進度")
+
+    progress_cards = (
+        (
+            "water",
+            "水量進度",
+            totals.get("water", 0),
+            goals.get("water", 0),
+            "ml",
+        ),
+        (
+            "protein",
+            "蛋白質進度",
+            totals.get("protein", 0),
+            goals.get("protein", 0),
+            "g",
+        ),
+    )
+    with st.container(key="daily_progress_cards"):
+        columns = st.columns(2, gap="small")
+        for column, (key, label, actual, goal, unit) in zip(columns, progress_cards):
+            with column:
+                st.plotly_chart(
+                    build_daily_progress_figure(label, actual, goal, unit),
+                    key=f"daily_progress_{key}",
+                    width="stretch",
+                    config={"displayModeBar": False, "responsive": True},
+                )
 
     st.write("<div style='height: 40px;'></div>", unsafe_allow_html=True)
 
