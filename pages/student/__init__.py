@@ -341,8 +341,8 @@ def build_daily_completion_html(completion: DailyCompletion) -> str:
         )
     bonus_class = " has-bonus" if completion.bonus else ""
     return (
-        f'<section class="daily-completion-card{bonus_class}" aria-label="今日完成度">'
-        '<div class="daily-completion-heading"><span>今日完成度</span>'
+        f'<section class="daily-completion-card{bonus_class}" aria-label="今日記錄完成度">'
+        '<div class="daily-completion-heading"><span>今日記錄完成度</span>'
         f'<strong>{completion.percentage}%</strong></div>'
         '<div class="daily-completion-track" role="progressbar" aria-valuemin="0" '
         f'aria-valuemax="100" aria-valuenow="{completion.percentage}">'

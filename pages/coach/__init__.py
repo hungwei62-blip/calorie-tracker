@@ -2,7 +2,9 @@
 from __future__ import annotations
 from datetime import date, datetime, timedelta
 from io import BytesIO
+import html
 import io as _io
+import math
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as _plt
@@ -14,6 +16,108 @@ from services import metrics, sheets
 from domain.history import aggregate_daily as _history_aggregate_daily
 from domain.history import parse_record_date as _parse_record_date
 from pages.common import _clear_analysis_cache
+
+
+COACH_NUTRIENT_SPECS = (
+    ("卡路里", "calories", "calorie", "kcal", "#ff6068"),
+    ("水", "water", "water", "ml", "#90cbfb"),
+    ("蛋白質", "protein", "protein", "g", "#bbf250"),
+)
+
+
+def _non_negative_number(value: object) -> float:
+    """Return a finite non-negative number for progress rendering."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return number if math.isfinite(number) and number > 0 else 0.0
+
+
+def calculate_coach_nutrient_progress(
+    actual: object, goal: object
+) -> tuple[float, float, float]:
+    """Normalize a nutrient pair and clamp its visual progress to 0-100%."""
+    actual_value = _non_negative_number(actual)
+    goal_value = _non_negative_number(goal)
+    percentage = min(actual_value / goal_value * 100, 100) if goal_value else 0.0
+    return actual_value, goal_value, percentage
+
+
+def _format_nutrient_value(value: float) -> str:
+    return str(int(round(value)))
+
+
+def build_coach_nutrient_progress_html(
+    label: str,
+    actual: object,
+    goal: object,
+    unit: str,
+    color: str,
+) -> str:
+    """Build one compact, accessible horizontal nutrient progress indicator."""
+    actual_value, goal_value, percentage = calculate_coach_nutrient_progress(
+        actual, goal
+    )
+    actual_text = _format_nutrient_value(actual_value)
+    goal_text = _format_nutrient_value(goal_value) if goal_value else "—"
+    safe_label = html.escape(label)
+    safe_unit = html.escape(unit)
+    safe_color = html.escape(color, quote=True)
+    value_text = f"{actual_text} / {goal_text} {safe_unit}"
+
+    return (
+        '<div class="coach-nutrient">'
+        f'<span class="coach-nutrient-label">{safe_label}</span>'
+        '<div class="coach-nutrient-track" role="progressbar" '
+        f'aria-label="{safe_label}" aria-valuemin="0" aria-valuemax="100" '
+        f'aria-valuenow="{percentage:.0f}">'
+        f'<span style="width:{percentage:.2f}%;background:{safe_color}"></span>'
+        "</div>"
+        f'<span class="coach-nutrient-value">{value_text}</span>'
+        "</div>"
+    )
+
+
+def build_coach_student_card_html(
+    name: object,
+    has_training: bool,
+    totals: dict[str, object],
+    goals: dict[str, object],
+) -> str:
+    """Build a student status card with three single-row nutrient indicators."""
+    display_name = str(name or "Unknown")
+    safe_name = html.escape(display_name)
+    safe_initial = html.escape(display_name[0] if display_name else "?")
+    training_class = "" if has_training else " not-done"
+    training_html = (
+        '<i class="fas fa-check"></i> Trained'
+        if has_training
+        else '<i class="fas fa-times"></i> Not trained'
+    )
+    nutrients_html = "".join(
+        build_coach_nutrient_progress_html(
+            label,
+            totals.get(actual_key, 0),
+            goals.get(goal_key, 0),
+            unit,
+            color,
+        )
+        for label, actual_key, goal_key, unit, color in COACH_NUTRIENT_SPECS
+    )
+
+    return (
+        '<div class="member-card">'
+        '<div class="member-top-row">'
+        f'<div class="member-avatar">{safe_initial}</div>'
+        f'<div class="member-name">{safe_name}</div>'
+        f'<div class="training-badge{training_class}">{training_html}</div>'
+        "</div>"
+        f'<div class="coach-nutrient-grid">{nutrients_html}</div>'
+        "</div>"
+    )
+
+
 def page_coach_overview() -> None:
     st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -28,17 +132,23 @@ def page_coach_overview() -> None:
             .member-name { font-size: 18px; font-weight: 400; color: #1F2937; }
     .training-badge { background: #DCFCE7; color: #16A34A; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
     .training-badge.not-done { background: #F3F4F6; color: #9CA3AF; }
-    .capsule-container { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 80px; }
-    .capsule-track { position: relative; overflow: hidden; width: 64px; height: 200px; border-radius: 50px; background-color: #f0f4f1; }
-    .capsule-fill { position: absolute; bottom: 0; left: 0; width: 100%; }
-    .capsule-fill.cal { background: linear-gradient(180deg, #d4f0f5 0%, #bbe8ee 100%); }
-    .capsule-fill.pro { background: linear-gradient(180deg, #e2f5dd 0%, #d1ebbe 100%); }
-    .capsule-fill.water { background: linear-gradient(180deg, #ffe0a3 0%, #ffc766 100%); }
-    .capsule-badge { position: absolute; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; background-color: #ffffff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 400; color: #3c3c3c; z-index: 10; }
-    .capsule-label { font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; }
-    .capsule-value { font-size: 10px; color: #9CA3AF; }
-    .capsule-row { display: flex; gap: 24px; justify-content: center; padding: 16px 0; }
+    .coach-nutrient-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; width: 100%; padding: 4px 0 2px; }
+    .coach-nutrient { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+    .coach-nutrient-label { overflow: hidden; color: #4B5563; font-size: 12px; font-weight: 500; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+    .coach-nutrient-track { width: 100%; height: 5px; overflow: hidden; border-radius: 999px; background: #E9ECEF; }
+    .coach-nutrient-track > span { display: block; height: 100%; border-radius: inherit; }
+    .coach-nutrient-value { overflow: hidden; color: #9CA3AF; font-size: 11px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
     .section-title { font-size: 18px; font-weight: 600; color: #1F2937; margin-bottom: 12px; }
+    @media (max-width: 480px) {
+        .member-card { gap: 12px; padding: 14px 12px; }
+        .member-avatar { width: 48px; height: 48px; margin-right: 8px; font-size: 19px; }
+        .member-name { min-width: 0; overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+        .training-badge { margin-left: auto; padding: 4px 7px; font-size: 10px; white-space: nowrap; }
+        .coach-nutrient-grid { gap: 10px; }
+        .coach-nutrient { gap: 6px; }
+        .coach-nutrient-label { font-size: 11px; }
+        .coach-nutrient-value { font-size: 9px; }
+    }
     </style>""", unsafe_allow_html=True)
 
     coach_name = str(st.session_state.username or "Coach")
@@ -70,38 +180,16 @@ def page_coach_overview() -> None:
 
     for student in students:
         uid = student.get("user_id", "")
-        name = student.get("name", student.get("username", "Unknown"))
+        name = student.get("name") or student.get("username") or "Unknown"
         goals = sheets.get_user_goals(uid)
         today_records = records_by_student.get(uid, [])
         totals = metrics.sum_totals(today_records).as_dict()
         training_today = training_by_student.get(uid)
         has_training = bool(training_today) and bool(training_today.get("training_types"))
 
-        calorie_goal = goals.get("calorie", 0)
-        protein_goal = goals.get("protein", 0)
-        water_goal = goals.get("water", 0)
-        calorie_actual = int(totals.get("calories", 0))
-        protein_actual = int(totals.get("protein", 0))
-        water_actual = int(totals.get("water", 0))
-
-        cal_pct = min((calorie_actual / calorie_goal) * 100, 100) if calorie_goal > 0 else 0
-        pro_pct = min((protein_actual / protein_goal) * 100, 100) if protein_goal > 0 else 0
-        water_pct = min((water_actual / water_goal) * 100, 100) if water_goal > 0 else 0
-
-        cal_top = 100 - cal_pct
-        pro_top = 100 - pro_pct
-        water_top = 100 - water_pct
-
-        if has_training:
-            training_html = "<i class=\"fas fa-check\"></i> Trained"
-            training_class = ""
-        else:
-            training_html = "<i class=\"fas fa-times\"></i> Not trained"
-            training_class = "not-done"
-
-        surname = name[0] if name else "?"
-
-        card_html = "<div class=\"member-card\"><div class=\"member-top-row\"><div class=\"member-avatar\">" + surname + "</div><div class=\"member-name\">" + name + "</div><div class=\"training-badge " + training_class + "\">" + training_html + "</div></div><div class=\"capsule-row\"><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill cal\" style=\"height: " + str(cal_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(cal_top) + "%\">" + str(calorie_actual) + "</div></div><div class=\"capsule-label\">CAL</div><div class=\"capsule-value\">" + str(calorie_actual) + "/" + str(int(calorie_goal)) + "</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill pro\" style=\"height: " + str(pro_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(pro_top) + "%\">" + str(protein_actual) + "</div></div><div class=\"capsule-label\">PROT</div><div class=\"capsule-value\">" + str(protein_actual) + "/" + str(int(protein_goal)) + "g</div></div><div class=\"capsule-container\"><div class=\"capsule-track\"><div class=\"capsule-fill water\" style=\"height: " + str(water_pct) + "%\"></div><div class=\"capsule-badge\" style=\"top: " + str(water_top) + "%\">" + str(water_actual) + "</div></div><div class=\"capsule-label\">WATER</div><div class=\"capsule-value\">" + str(water_actual) + "/" + str(int(water_goal)) + "</div></div></div></div>"
+        card_html = build_coach_student_card_html(
+            name, has_training, totals, goals
+        )
         st.markdown(card_html, unsafe_allow_html=True)
 def page_coach_student_detail() -> None:
 

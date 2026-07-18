@@ -72,7 +72,9 @@ def test_completion_html_has_four_unlabelled_icons_and_accessible_statuses():
     )
     markup = build_daily_completion_html(completion)
 
-    assert "今日完成度" in markup
+    assert "今日記錄完成度" in markup
+    assert 'aria-label="今日記錄完成度"' in markup
+    assert "今日完成度" not in markup
     assert "飲食完成 2 / 3 項" in markup
     assert 'aria-valuenow="67"' in markup
     assert markup.count('role="listitem"') == 4
