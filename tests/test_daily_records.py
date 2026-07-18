@@ -162,6 +162,12 @@ def test_daily_record_page_uses_plain_labels_and_scoped_card_styles():
         if isinstance(value, str) and ".st-key-daily_record_page" in value
     )
     assert '.st-key-daily_record_page [data-baseweb="tab-list"]' in stylesheet
+    assert '.block-container:has(.st-key-daily_record_page)' in stylesheet
+    assert '[data-testid="stMainBlockContainer"]:has(.st-key-daily_record_page)' in stylesheet
+    assert stylesheet.count(
+        '.main .block-container:has(.st-key-daily_record_page),'
+    ) == 2
+    assert 'padding-bottom: 48px !important;' not in stylesheet
     assert 'background: #f7f7f7 !important;' in stylesheet
     assert 'border-radius: 999px !important;' in stylesheet
     assert '.st-key-daily_record_page [data-testid="stForm"]' in stylesheet

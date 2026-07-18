@@ -278,9 +278,20 @@ def apply_global_styles() -> None:
             }
 
             /* ===== 學員日常紀錄：首頁一致的無圖示卡片風格 ===== */
+            .main .block-container:has(.st-key-daily_record_page),
+            [data-testid="stMainBlockContainer"]:has(.st-key-daily_record_page) {
+                padding-top: 32px !important;
+            }
+
             .st-key-daily_record_page {
-                padding-bottom: 48px !important;
                 font-family: system-ui, -apple-system, sans-serif !important;
+            }
+
+            @media (max-width: 768px) {
+                .main .block-container:has(.st-key-daily_record_page),
+                [data-testid="stMainBlockContainer"]:has(.st-key-daily_record_page) {
+                    padding-top: 32px !important;
+                }
             }
 
             .st-key-daily_record_page [data-baseweb="tab-list"] {
@@ -484,7 +495,7 @@ def apply_global_styles() -> None:
                 padding: 24px !important;
                 box-sizing: border-box !important;
                 overflow: hidden !important;
-                background-color: #f8f8f8 !important;
+                background-color: #e8e5f4 !important;
                 border-radius: 24px !important;
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
             }

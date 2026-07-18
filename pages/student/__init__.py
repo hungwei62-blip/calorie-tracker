@@ -67,6 +67,10 @@ def build_daily_progress_figure(
     actual_value = max(_to_float(actual), 0.0)
     percentage = _progress_percentage(actual_value, goal)
     date_label = (display_date or date.today()).strftime("%d %B")
+    card_background = {
+        "水量": "#e0edf6",
+        "蛋白質": "#f8ebe7",
+    }.get(label, "#c7edf6")
 
     figure = go.Figure(
         data=[
@@ -160,8 +164,8 @@ def build_daily_progress_figure(
         )
 
     figure.update_layout(
-        paper_bgcolor="#c7edf6",
-        plot_bgcolor="#c7edf6",
+        paper_bgcolor=card_background,
+        plot_bgcolor=card_background,
         height=180,
         margin={"l": 8, "r": 8, "t": 8, "b": 8},
         showlegend=False,

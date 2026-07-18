@@ -45,6 +45,8 @@ def test_progress_figure_contains_expected_values_labels_and_units():
     assert list(figure.data[0].values) == [63, 37]
     assert figure.data[0].hole == 0.68
     assert figure.layout.height == 180
+    assert figure.layout.paper_bgcolor == "#e0edf6"
+    assert figure.layout.plot_bgcolor == "#e0edf6"
     annotation_text = [annotation.text for annotation in figure.layout.annotations]
     assert annotation_text == [
         "水量",
@@ -74,6 +76,8 @@ def test_progress_figure_clamps_over_goal_and_handles_zero_goal():
 
     assert list(over_goal.data[0].values) == [100, 0]
     assert list(zero_goal.data[0].values) == [0, 100]
+    assert zero_goal.layout.paper_bgcolor == "#f8ebe7"
+    assert zero_goal.layout.plot_bgcolor == "#f8ebe7"
     assert over_goal.layout.annotations[-1].text == "<b>達成</b>"
     assert len(zero_goal.layout.annotations) == 5
     protein_title = zero_goal.layout.annotations[0]
@@ -164,6 +168,7 @@ def test_daily_summary_cards_have_scoped_equal_height_two_column_styles():
     assert '.st-key-daily_summary_cards [data-testid="stColumn"]' in stylesheet
     assert 'flex: 0 0 calc(50% - 5px) !important;' in stylesheet
     assert '.st-key-daily_summary_cards .weight-card' in stylesheet
+    assert 'background-color: #e8e5f4 !important;' in stylesheet
     assert 'height: 180px !important;' in stylesheet
     assert '.st-key-daily_summary_cards .st-key-weight_add_btn button' in stylesheet
     assert '.st-key-daily_summary_cards .weight-title' in stylesheet
@@ -186,7 +191,9 @@ def test_student_home_has_scoped_desktop_and_mobile_top_spacing():
 
     assert '.block-container:has(.st-key-student_home_header)' in stylesheet
     assert '[data-testid="stMainBlockContainer"]:has(.st-key-student_home_header)' in stylesheet
-    assert stylesheet.count('padding-top: 32px !important;') == 2
+    assert stylesheet.count(
+        '.main .block-container:has(.st-key-student_home_header),'
+    ) == 2
     assert 'padding-top: 16px !important;' not in stylesheet
     assert '.st-key-student_home_header .student-home-welcome' in stylesheet
 
