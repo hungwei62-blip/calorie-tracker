@@ -2,6 +2,7 @@
 from __future__ import annotations
 import streamlit as st
 from services import sheets
+from services.security import clear_auth_session, resolve_auth_context, safe_failure_message
 from pages.common import init_session
 from ui.navigation import render_bottom_navigation
 from ui.styles import apply_global_styles
@@ -47,7 +48,21 @@ def main() -> None:
 
         return
 
-    role = st.session_state.get("role", "student")
+    try:
+        auth_context = resolve_auth_context(
+            str(st.session_state.user_id or ""), sheets.get_users_rows()
+        )
+    except Exception as exc:
+        st.error(safe_failure_message("auth.refresh", exc))
+        return
+    if auth_context is None:
+        clear_auth_session(st.session_state)
+        st.warning("登入狀態已失效，請重新登入")
+        st.rerun()
+        return
+
+    st.session_state.role = auth_context.role
+    role = auth_context.role
 
     is_coach = role in ("coach", "admin")
 

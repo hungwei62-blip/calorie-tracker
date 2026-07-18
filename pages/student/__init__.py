@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
 from services import auth, gemini, metrics, sheets
+from services.security import LOGIN_RATE_LIMITER, log_event, safe_failure_message
 from domain.daily_completion import DailyCompletion, calculate_daily_completion
 from domain.history import (
     NutritionHistoryPoint,
@@ -519,18 +520,27 @@ def page_login() -> None:
                 submit = st.form_submit_button("登入", width="stretch")
 
         if submit:
+            if LOGIN_RATE_LIMITER.is_blocked(username):
+                st.error("登入嘗試過於頻繁，請稍後再試")
+                return
             try:
                 rows = sheets.get_users_rows()
             except Exception as exc:
-                st.error("取得使用者失敗: " + str(exc))
+                st.error(safe_failure_message("login.read_users", exc))
                 return
             user = auth.find_user(rows, username)
-            if not user:
-                st.error("找不到此帳號")
+            if not user or not auth.verify_password(password, user.get("password_hash", "")):
+                blocked = LOGIN_RATE_LIMITER.register_failure(username)
+                log_event("login.failure", result="blocked" if blocked else "denied")
+                st.error(
+                    "登入嘗試過於頻繁，請稍後再試"
+                    if blocked
+                    else "帳號或密碼錯誤"
+                )
                 return
-            if not auth.verify_password(password, user.get("password_hash", "")):
-                st.error("密碼錯誤")
-                return
+
+            LOGIN_RATE_LIMITER.register_success(username)
+            log_event("login.success", result="success", actor_id=str(user.get("user_id") or ""))
 
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
@@ -636,7 +646,7 @@ def page_login() -> None:
                 st.rerun()
 
             except Exception as exc:
-                st.error("註冊失敗: " + str(exc))
+                st.error(safe_failure_message("registration.create", exc))
 
         # 切換回登入
         if st.button("已經有帳號了？立即登入", key="nav_to_login"):

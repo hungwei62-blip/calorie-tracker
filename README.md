@@ -174,7 +174,7 @@ Copy-Item config\secrets.example.toml .streamlit\secrets.toml
 
 - 頂層 `SPREADSHEET_ID`。
 - `[gcp]` 內完整的 Google Service Account JSON 欄位。
-- Gemini：目前程式讀取 Streamlit secret `gemini_api_key`（小寫），或環境變數 `GEMINI_API_KEY`。
+- Gemini：Streamlit secret 與環境變數皆使用 `GEMINI_API_KEY`。
 
 請將 Google Sheet 分享給 Service Account 的 `client_email` 並授予 Editor。完整步驟見 [docs/SETUP_GCP.md](docs/SETUP_GCP.md)。
 
@@ -267,7 +267,7 @@ git push origin main
 
 ### Gemini 找不到 API key
 
-目前 Streamlit secret 名稱為小寫 `gemini_api_key`；環境變數則為大寫 `GEMINI_API_KEY`。`config/secrets.example.toml` 與部分舊文件仍使用大寫，接手者應統一這項設定，避免部署環境差異。
+確認 Streamlit secret 或環境變數使用大寫 `GEMINI_API_KEY`，並重新啟動應用程式。
 
 ### 手機樣式沒有更新
 
@@ -281,10 +281,9 @@ git push origin main
 
 1. `pages/student/__init__.py` 與 `pages/coach/__init__.py` 仍偏大，後續可按頁面或元件繼續拆分。
 2. 主教練 ID 目前硬編碼；若需要可營運切換，應改成受驗證的部署設定或管理員介面。
-3. Gemini secret 的大小寫在程式、範例與舊文件間尚未完全一致，建議優先統一。
-4. Google Sheets 適合目前規模，但不具交易、關聯約束與高併發能力；學員量或寫入頻率明顯成長時應評估 SQL。
-5. 部署網址未寫入版本庫；交接時需由部署平台管理者補充正式 URL、擁有者與回滾方式。
-6. 線上資料不隨 Git 版本回滾。程式回退前必須確認 schema 與線上資料仍相容。
+3. Google Sheets 適合目前規模，但不具交易、關聯約束與高併發能力；學員量或寫入頻率明顯成長時應評估 SQL。
+4. 部署網址未寫入版本庫；交接時需由部署平台管理者補充正式 URL、擁有者與回滾方式。
+5. 線上資料不隨 Git 版本回滾。程式回退前必須確認 schema 與線上資料仍相容。
 
 ## Handoff 檢查清單
 

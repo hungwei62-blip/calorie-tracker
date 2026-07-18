@@ -151,6 +151,11 @@ def test_main_routes_legacy_record_page_to_integrated_page(monkeypatch, legacy_p
     monkeypatch.setattr(app, "st", fake_st)
     monkeypatch.setattr(app, "apply_global_styles", lambda: None)
     monkeypatch.setattr(app, "init_session", lambda: None)
+    monkeypatch.setattr(
+        app.sheets,
+        "get_users_rows",
+        lambda: [{"user_id": "student_1", "role": "student"}],
+    )
     monkeypatch.setattr(app.sheets, "get_user_goals", lambda _user_id: {"bmr": 1500, "calorie": 2000})
     monkeypatch.setattr(
         app,
@@ -202,6 +207,11 @@ def test_navigation_renders_when_tdee_goals_are_missing(monkeypatch):
     monkeypatch.setattr(app, "st", fake_st)
     monkeypatch.setattr(app, "apply_global_styles", lambda: None)
     monkeypatch.setattr(app, "init_session", lambda: None)
+    monkeypatch.setattr(
+        app.sheets,
+        "get_users_rows",
+        lambda: [{"user_id": "student_1", "role": "student"}],
+    )
     monkeypatch.setattr(
         app,
         "render_bottom_navigation",

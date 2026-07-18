@@ -13,6 +13,7 @@ from datetime import date
 from pathlib import Path
 import streamlit as st
 from services import metrics, sheets
+from services.security import clear_auth_session
 
 # ---------- 常數 ----------
 
@@ -128,9 +129,5 @@ def _week_range() -> tuple:
 
 def do_logout() -> None:
     """清除 session 並重新整理頁面（用於登出按鈕）"""
-    for k in list(st.session_state.keys()):
-        if k != "page":
-            del st.session_state[k]
-    st.session_state.user_id = None
-    st.session_state.username = None
+    clear_auth_session(st.session_state)
     st.rerun()

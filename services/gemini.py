@@ -12,7 +12,7 @@ from PIL import Image
 
 
 MODEL_NAME = "gemini-2.5-flash"
-ENV_VAR = "gemini_api_key"
+SECRET_NAME = "GEMINI_API_KEY"
 
 SYSTEM_PROMPT = """你是專業的營養分析助手，只分析使用者提供的食物照片。
 請辨識照片中所有可食用內容，估計整張照片所呈現餐點的總熱量與總蛋白質；不要重複計算同一食物，無法判斷份量時採保守估計。
@@ -42,14 +42,14 @@ def _get_api_key() -> str:
     try:
         import streamlit as st
 
-        if hasattr(st, "secrets") and ENV_VAR in st.secrets:
-            return str(st.secrets[ENV_VAR])
+        if hasattr(st, "secrets") and SECRET_NAME in st.secrets:
+            return str(st.secrets[SECRET_NAME])
     except Exception:
         pass
 
     import os
 
-    value = os.environ.get("GEMINI_API_KEY")
+    value = os.environ.get(SECRET_NAME)
     if value:
         return value
     raise EnvironmentError(

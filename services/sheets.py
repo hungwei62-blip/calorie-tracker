@@ -29,10 +29,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 import streamlit as st
 
+from config.settings import SETTINGS
 from domain.history import summarize_weight_measurements
 
-CACHE_TTL = 60  # 快取 TTL（秒）
-FIXED_PRIMARY_COACH_ID = "u_20260629165506_4b525f9c"
+CACHE_TTL = SETTINGS.cache_ttl_seconds
+FIXED_PRIMARY_COACH_ID = SETTINGS.primary_coach_id
 _VERIFIED_WORKSHEET_SCHEMAS: set[tuple[str, str]] = set()
 
 # ---------- Headers ----------
