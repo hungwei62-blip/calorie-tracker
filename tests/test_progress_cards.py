@@ -259,6 +259,28 @@ def test_daily_completion_card_has_scoped_compact_and_bonus_styles():
     assert "padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px))" in stylesheet
 
 
+def test_student_home_cards_are_square_only_on_phone_widths():
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-daily_summary_cards" in value
+    )
+    square_comment = "/* ===== 手機版四張首頁卡片：由欄寬推導精確 1:1 ===== */"
+    square_rules = stylesheet[stylesheet.index(square_comment):]
+
+    assert "@media (max-width: 480px)" in square_rules
+    assert ".st-key-daily_summary_cards .weight-card" in square_rules
+    assert '.st-key-daily_summary_cards div[data-testid="stPlotlyChart"]' in square_rules
+    assert '.st-key-daily_progress_cards div[data-testid="stPlotlyChart"]' in square_rules
+    assert "aspect-ratio: 1 / 1 !important;" in square_rules
+    assert "height: auto !important;" in square_rules
+    assert "max-height: none !important;" in square_rules
+    assert stylesheet.index(square_comment) > stylesheet.index(
+        "@media (max-width: 768px) and (max-height: 700px)"
+    )
+    assert "height: 180px !important;" in stylesheet[:stylesheet.index(square_comment)]
+
+
 def test_progress_container_renders_two_plotly_components():
     app = AppTest.from_string(
         '''

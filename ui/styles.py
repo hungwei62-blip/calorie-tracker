@@ -851,6 +851,35 @@ def apply_global_styles() -> None:
                 }
             }
 
+            /* ===== 手機版四張首頁卡片：由欄寬推導精確 1:1 ===== */
+            @media (max-width: 480px) {
+                .st-key-daily_summary_cards .weight-card,
+                .st-key-daily_summary_cards div[data-testid="stPlotlyChart"],
+                .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
+                    width: 100% !important;
+                    height: auto !important;
+                    min-height: 0 !important;
+                    max-height: none !important;
+                    aspect-ratio: 1 / 1 !important;
+                }
+
+                .st-key-daily_progress_cards [data-testid="stColumn"] {
+                    max-height: none !important;
+                }
+
+                .st-key-daily_summary_cards div[data-testid="stPlotlyChart"] > div,
+                .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] > div,
+                .st-key-daily_summary_cards .js-plotly-plot,
+                .st-key-daily_progress_cards .js-plotly-plot,
+                .st-key-daily_summary_cards .plot-container,
+                .st-key-daily_progress_cards .plot-container,
+                .st-key-daily_summary_cards .svg-container,
+                .st-key-daily_progress_cards .svg-container {
+                    width: 100% !important;
+                    height: 100% !important;
+                }
+            }
+
 
             /* ===== Dashboard Styles (教練端) ===== */
 
