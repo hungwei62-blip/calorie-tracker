@@ -46,6 +46,13 @@ def test_flat_weight_figure_has_padding_and_only_measured_markers():
     assert figure.data[0].textposition == "top center"
     assert figure.data[0].fill == "tozeroy"
     assert figure.data[0].fillgradient.type == "vertical"
+    assert list(figure.data[0].fillgradient.colorscale) == [
+        (0.0, "rgba(168,213,194,0.00)"),
+        (0.55, "rgba(168,213,194,0.22)"),
+        (1.0, "rgba(168,213,194,0.72)"),
+    ]
+    assert figure.data[0].fillgradient.start == 49.5
+    assert figure.data[0].fillgradient.stop == 50.5
     assert figure.layout.yaxis.visible is False
     assert figure.layout.margin.l == 18
     assert figure.layout.margin.b == 22

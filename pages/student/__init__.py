@@ -1191,6 +1191,24 @@ def build_weight_history_figure(
         if point.measured and point.weight_kg is not None
     ]
 
+    weights = [float(value) for value in y_values if value is not None]
+    y_range = None
+    if weights:
+        low, high = min(weights), max(weights)
+        padding = max((high - low) * 0.12, 0.5 if low == high else 0.3)
+        y_range = [low - padding, high + padding]
+
+    fill_gradient: dict[str, object] = {
+        "type": "vertical",
+        "colorscale": [
+            [0.0, "rgba(168,213,194,0.00)"],
+            [0.55, "rgba(168,213,194,0.22)"],
+            [1.0, "rgba(168,213,194,0.72)"],
+        ],
+    }
+    if y_range is not None:
+        fill_gradient.update(start=y_range[0], stop=y_range[1])
+
     figure = go.Figure()
     figure.add_trace(
         go.Scatter(
@@ -1204,13 +1222,7 @@ def build_weight_history_figure(
                 "smoothing": 1.05,
             },
             fill="tozeroy",
-            fillgradient={
-                "type": "vertical",
-                "colorscale": [
-                    [0.0, "rgba(168,213,194,0.00)"],
-                    [1.0, "rgba(168,213,194,0.30)"],
-                ],
-            },
+            fillgradient=fill_gradient,
             marker={"size": 5, "color": HISTORY_PRIMARY},
             text=point_labels,
             textposition="top center",
@@ -1240,13 +1252,6 @@ def build_weight_history_figure(
             name="實際紀錄",
         )
     )
-
-    weights = [float(value) for value in y_values if value is not None]
-    y_range = None
-    if weights:
-        low, high = min(weights), max(weights)
-        padding = max((high - low) * 0.12, 0.5 if low == high else 0.3)
-        y_range = [low - padding, high + padding]
 
     tick_values = _weight_history_tick_values(x_values, day_count)
 
