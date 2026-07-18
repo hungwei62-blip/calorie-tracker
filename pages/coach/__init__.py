@@ -12,10 +12,15 @@ from matplotlib.backends.backend_pdf import PdfPages as _PdfPages
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from services import metrics, sheets
+from services import application, metrics, sheets
 from domain.history import aggregate_daily as _history_aggregate_daily
 from domain.history import parse_record_date as _parse_record_date
-from pages.common import _clear_analysis_cache, get_default_avatar_source
+from domain.validation import safe_csv_cell
+from pages.common import (
+    _clear_analysis_cache,
+    current_auth_context,
+    get_default_avatar_source,
+)
 
 
 COACH_NUTRIENT_SPECS = (
@@ -134,8 +139,7 @@ def build_coach_welcome_html(display_name: object, avatar_source: str) -> str:
 
 
 def page_coach_overview() -> None:
-    st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+    st.markdown("""<style>
     .member-card { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 16px; }
     .member-top-row { display: flex; align-items: center; gap: 12px; }
     .member-avatar { width: 48px; height: 48px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
@@ -172,7 +176,7 @@ def page_coach_overview() -> None:
         st.header("本日學員狀態")
 
     try:
-        students = sheets.get_students_for_manager(st.session_state.user_id)
+        students = application.get_students(current_auth_context())
         all_records = sheets.get_records()
         all_trainings = sheets.get_training_records()
     except Exception as exc:
@@ -216,7 +220,7 @@ def page_coach_student_detail() -> None:
 
         return
 
-    student = sheets.get_student_for_manager(uid, st.session_state.user_id)
+    student = application.get_student(current_auth_context(), uid)
 
     if not student:
 
@@ -255,7 +259,10 @@ def page_coach_student_detail() -> None:
 
             # 第一次分析（不回寫）
             with st.spinner("分析 Excel 檔案中..."):
-                analysis_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=False)
+                analysis_result = application.import_student_records(
+                    current_auth_context(), uid,
+                    excel_file_bytes=file_bytes, overwrite_duplicates=False,
+                )
 
             # 顯示分析結果
             col1, col2, col3 = st.columns(3)
@@ -291,9 +298,9 @@ def page_coach_student_detail() -> None:
                 if st.button("確認匯入", type="primary", width="stretch"):
                     with st.spinner("匯入資料中..."):
                         # 第二次呼叫，實際寫入
-                        final_result = sheets.import_records_from_excel(
+                        final_result = application.import_student_records(
+                            current_auth_context(), uid,
                             precomputed_data=analysis_result['parsed_data'],
-                            user_id=uid,
                             overwrite_duplicates=do_overwrite
                         )
                         _clear_analysis_cache()
@@ -364,7 +371,7 @@ def page_coach_student_detail() -> None:
 
         try:
 
-            sheets.update_user_goals(uid, {
+            application.update_student_goals(current_auth_context(), uid, {
 
                 "calorie": new_calorie,
 
@@ -421,11 +428,12 @@ def _build_history_csv(student, daily, weights, trainings, notes, start_date, en
     import csv
     buf = _io.StringIO()
     w = csv.writer(buf)
+    write_row = lambda values: w.writerow([safe_csv_cell(value) for value in values])
     name = student.get("name", student.get("username", "未知"))
-    w.writerow(["學員：" + str(name)])
-    w.writerow(["區間：" + str(start_date.isoformat()) + " ~ " + str(end_date.isoformat())])
-    w.writerow([])
-    w.writerow(["日期", "熱量 (kcal)", "蛋白質 (g)", "醣類 (g)", "脂質 (g)", "水量 (ml)", "體重 (kg)", "訓練項目"])
+    write_row(["學員：" + str(name)])
+    write_row(["區間：" + str(start_date.isoformat()) + " ~ " + str(end_date.isoformat())])
+    write_row([])
+    write_row(["日期", "熱量 (kcal)", "蛋白質 (g)", "醣類 (g)", "脂質 (g)", "水量 (ml)", "體重 (kg)", "訓練項目"])
     weight_by_day = {}
     for r in weights:
         d = _parse_record_date(r.get("timestamp", ""))
@@ -440,7 +448,7 @@ def _build_history_csv(student, daily, weights, trainings, notes, start_date, en
         v = daily[d]
         wd = weight_by_day.get(d, "")
         wd_str = (("%.1f" % wd) if isinstance(wd, (int, float)) else (wd if wd else ""))
-        w.writerow([
+        write_row([
             d.isoformat(),
             "%.0f" % v["calorie"],
             "%.0f" % v["protein"],
@@ -451,11 +459,11 @@ def _build_history_csv(student, daily, weights, trainings, notes, start_date, en
             training_by_day.get(d, ""),
         ])
     if notes:
-        w.writerow([])
-        w.writerow(["教練備註"])
-        w.writerow(["時間", "教練", "內容"])
+        write_row([])
+        write_row(["教練備註"])
+        write_row(["時間", "教練", "內容"])
         for n in notes:
-            w.writerow([
+            write_row([
                 n.get("timestamp", "")[:19],
                 n.get("coach_id", ""),
                 n.get("note", "").replace("\n", " "),
@@ -629,7 +637,7 @@ def page_coach_student_history():
 
     if not uid:
         try:
-            students = sheets.get_students_for_manager(st.session_state.user_id)
+            students = application.get_students(current_auth_context())
         except Exception as exc:
             st.error("取得學員列表失敗：" + str(exc))
             return
@@ -652,7 +660,7 @@ def page_coach_student_history():
             st.rerun()
         return
 
-    student = sheets.get_student_for_manager(uid, st.session_state.user_id)
+    student = application.get_student(current_auth_context(), uid)
     if not student:
         st.error("沒有權限查看此學員，請返回總覽重新選擇。")
         if st.button("← 返回學員狀態", key="back_err"):
@@ -688,7 +696,10 @@ def page_coach_student_history():
                 file_bytes = uploaded_file.getvalue()
 
                 with st.spinner("分析 Excel 檔案中..."):
-                    analysis_result = sheets.import_records_from_excel(file_bytes, uid, overwrite_duplicates=False)
+                    analysis_result = application.import_student_records(
+                        current_auth_context(), uid,
+                        excel_file_bytes=file_bytes, overwrite_duplicates=False,
+                    )
 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -718,9 +729,9 @@ def page_coach_student_history():
 
                     if st.button("確認匯入", type="primary", width="stretch"):
                         with st.spinner("匯入資料中..."):
-                            final_result = sheets.import_records_from_excel(
+                            final_result = application.import_student_records(
+                                current_auth_context(), uid,
                                 precomputed_data=analysis_result['parsed_data'],
-                                user_id=uid,
                                 overwrite_duplicates=do_overwrite
                             )
                             _clear_analysis_cache()

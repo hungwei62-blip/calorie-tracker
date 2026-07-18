@@ -112,6 +112,11 @@ def test_food_and_water_records_use_new_record_categories(monkeypatch):
     appended = []
     monkeypatch.setattr(student_pages.sheets, "append_record", lambda **kwargs: appended.append(kwargs))
     monkeypatch.setattr(student_pages, "_clear_analysis_cache", lambda: None)
+    monkeypatch.setattr(
+        student_pages,
+        "current_auth_context",
+        lambda: student_pages.application.AuthContext("student-1", "student"),
+    )
 
     student_pages._append_water_record("student-1", 350)
     student_pages._append_food_record("student-1", "手動紀錄", 420, 28)

@@ -10,7 +10,7 @@ from pathlib import Path
 import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
-from services import auth, gemini, metrics, sheets
+from services import application, auth, gemini, metrics, sheets
 from services.security import LOGIN_RATE_LIMITER, log_event, safe_failure_message
 from domain.daily_completion import DailyCompletion, calculate_daily_completion
 from domain.history import (
@@ -33,7 +33,7 @@ from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, ca
 from pages.common import (
     DEFAULT_GOALS, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
     _fetch_records_cached, _today_range, do_logout,
-    get_default_avatar_source,
+    current_auth_context, get_default_avatar_source,
 )
 
 DAILY_RECORD_TABS = ("食物", "飲水", "訓練", "體重")
@@ -455,15 +455,17 @@ def page_tdee_questionnaire() -> None:
 
             uid = st.session_state.user_id
 
-            sheets.update_user_bmr(uid, bmr)
+            application.update_student_bmr(current_auth_context(), uid, bmr)
 
-            sheets.update_user_goals(uid, goals)
+            application.update_student_goals(current_auth_context(), uid, goals)
 
             sheets.set_user_record_mode(uid, mode)
 
             if mode == "simple":
 
-                sheets.update_user_goals(uid, {"carb": 0.0, "fat": 0.0})
+                application.update_student_goals(
+                    current_auth_context(), uid, {"carb": 0.0, "fat": 0.0}
+                )
 
             _clear_analysis_cache()
 
@@ -841,7 +843,8 @@ def _append_water_record(user_id: str, water_ml: float) -> None:
     water_value = float(water_ml)
     if not math.isfinite(water_value) or water_value <= 0:
         raise ValueError("飲水量必須大於 0")
-    sheets.append_record(
+    application.append_student_record(
+        current_auth_context(),
         timestamp=datetime.now().isoformat(), user_id=user_id,
         meal_type="飲水", food_summary="飲水",
         calories=0, protein=0, carb=0, fat=0, water_ml=water_value,
@@ -863,7 +866,8 @@ def _append_food_record(
         raise ValueError("熱量與蛋白質必須是非負有限數字")
     if calorie_value == 0 and protein_value == 0:
         raise ValueError("熱量與蛋白質至少一項必須大於 0")
-    sheets.append_record(
+    application.append_student_record(
+        current_auth_context(),
         timestamp=datetime.now().isoformat(), user_id=user_id,
         meal_type="食物", food_summary=food_summary.strip() or "手動紀錄",
         calories=calorie_value, protein=protein_value,
@@ -1080,7 +1084,8 @@ def _render_training_records() -> None:
         submitted = st.form_submit_button("儲存訓練紀錄", width="stretch")
     if submitted:
         try:
-            sheets.update_training(
+            application.update_student_training(
+                current_auth_context(),
                 timestamp=today.isoformat(),
                 user_id=uid,
                 training_types=selected_types,
@@ -1106,9 +1111,9 @@ def _render_weight_records() -> None:
         submitted = st.form_submit_button("儲存體重紀錄", width="stretch")
     if submitted:
         try:
-            sheets.append_weight(
-                timestamp=datetime.now().isoformat(),
-                user_id=uid, weight_kg=weight,
+            application.append_student_weight(
+                current_auth_context(), uid,
+                timestamp=datetime.now().isoformat(), weight_kg=weight,
             )
         except Exception:
             st.error("體重紀錄儲存失敗，請稍後再試。")

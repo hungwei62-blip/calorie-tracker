@@ -31,6 +31,14 @@ import streamlit as st
 
 from config.settings import SETTINGS
 from domain.history import summarize_weight_measurements
+from domain.validation import (
+    TEXT_LIMITS,
+    bounded_text,
+    finite_non_negative,
+    meal_type as validate_meal_type,
+    positive_number,
+    valid_timestamp,
+)
 
 CACHE_TTL = SETTINGS.cache_ttl_seconds
 FIXED_PRIMARY_COACH_ID = SETTINGS.primary_coach_id
@@ -198,13 +206,7 @@ def _to_int(val: Any, default: int) -> int:
 
 def _validated_non_negative(value: Any, field_name: str) -> float:
     """將營養數值轉成非負浮點數；無效值直接拒絕，避免污染試算表。"""
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} 必須是數字") from exc
-    if parsed < 0:
-        raise ValueError(f"{field_name} 不可小於 0")
-    return round(parsed, 2)
+    return round(finite_non_negative(value, field_name), 2)
 
 
 def clear_read_caches() -> None:
@@ -258,6 +260,11 @@ def append_user(
         coach_id: 所屬教練 ID
         weekly_training: 每週訓練目標次數，預設 4
     """
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    username = bounded_text(username, "帳號", limit=TEXT_LIMITS["username"])
+    name = bounded_text(name, "姓名", limit=TEXT_LIMITS["name"])
+    created_at = valid_timestamp(created_at, "created_at")
+    coach_id = bounded_text(coach_id, "coach_id", limit=80)
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     row = [
@@ -465,6 +472,19 @@ def append_record(
     portion: float,
 ) -> None:
     """新增一筆飲食記錄到 Records 工作表。"""
+    timestamp = valid_timestamp(timestamp)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    meal_type = validate_meal_type(meal_type)
+    food_summary = bounded_text(
+        food_summary, "食物摘要", limit=TEXT_LIMITS["food_summary"]
+    )
+    calories = finite_non_negative(calories, "calories")
+    protein = finite_non_negative(protein, "protein")
+    carb = finite_non_negative(carb, "carb")
+    fat = finite_non_negative(fat, "fat")
+    water_ml = finite_non_negative(water_ml, "water_ml")
+    portion = positive_number(portion, "portion")
+    image_url = ""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
     row = [
@@ -560,6 +580,9 @@ def delete_record(record_timestamp: str, user_id: str) -> bool:
 
 def append_weight(timestamp: str, user_id: str, weight_kg: float) -> None:
     """新增一筆體重記錄到 Weight 工作表。"""
+    timestamp = valid_timestamp(timestamp)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    weight_kg = positive_number(weight_kg, "weight_kg")
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
     row = [
@@ -635,9 +658,15 @@ def _validated_training_values(
         raise ValueError("請至少選擇一種訓練類型")
 
     details = {
-        "strength_detail": str(strength_detail or "").strip(),
-        "cardio_detail": str(cardio_detail or "").strip(),
-        "other_detail": str(other_detail or "").strip(),
+        "strength_detail": bounded_text(
+            strength_detail, "重量訓練內容", limit=TEXT_LIMITS["training_detail"], required=False
+        ),
+        "cardio_detail": bounded_text(
+            cardio_detail, "有氧訓練內容", limit=TEXT_LIMITS["training_detail"], required=False
+        ),
+        "other_detail": bounded_text(
+            other_detail, "其他訓練內容", limit=TEXT_LIMITS["training_detail"], required=False
+        ),
     }
     missing = [label for label in selected if not details[TRAINING_TYPE_FIELDS[label]]]
     if missing:
@@ -666,6 +695,8 @@ def append_training(
     other_detail: str = "",
 ) -> None:
     """新增一筆訓練記錄到 Training 工作表。"""
+    timestamp = valid_timestamp(timestamp)
+    user_id = bounded_text(user_id, "user_id", limit=80)
     selected, details = _validated_training_values(
         training_types, strength_detail, cardio_detail, other_detail
     )
@@ -731,6 +762,8 @@ def update_training(
     other_detail: str = "",
 ) -> bool:
     """更新指定日期的訓練記錄，若該日記錄不存在則新增。成功回傳 True。"""
+    timestamp = valid_timestamp(timestamp)
+    user_id = bounded_text(user_id, "user_id", limit=80)
     selected, details = _validated_training_values(
         training_types, strength_detail, cardio_detail, other_detail
     )
@@ -775,6 +808,10 @@ def update_training(
 
 def append_note(timestamp: str, user_id: str, coach_id: str, note: str) -> None:
     """新增一筆教練備註到 Notes 工作表。"""
+    timestamp = valid_timestamp(timestamp)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    coach_id = bounded_text(coach_id, "coach_id", limit=80)
+    note = bounded_text(note, "備註", limit=TEXT_LIMITS["note"])
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Notes", NOTES_HEADERS)
     row = [
@@ -862,6 +899,7 @@ def import_records_from_excel(
     import openpyxl
     from io import BytesIO
     from datetime import datetime
+    import zipfile
     
     import time
     from services.sheets import get_records, delete_record, append_record
@@ -888,8 +926,25 @@ def import_records_from_excel(
             # 第一次執行：讀取 Excel 並解析
             if excel_file_bytes is None or user_id is None:
                 raise ValueError("excel_file_bytes 和 user_id 是必要參數")
-            
-            wb = openpyxl.load_workbook(BytesIO(excel_file_bytes))
+            if len(excel_file_bytes) > SETTINGS.max_upload_mb * 1024 * 1024:
+                raise ValueError(f"Excel 檔案不可超過 {SETTINGS.max_upload_mb} MB")
+            try:
+                with zipfile.ZipFile(BytesIO(excel_file_bytes)) as archive:
+                    members = archive.infolist()
+                    total_uncompressed = sum(item.file_size for item in members)
+                    total_compressed = max(sum(item.compress_size for item in members), 1)
+                    if len(members) > 500 or total_uncompressed > 50 * 1024 * 1024:
+                        raise ValueError("Excel 解壓縮內容過大")
+                    if total_uncompressed / total_compressed > 100:
+                        raise ValueError("Excel 壓縮比例異常")
+            except zipfile.BadZipFile as exc:
+                raise ValueError("Excel 檔案格式無效") from exc
+
+            wb = openpyxl.load_workbook(
+                BytesIO(excel_file_bytes), read_only=True, data_only=False
+            )
+            if len(wb.sheetnames) > 24:
+                raise ValueError("Excel 工作表不可超過 24 個")
             
             # 取得現有記錄以檢查重複
             existing_records = get_records(user_id)
@@ -930,7 +985,7 @@ def import_records_from_excel(
                     # 嘗試 %m/%d 格式（如 6/30）
                     try:
                         parsed = datetime.strptime(date_val.strip(), "%m/%d")
-                        return f"2026-{parsed.month:02d}-{parsed.day:02d}"
+                        return f"{datetime.now().year}-{parsed.month:02d}-{parsed.day:02d}"
                     except ValueError:
                         pass
                     # 嘗試其他常見格式
@@ -947,6 +1002,9 @@ def import_records_from_excel(
                     continue
                     
                 ws = wb[sheet_name]
+                if ws.max_row > 10008:
+                    result["errors"].append(f"工作表「{sheet_name}」超過 10,000 筆資料，略過")
+                    continue
                 
                 # 第 8 列為欄位列
                 header_row = 8
@@ -981,6 +1039,11 @@ def import_records_from_excel(
                 for row_idx in range(header_row + 1, ws.max_row + 1):
                     try:
                         row = [ws.cell(row=row_idx, column=col).value for col in range(1, 8)]
+                        if any(isinstance(value, str) and value.startswith("=") for value in row):
+                            result["errors"].append(
+                                f"工作表「{sheet_name}」第 {row_idx} 列包含公式，略過"
+                            )
+                            continue
                         
                         # 取得日期值
                         date_val = row[col_idx["date"]]

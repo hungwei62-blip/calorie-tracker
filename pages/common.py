@@ -13,7 +13,7 @@ from datetime import date
 from pathlib import Path
 import streamlit as st
 from services import metrics, sheets
-from services.security import clear_auth_session
+from services.security import AuthContext, clear_auth_session
 
 # ---------- 常數 ----------
 
@@ -120,6 +120,15 @@ def _week_range() -> tuple:
     start = metrics.week_start(today)
 
     return start, today
+
+
+def current_auth_context() -> AuthContext:
+    """Return the server-validated identity stored by the top-level router."""
+    user_id = str(st.session_state.get("user_id") or "").strip()
+    role = str(st.session_state.get("role") or "").strip().lower()
+    if not user_id or role not in {"student", "coach", "admin"}:
+        raise PermissionError("登入狀態無效")
+    return AuthContext(user_id=user_id, role=role)
 
 # =============================================================================
 

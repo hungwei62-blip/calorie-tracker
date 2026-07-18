@@ -112,7 +112,7 @@ def test_append_user_persists_coach_id(monkeypatch):
         "account",
         "name",
         "hash",
-        "now",
+        "2026-07-19T12:00:00+08:00",
         {},
         sheets.FIXED_PRIMARY_COACH_ID,
     )
