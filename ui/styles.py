@@ -660,6 +660,78 @@ def apply_global_styles() -> None:
                 }
             }
 
+            /* ===== 學員歷史：體重摘要與折線圖 ===== */
+            .st-key-student_weight_history .weight-history-summary {
+                display: grid !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                margin: 8px 0 12px !important;
+                padding: 14px 10px !important;
+                border: 1px solid rgba(47, 62, 70, 0.08) !important;
+                border-radius: 16px !important;
+                background: #f7f7f7 !important;
+            }
+
+            .st-key-student_weight_history .weight-history-summary > div {
+                min-width: 0 !important;
+                padding: 0 10px !important;
+                text-align: center !important;
+            }
+
+            .st-key-student_weight_history .weight-history-summary > div + div {
+                border-left: 1px solid rgba(47, 62, 70, 0.10) !important;
+            }
+
+            .st-key-student_weight_history .weight-history-summary span,
+            .st-key-student_weight_history .weight-history-summary strong {
+                display: block !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            .st-key-student_weight_history .weight-history-summary span {
+                margin-bottom: 5px !important;
+                color: #7a7a7a !important;
+                font-size: 11px !important;
+                font-weight: 400 !important;
+            }
+
+            .st-key-student_weight_history .weight-history-summary strong {
+                color: #2f3e46 !important;
+                font-size: 17px !important;
+                font-variant-numeric: tabular-nums !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-student_weight_history_chart div[data-testid="stPlotlyChart"] {
+                overflow: hidden !important;
+                border-radius: 16px !important;
+            }
+
+            @media (max-width: 480px) {
+                .st-key-student_weight_history .weight-history-summary {
+                    padding: 12px 4px !important;
+                }
+
+                .st-key-student_weight_history .weight-history-summary > div {
+                    padding: 0 5px !important;
+                }
+
+                .st-key-student_weight_history .weight-history-summary span {
+                    font-size: 10px !important;
+                }
+
+                .st-key-student_weight_history .weight-history-summary strong {
+                    font-size: 14px !important;
+                }
+
+                .st-key-student_weight_history_chart div[data-testid="stPlotlyChart"],
+                .st-key-student_weight_history_chart .js-plotly-plot,
+                .st-key-student_weight_history_chart .plot-container {
+                    height: 260px !important;
+                }
+            }
+
             /* ===== 學員今日完成度：原四卡下方的緊湊摘要 ===== */
             .st-key-daily_completion_card {
                 margin-top: -4px !important;

@@ -199,7 +199,10 @@ def test_daily_record_sections_remove_duplicate_headings_and_simplify_weight():
     source = inspect.getsource(student_pages)
     water_renderer = source[source.index("def _render_water_records"):source.index("def _selected_food_image_bytes")]
     food_renderer = source[source.index("def _render_food_records"):source.index("def _render_training_records")]
-    weight_renderer = source[source.index("def _render_weight_records"):source.index("def page_log_meal")]
+    weight_renderer = source[
+        source.index("def _render_weight_records"):
+        source.index("def _weight_history_summary")
+    ]
 
     assert 'st.subheader("飲水")' not in water_renderer
     assert 'value=200, step=100' in water_renderer

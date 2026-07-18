@@ -12,6 +12,11 @@ import streamlit as st
 from PIL import Image
 from services import auth, gemini, metrics, sheets
 from domain.daily_completion import DailyCompletion, calculate_daily_completion
+from domain.history import (
+    WeightHistoryPoint,
+    build_weight_history_series,
+    history_date_range,
+)
 from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, calculate_tdee
 from pages.common import (
     DEFAULT_GOALS, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
@@ -1090,6 +1095,190 @@ def _render_weight_records() -> None:
             st.rerun()
 
 
+def _weight_history_summary(
+    points: list[WeightHistoryPoint],
+) -> tuple[float, float, int] | None:
+    valid_points = [point for point in points if point.weight_kg is not None]
+    if not valid_points:
+        return None
+    current = float(valid_points[-1].weight_kg)
+    change = current - float(valid_points[0].weight_kg)
+    measured_count = sum(point.measured for point in points)
+    return current, change, measured_count
+
+
+def build_weight_history_summary_html(points: list[WeightHistoryPoint]) -> str:
+    summary = _weight_history_summary(points)
+    if summary is None:
+        return ""
+    current, change, measured_count = summary
+    change_text = f"{change:+.1f} kg" if abs(change) >= 0.05 else "0.0 kg"
+    return (
+        '<section class="weight-history-summary" aria-label="體重期間摘要">'
+        '<div><span>目前體重</span>'
+        f'<strong>{current:.1f} kg</strong></div>'
+        '<div><span>期間變化</span>'
+        f'<strong>{change_text}</strong></div>'
+        '<div><span>實際量測</span>'
+        f'<strong>{measured_count} 次</strong></div>'
+        "</section>"
+    )
+
+
+def build_weight_history_figure(
+    points: list[WeightHistoryPoint], day_count: int
+) -> go.Figure:
+    x_values = [point.day for point in points]
+    y_values = [point.weight_kg for point in points]
+    hover_status = [
+        (
+            "實際紀錄"
+            if point.measured
+            else (
+                f"沿用自 {point.source_date:%m/%d}"
+                if point.source_date
+                else "尚無紀錄"
+            )
+        )
+        for point in points
+    ]
+    measured_points = [
+        point
+        for point in points
+        if point.measured and point.weight_kg is not None
+    ]
+
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=y_values,
+            mode="lines",
+            line={"color": "#8f85b7", "width": 3, "shape": "linear"},
+            customdata=hover_status,
+            connectgaps=False,
+            hovertemplate=(
+                "%{x|%m/%d}<br>%{y:.1f} kg<br>%{customdata}<extra></extra>"
+            ),
+            name="體重",
+        )
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=[point.day for point in measured_points],
+            y=[point.weight_kg for point in measured_points],
+            mode="markers",
+            marker={
+                "size": 9,
+                "color": "#8f85b7",
+                "line": {"color": "#ffffff", "width": 2},
+            },
+            hovertemplate=(
+                "%{x|%m/%d}<br>%{y:.1f} kg<br>實際紀錄<extra></extra>"
+            ),
+            name="實際紀錄",
+        )
+    )
+
+    weights = [float(value) for value in y_values if value is not None]
+    y_range = None
+    if weights:
+        low, high = min(weights), max(weights)
+        padding = max((high - low) * 0.2, 1.0 if low == high else 0.5)
+        y_range = [low - padding, high + padding]
+
+    tick_values = x_values
+    if day_count > 7 and x_values:
+        tick_values = x_values[::5]
+        if tick_values[-1] != x_values[-1]:
+            tick_values.append(x_values[-1])
+
+    figure.update_layout(
+        height=300,
+        margin={"l": 12, "r": 12, "t": 16, "b": 12},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#fafafa",
+        showlegend=False,
+        hovermode="x unified",
+        xaxis={
+            "showgrid": False,
+            "zeroline": False,
+            "tickvals": tick_values,
+            "tickformat": "%m/%d",
+            "tickfont": {"size": 11, "color": "#7a7a7a"},
+            "fixedrange": True,
+        },
+        yaxis={
+            "showgrid": True,
+            "gridcolor": "rgba(47,62,70,0.08)",
+            "zeroline": False,
+            "ticksuffix": " kg",
+            "tickfont": {"size": 11, "color": "#7a7a7a"},
+            "range": y_range,
+            "fixedrange": True,
+        },
+        font={"family": "system-ui, -apple-system, sans-serif"},
+    )
+    return figure
+
+
+def _render_student_weight_history(user_id: str) -> None:
+    with st.container(key="student_weight_history"):
+        st.subheader("體重變化")
+        selected_range = st.segmented_control(
+            "期間",
+            ("7 天", "30 天"),
+            default="7 天",
+            key="weight_history_range",
+            required=True,
+            width="stretch",
+        )
+        day_count = 30 if selected_range == "30 天" else 7
+        start_date, end_date = history_date_range(date.today(), day_count)
+
+        try:
+            weight_records = sheets.get_weight_records(user_id)
+        except Exception:
+            st.error("取得體重紀錄失敗，請稍後再試。")
+            return
+
+        points = build_weight_history_series(
+            weight_records, start_date, end_date
+        )
+        if _weight_history_summary(points) is None:
+            st.info("目前尚無體重紀錄。")
+            if st.button(
+                "新增體重紀錄",
+                key="history_add_weight",
+                width="stretch",
+            ):
+                open_daily_record_tab("體重")
+                st.rerun()
+            return
+
+        st.markdown(
+            build_weight_history_summary_html(points),
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(
+            build_weight_history_figure(points, day_count),
+            key="student_weight_history_chart",
+            width="stretch",
+            config={"displayModeBar": False, "responsive": True},
+        )
+
+        today_point = points[-1]
+        if (
+            today_point.weight_kg is not None
+            and not today_point.measured
+            and today_point.source_date is not None
+        ):
+            st.caption(
+                "今天尚未記錄體重，目前數值沿用自 "
+                f"{today_point.source_date:%m/%d} 的最近紀錄。"
+            )
+
+
 def page_log_meal() -> None:
     """學員日常紀錄入口，只渲染目前開啟的分段。"""
     target_tab = st.session_state.pop(DAILY_RECORD_TAB_TARGET_KEY, None)
@@ -1136,6 +1325,10 @@ def page_history() -> None:
 
     uid = st.session_state.user_id
 
+    _render_student_weight_history(uid)
+
+    st.divider()
+
     try:
 
         records = _fetch_records_cached(uid)
@@ -1154,7 +1347,7 @@ def page_history() -> None:
 
     if bmr <= 0 or calorie_goal <= 0:
 
-        st.warning("你尚未設定營養目標")
+        st.info("營養目標尚未設定，暫時無法顯示攝取歷史。")
 
         return
 

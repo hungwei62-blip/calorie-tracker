@@ -197,6 +197,7 @@ class _FakeStreamlit:
 def test_navigation_renders_when_tdee_goals_are_missing(monkeypatch):
     fake_st = _FakeStreamlit()
     rendered_navigation = []
+    rendered_pages = []
 
     monkeypatch.setattr(app, "st", fake_st)
     monkeypatch.setattr(app, "apply_global_styles", lambda: None)
@@ -207,9 +208,12 @@ def test_navigation_renders_when_tdee_goals_are_missing(monkeypatch):
         lambda role, page: rendered_navigation.append((role, page)),
     )
     monkeypatch.setattr(app.sheets, "get_user_goals", lambda _user_id: {"bmr": 0, "calorie": 0})
-    monkeypatch.setattr(app, "page_history", lambda: (_ for _ in ()).throw(AssertionError("不應渲染歷史頁")))
+    monkeypatch.setattr(
+        app, "page_history", lambda: rendered_pages.append("歷史")
+    )
 
     app.main()
 
     assert rendered_navigation == [("student", "歷史")]
-    assert fake_st.warnings == ["請先設定營養目標"]
+    assert rendered_pages == ["歷史"]
+    assert fake_st.warnings == []

@@ -90,7 +90,7 @@ def main() -> None:
     else:
         can_render_page = True
 
-        if st.session_state.page not in ["TDEE 問卷", "個人"]:
+        if st.session_state.page not in ["TDEE 問卷", "個人", "歷史"]:
 
             goals_check = sheets.get_user_goals(st.session_state.user_id)
 
