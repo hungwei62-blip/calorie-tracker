@@ -149,7 +149,7 @@ def page_coach_overview() -> None:
     .coach-nutrient-label { overflow: hidden; color: #4B5563; font-size: 12px; font-weight: 500; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
     .coach-nutrient-track { width: 100%; height: 5px; overflow: hidden; border-radius: 999px; background: #E9ECEF; }
     .coach-nutrient-track > span { display: block; height: 100%; border-radius: inherit; }
-    .coach-nutrient-value { overflow: hidden; color: #9CA3AF; font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+    .coach-nutrient-value { display: block; width: 100%; overflow: hidden; color: #9CA3AF; font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
     @media (max-width: 480px) {
         .member-card { gap: 12px; padding: 14px 12px; }
         .member-avatar { width: 48px; height: 48px; margin-right: 8px; font-size: 19px; }
@@ -158,7 +158,7 @@ def page_coach_overview() -> None:
         .coach-nutrient-grid { gap: 6px; }
         .coach-nutrient { gap: 6px; }
         .coach-nutrient-label { font-size: 11px; }
-        .coach-nutrient-value { font-size: 11px; }
+        .coach-nutrient-value { font-size: 13px; }
     }
     </style>""", unsafe_allow_html=True)
 

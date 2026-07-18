@@ -36,6 +36,9 @@ def test_coach_nutrient_html_shows_values_color_and_accessible_progress():
     assert "background:#ff6068" in markup
     assert 'role="progressbar"' in markup
     assert 'aria-valuenow="100"' in markup
+    assert markup.index('class="coach-nutrient-track"') < markup.index(
+        'class="coach-nutrient-value"'
+    )
 
 
 def test_coach_nutrient_html_uses_dash_when_goal_is_missing():
@@ -94,7 +97,9 @@ def test_coach_overview_matches_student_header_and_enlarges_values():
     assert 'key="coach_overview_header"' in source
     assert 'st.header("本日學員狀態")' in source
     assert "section-title" not in source
-    assert "font-size: 13px" in source
-    assert "font-size: 11px" in source
+    assert ".coach-nutrient-value { display: block; width: 100%;" in source
+    assert "font-size: 15px" in source
+    assert "text-align: center" in source
+    assert ".coach-nutrient-value { font-size: 13px; }" in source
     assert "font-variant-numeric: tabular-nums" in source
     assert ".coach-nutrient-grid { gap: 6px; }" in source
