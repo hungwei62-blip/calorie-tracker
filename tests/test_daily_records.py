@@ -181,6 +181,10 @@ def test_daily_record_page_uses_plain_labels_and_scoped_card_styles():
     assert 'border-radius: 10px !important;' in stylesheet
     assert '.st-key-daily_record_page button [data-testid="stMarkdownContainer"]' in stylesheet
     assert 'background: transparent !important;' in stylesheet
+    assert '.st-key-daily_record_page [data-testid="stTabContent"]:has(.st-key-food_record_panel)' in stylesheet
+    assert '.st-key-food_record_panel > div[data-testid="stVerticalBlock"]' in stylesheet
+    assert '.block-container:has(.st-key-food_record_panel)' in stylesheet
+    assert 'padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px))' in stylesheet
 
 
 def test_food_input_defaults_to_manual_mode():
@@ -188,6 +192,7 @@ def test_food_input_defaults_to_manual_mode():
     food_renderer = source[source.index("def _render_food_records"):]
     assert '("照片辨識", "手動輸入")' in food_renderer
     assert 'default="手動輸入"' in food_renderer
+    assert 'key="food_record_panel"' in food_renderer
 
 
 def test_daily_record_sections_remove_duplicate_headings_and_simplify_weight():
@@ -202,6 +207,7 @@ def test_daily_record_sections_remove_duplicate_headings_and_simplify_weight():
     assert '體重趨勢' not in weight_renderer
     assert 'get_weight_records' not in weight_renderer
     assert 'line_chart' not in weight_renderer
+    assert 'step=0.5' in weight_renderer
 
 
 @pytest.mark.parametrize(

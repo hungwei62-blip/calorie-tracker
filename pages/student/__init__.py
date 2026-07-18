@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
 from services import auth, gemini, metrics, sheets
+from domain.daily_completion import DailyCompletion, calculate_daily_completion
 from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, calculate_tdee
 from pages.common import (
     DEFAULT_GOALS, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
@@ -304,6 +305,53 @@ def _weight_summary(weight_records: list[dict[str, object]]) -> tuple[float | No
     else:
         trend = "⬌ 體重維持持平"
     return latest_weight, trend
+
+
+_COMPLETION_ICONS = {
+    "體重": '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="4"/><path d="M9 9.5c1.7-1.4 4.3-1.4 6 0"/><path d="m12 9.5 1.2 2"/></svg>',
+    "水量": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3S6.5 9.2 6.5 14a5.5 5.5 0 0 0 11 0C17.5 9.2 12 3 12 3Z"/></svg>',
+    "蛋白質": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v7M4.5 3v5.5A2.5 2.5 0 0 0 7 11v10M9.5 3v5.5A2.5 2.5 0 0 1 7 11"/><path d="M16 3v18M16 3c2.2 1.5 3.5 4 3.5 6.5H16"/></svg>',
+    "卡路里": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 3.5c.4 3-1.5 4.3-3 6.2-1.4 1.7-2.2 3.3-1.5 5.5.4-1.3 1.3-2.2 2.5-3.2-.2 2.3 1 3.7 2.4 4.8 1.5-1.2 2.2-2.8 1.8-4.8 1.5 1.4 2.4 3 2.1 4.9-.4 2.5-2.5 4.1-5.3 4.1-3.4 0-5.7-2.2-5.7-5.5 0-4.6 4.2-6.1 6.7-12Z"/></svg>',
+}
+
+
+def _completion_badge_svg(completed: bool) -> str:
+    path = '<path d="m4 8 2.5 2.5L12 5"/>' if completed else '<path d="m5 5 6 6M11 5l-6 6"/>'
+    return f'<svg viewBox="0 0 16 16" aria-hidden="true">{path}</svg>'
+
+
+def build_daily_completion_html(completion: DailyCompletion) -> str:
+    """Render the compact accessible completion card shown below the four cards."""
+    statuses = (
+        ("體重", completion.weight_logged),
+        ("水量", completion.water_logged),
+        ("蛋白質", completion.protein_logged),
+        ("卡路里", completion.calories_logged),
+    )
+    items = []
+    for label, completed in statuses:
+        status_text = "已完成" if completed else "未完成"
+        state_class = "is-complete" if completed else "is-incomplete"
+        items.append(
+            f'<div class="daily-completion-item {state_class}" role="listitem" '
+            f'aria-label="{label}：{status_text}" title="{label}：{status_text}">'
+            f'<span class="daily-completion-icon">{_COMPLETION_ICONS[label]}</span>'
+            f'<span class="daily-completion-badge">{_completion_badge_svg(completed)}</span>'
+            '</div>'
+        )
+    bonus_class = " has-bonus" if completion.bonus else ""
+    return (
+        f'<section class="daily-completion-card{bonus_class}" aria-label="今日完成度">'
+        '<div class="daily-completion-heading"><span>今日完成度</span>'
+        f'<strong>{completion.percentage}%</strong></div>'
+        '<div class="daily-completion-track" role="progressbar" aria-valuemin="0" '
+        f'aria-valuemax="100" aria-valuenow="{completion.percentage}">'
+        f'<span style="width: {completion.percentage}%"></span></div>'
+        '<div class="daily-completion-footer">'
+        f'<div class="daily-completion-meta">飲食完成 {completion.completed_count} / 3 項</div>'
+        f'<div class="daily-completion-items" role="list">{"".join(items)}</div></div>'
+        '</section>'
+    )
 
 
 def open_daily_record_tab(tab: str) -> None:
@@ -657,7 +705,12 @@ def page_personal() -> None:
 
     totals = metrics.sum_totals(today_records).as_dict()
 
-    latest_weight, trend_content = _weight_summary(sheets.get_weight_records(uid))
+    weight_records = sheets.get_weight_records(uid)
+    latest_weight, trend_content = _weight_summary(weight_records)
+    weight_logged_today = any(
+        str(record.get("timestamp", ""))[:10] == ws.isoformat()
+        for record in weight_records
+    )
     weight_display_str = f"{latest_weight:.1f}" if latest_weight else "--.-"
 
     card_html = f"""
@@ -725,7 +778,16 @@ def page_personal() -> None:
                     config={"displayModeBar": False, "responsive": True},
                 )
 
-    st.write("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+    completion = calculate_daily_completion(
+        totals,
+        goals,
+        weight_logged=weight_logged_today,
+    )
+    with st.container(key="daily_completion_card"):
+        st.markdown(
+            build_daily_completion_html(completion),
+            unsafe_allow_html=True,
+        )
 
 
 # =============================================================================
@@ -891,14 +953,15 @@ def _render_manual_food_input(uid: str) -> None:
 
 def _render_food_records() -> None:
     uid = st.session_state.user_id
-    input_mode = st.segmented_control(
-        "輸入方式", ("照片辨識", "手動輸入"),
-        default="手動輸入", key="food_input_mode",
-    )
-    if input_mode == "手動輸入":
-        _render_manual_food_input(uid)
-    else:
-        _render_photo_food_input(uid)
+    with st.container(key="food_record_panel"):
+        input_mode = st.segmented_control(
+            "輸入方式", ("照片辨識", "手動輸入"),
+            default="手動輸入", key="food_input_mode",
+        )
+        if input_mode == "手動輸入":
+            _render_manual_food_input(uid)
+        else:
+            _render_photo_food_input(uid)
 
 
 TRAINING_DETAIL_LABELS = {
@@ -997,7 +1060,7 @@ def _render_weight_records() -> None:
     uid = st.session_state.user_id
     with st.form("weight_form"):
         weight = st.number_input(
-            "今日體重 (kg)", value=60.0, step=0.1,
+            "今日體重 (kg)", value=60.0, step=0.5,
             min_value=30.0, max_value=300.0,
         )
         submitted = st.form_submit_button("儲存體重紀錄", width="stretch")

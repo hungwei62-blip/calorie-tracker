@@ -237,6 +237,26 @@ def test_personal_page_is_simplified_and_orders_summary_before_progress():
     assert source.index('key="daily_summary_cards"') < source.index(
         'key="daily_progress_cards"'
     )
+    assert source.index('key="daily_progress_cards"') < source.index(
+        'key="daily_completion_card"'
+    )
+    assert "height: 40px" not in source
+
+
+def test_daily_completion_card_has_scoped_compact_and_bonus_styles():
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-daily_completion_card" in value
+    )
+
+    assert ".st-key-daily_completion_card .daily-completion-card" in stylesheet
+    assert "min-height: 104px !important;" in stylesheet
+    assert ".daily-completion-card.has-bonus .daily-completion-track > span" in stylesheet
+    assert "linear-gradient(90deg" in stylesheet
+    assert "@media (max-width: 768px) and (max-height: 700px)" in stylesheet
+    assert "height: 158px !important;" in stylesheet
+    assert "padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px))" in stylesheet
 
 
 def test_progress_container_renders_two_plotly_components():

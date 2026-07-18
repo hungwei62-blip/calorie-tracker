@@ -270,6 +270,13 @@ def apply_global_styles() -> None:
                 margin-top: 0 !important;
             }
 
+            .main .block-container:has(.st-key-daily_completion_card),
+            [data-testid="stMainBlockContainer"]:has(.st-key-daily_completion_card) {
+                padding-bottom: 80px !important;
+                padding-bottom: calc(80px + constant(safe-area-inset-bottom)) !important;
+                padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+            }
+
             @media (max-width: 768px) {
                 .main .block-container:has(.st-key-student_home_header),
                 [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header) {
@@ -335,6 +342,26 @@ def apply_global_styles() -> None:
 
             .st-key-daily_record_page [data-testid="stTabContent"] {
                 padding-top: 18px !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stTabContent"]:has(.st-key-food_record_panel) {
+                padding-top: 12px !important;
+            }
+
+            .st-key-food_record_panel,
+            .st-key-food_record_panel [data-testid="stForm"] {
+                margin-bottom: 0 !important;
+            }
+
+            .st-key-food_record_panel > div[data-testid="stVerticalBlock"] {
+                gap: 12px !important;
+            }
+
+            .main .block-container:has(.st-key-food_record_panel),
+            [data-testid="stMainBlockContainer"]:has(.st-key-food_record_panel) {
+                padding-bottom: 80px !important;
+                padding-bottom: calc(80px + constant(safe-area-inset-bottom)) !important;
+                padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
             }
 
             .st-key-daily_record_page [data-testid="stForm"],
@@ -625,6 +652,202 @@ def apply_global_styles() -> None:
                     height: 34px !important;
                     min-height: 34px !important;
                     font-size: 15px !important;
+                }
+            }
+
+            /* ===== 學員今日完成度：原四卡下方的緊湊摘要 ===== */
+            .st-key-daily_completion_card {
+                margin-top: -4px !important;
+            }
+
+            .st-key-daily_completion_card .daily-completion-card {
+                box-sizing: border-box !important;
+                width: 100% !important;
+                min-height: 104px !important;
+                padding: 12px 16px !important;
+                color: #252525 !important;
+                background: rgba(250, 250, 250, 0.96) !important;
+                border: 1px solid rgba(120, 120, 115, 0.10) !important;
+                border-radius: 22px !important;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.035) !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+            }
+
+            .daily-completion-heading,
+            .daily-completion-footer,
+            .daily-completion-items {
+                display: flex !important;
+                align-items: center !important;
+            }
+
+            .daily-completion-heading {
+                justify-content: space-between !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                line-height: 1.2 !important;
+            }
+
+            .daily-completion-heading strong {
+                color: #1a1a1a !important;
+                font-size: 22px !important;
+                font-weight: 650 !important;
+            }
+
+            .daily-completion-track {
+                width: 100% !important;
+                height: 8px !important;
+                margin-top: 6px !important;
+                overflow: hidden !important;
+                background: #ececea !important;
+                border-radius: 999px !important;
+            }
+
+            .daily-completion-track > span {
+                display: block !important;
+                height: 100% !important;
+                background: #b9c9d6 !important;
+                border-radius: inherit !important;
+                transition: width 180ms ease !important;
+            }
+
+            .daily-completion-card.has-bonus .daily-completion-track > span {
+                background: linear-gradient(90deg, #acd9f5 0%, #d8c8f2 54%, #ffb9a7 100%) !important;
+                box-shadow: 0 0 10px rgba(178, 157, 225, 0.42) !important;
+            }
+
+            .daily-completion-footer {
+                justify-content: space-between !important;
+                gap: 10px !important;
+                margin-top: 7px !important;
+            }
+
+            .daily-completion-meta {
+                flex: 0 0 auto !important;
+                color: #777773 !important;
+                font-size: 11px !important;
+                line-height: 1.2 !important;
+            }
+
+            .daily-completion-items {
+                justify-content: flex-end !important;
+                gap: 10px !important;
+            }
+
+            .daily-completion-item {
+                position: relative !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 30px !important;
+                height: 30px !important;
+                color: #91918d !important;
+                background: #f1f1ef !important;
+                border-radius: 50% !important;
+            }
+
+            .daily-completion-item.is-complete {
+                color: #6f7790 !important;
+                background: #f0eff7 !important;
+            }
+
+            .daily-completion-icon,
+            .daily-completion-icon svg {
+                display: block !important;
+                width: 18px !important;
+                height: 18px !important;
+            }
+
+            .daily-completion-icon svg,
+            .daily-completion-badge svg {
+                fill: none !important;
+                stroke: currentColor !important;
+                stroke-width: 1.7 !important;
+                stroke-linecap: round !important;
+                stroke-linejoin: round !important;
+            }
+
+            .daily-completion-badge {
+                position: absolute !important;
+                top: -4px !important;
+                right: -4px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 14px !important;
+                height: 14px !important;
+                color: #ffffff !important;
+                background: #a6a6a2 !important;
+                border: 2px solid #fafafa !important;
+                border-radius: 50% !important;
+            }
+
+            .daily-completion-item.is-complete .daily-completion-badge {
+                background: #7b9f8a !important;
+            }
+
+            .daily-completion-badge svg {
+                width: 10px !important;
+                height: 10px !important;
+                stroke-width: 2.1 !important;
+            }
+
+            @media (max-width: 768px) {
+                .st-key-student_home_header .student-home-welcome {
+                    margin-bottom: 14px !important;
+                }
+
+                .daily-completion-items {
+                    gap: 8px !important;
+                }
+            }
+
+            @media (max-width: 768px) and (max-height: 700px) {
+                .st-key-daily_summary_cards div[data-testid="stPlotlyChart"],
+                .st-key-daily_summary_cards .weight-card,
+                .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
+                    height: 158px !important;
+                    min-height: 158px !important;
+                }
+
+                .st-key-daily_progress_cards [data-testid="stColumn"] {
+                    max-height: 158px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-card {
+                    padding: 18px 14px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-title {
+                    margin-bottom: 8px !important;
+                }
+
+                .st-key-daily_summary_cards .weight-trend {
+                    margin-top: 8px !important;
+                }
+
+                .st-key-daily_completion_card .daily-completion-card {
+                    min-height: 94px !important;
+                    padding: 9px 12px !important;
+                    border-radius: 18px !important;
+                }
+
+                .daily-completion-heading strong {
+                    font-size: 20px !important;
+                }
+
+                .daily-completion-footer {
+                    margin-top: 5px !important;
+                }
+
+                .daily-completion-item {
+                    width: 27px !important;
+                    height: 27px !important;
+                }
+
+                .daily-completion-icon,
+                .daily-completion-icon svg {
+                    width: 16px !important;
+                    height: 16px !important;
                 }
             }
 
