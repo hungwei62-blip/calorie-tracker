@@ -264,7 +264,9 @@ def apply_global_styles() -> None:
             .main .block-container:has(.st-key-student_home_header),
             [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header),
             .main .block-container:has(.st-key-coach_overview_header),
-            [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header) {
+            [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header),
+            .main .block-container:has(.st-key-student_history_page),
+            [data-testid="stMainBlockContainer"]:has(.st-key-student_history_page) {
                 padding-top: 32px !important;
             }
 
@@ -284,7 +286,9 @@ def apply_global_styles() -> None:
                 .main .block-container:has(.st-key-student_home_header),
                 [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header),
                 .main .block-container:has(.st-key-coach_overview_header),
-                [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header) {
+                [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header),
+                .main .block-container:has(.st-key-student_history_page),
+                [data-testid="stMainBlockContainer"]:has(.st-key-student_history_page) {
                     padding-top: 32px !important;
                 }
             }
@@ -664,7 +668,7 @@ def apply_global_styles() -> None:
             .st-key-student_weight_history_card {
                 box-sizing: border-box !important;
                 width: 100% !important;
-                padding: 18px 18px 6px !important;
+                padding: 18px 18px 4px !important;
                 overflow: hidden !important;
                 background: #ffffff !important;
                 border: 1px solid rgba(47, 62, 70, 0.08) !important;
@@ -684,6 +688,11 @@ def apply_global_styles() -> None:
 
             .st-key-student_weight_history_card div[data-testid="stColumn"] {
                 min-width: 0 !important;
+            }
+
+            .st-key-student_weight_history_card div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
+                box-sizing: border-box !important;
+                padding-left: 18px !important;
             }
 
             .st-key-student_weight_history_card .weight-history-card-heading {
@@ -741,13 +750,16 @@ def apply_global_styles() -> None:
                 box-shadow: 0 2px 8px rgba(47, 62, 70, 0.08) !important;
             }
 
+            .st-key-student_weight_history_chart,
             .st-key-student_weight_history_chart div[data-testid="stPlotlyChart"] {
+                margin-bottom: 0 !important;
+                padding-bottom: 0 !important;
                 overflow: hidden !important;
             }
 
             @media (max-width: 480px) {
                 .st-key-student_weight_history_card {
-                    padding: 14px 12px 6px !important;
+                    padding: 14px 12px 4px !important;
                     border-radius: 18px !important;
                 }
 
@@ -788,12 +800,6 @@ def apply_global_styles() -> None:
                     font-size: 11px !important;
                 }
 
-                .st-key-student_weight_history_chart div[data-testid="stPlotlyChart"],
-                .st-key-student_weight_history_chart .js-plotly-plot,
-                .st-key-student_weight_history_chart .plot-container {
-                    height: 230px !important;
-                }
-
             }
 
             /* ===== 學員歷史：週／月訓練日曆 ===== */
@@ -804,7 +810,7 @@ def apply_global_styles() -> None:
             .st-key-student_training_history_card {
                 box-sizing: border-box !important;
                 width: 100% !important;
-                padding: 16px 18px 18px !important;
+                padding: 16px 18px 26px !important;
                 overflow: hidden !important;
                 background: #ffffff !important;
                 border: 1px solid rgba(47, 62, 70, 0.08) !important;
@@ -953,7 +959,7 @@ def apply_global_styles() -> None:
                 }
 
                 .st-key-student_training_history_card {
-                    padding: 14px 10px 16px !important;
+                    padding: 14px 10px 24px !important;
                     border-radius: 18px !important;
                 }
 
@@ -988,6 +994,149 @@ def apply_global_styles() -> None:
                 .st-key-student_training_history_card .training-calendar-day {
                     width: min(38px, 100%) !important;
                     font-size: 12px !important;
+                }
+            }
+
+            /* ===== 學員歷史：熱量與蛋白質雙軸趨勢 ===== */
+            .st-key-student_nutrition_history {
+                margin-top: 20px !important;
+            }
+
+            .st-key-student_nutrition_history_card {
+                box-sizing: border-box !important;
+                width: 100% !important;
+                padding: 16px 0 8px !important;
+                overflow: hidden !important;
+                background: #ffffff !important;
+                border: 1px solid rgba(47, 62, 70, 0.08) !important;
+                border-radius: 20px !important;
+                box-shadow: 0 8px 28px rgba(47, 62, 70, 0.055) !important;
+            }
+
+            .st-key-student_nutrition_history_card > div[data-testid="stVerticalBlock"] {
+                gap: 8px !important;
+            }
+
+            .st-key-student_nutrition_history_card [data-testid="stButtonGroup"] {
+                width: min(180px, 100%) !important;
+                margin-left: auto !important;
+                margin-right: 18px !important;
+                padding: 3px !important;
+                background: #f3f4f2 !important;
+                border-radius: 12px !important;
+            }
+
+            .st-key-student_nutrition_history_card [data-testid="stButtonGroup"] button,
+            .st-key-student_nutrition_history_card button[data-testid="stBaseButton-segmented_control"] {
+                min-height: 32px !important;
+                padding: 4px 10px !important;
+                color: #777c79 !important;
+                background: transparent !important;
+                border: none !important;
+                border-radius: 9px !important;
+                box-shadow: none !important;
+                font-size: 12px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-student_nutrition_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
+            .st-key-student_nutrition_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
+                color: #252a27 !important;
+                background: #ffffff !important;
+                box-shadow: 0 2px 8px rgba(47, 62, 70, 0.08) !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 4px 14px !important;
+                padding: 2px 22px 0 !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary > div {
+                min-width: 0 !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary > div + div {
+                padding-left: 14px !important;
+                border-left: 1px solid rgba(47, 62, 70, 0.08) !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary span,
+            .st-key-student_nutrition_history_card .nutrition-history-summary strong,
+            .st-key-student_nutrition_history_card .nutrition-history-summary small {
+                font-variant-numeric: tabular-nums !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary > div > span {
+                display: block !important;
+                margin-bottom: 3px !important;
+                color: #737875 !important;
+                font-size: 11px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary strong {
+                margin-right: 5px !important;
+                font-size: 24px !important;
+                font-weight: 650 !important;
+                line-height: 1 !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary .is-calories strong {
+                color: #fd5424 !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary .is-protein strong {
+                color: #c18b00 !important;
+            }
+
+            .st-key-student_nutrition_history_card .nutrition-history-summary small {
+                color: #858a87 !important;
+                font-size: 10px !important;
+            }
+
+            .st-key-student_nutrition_history_card div[data-testid="stAlert"] {
+                margin-inline: 18px !important;
+            }
+
+            .st-key-student_nutrition_history_chart,
+            .st-key-student_nutrition_history_chart div[data-testid="stPlotlyChart"] {
+                margin-bottom: 0 !important;
+                overflow: hidden !important;
+            }
+
+            @media (max-width: 480px) {
+                .st-key-student_nutrition_history {
+                    margin-top: 16px !important;
+                }
+
+                .st-key-student_nutrition_history_card {
+                    padding: 14px 0 6px !important;
+                    border-radius: 18px !important;
+                }
+
+                .st-key-student_nutrition_history_card [data-testid="stButtonGroup"] {
+                    width: 150px !important;
+                    margin-right: 10px !important;
+                }
+
+                .st-key-student_nutrition_history_card .nutrition-history-summary {
+                    gap: 4px 8px !important;
+                    padding-inline: 12px !important;
+                }
+
+                .st-key-student_nutrition_history_card .nutrition-history-summary > div + div {
+                    padding-left: 8px !important;
+                }
+
+                .st-key-student_nutrition_history_card .nutrition-history-summary strong {
+                    font-size: 20px !important;
+                }
+
+                .st-key-student_nutrition_history_card div[data-testid="stAlert"] {
+                    margin-inline: 10px !important;
                 }
             }
 

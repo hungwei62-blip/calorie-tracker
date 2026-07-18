@@ -13,18 +13,21 @@ from PIL import Image
 from services import auth, gemini, metrics, sheets
 from domain.daily_completion import DailyCompletion, calculate_daily_completion
 from domain.history import (
+    NutritionHistoryPoint,
     TrainingCalendarDay,
     WeightHistoryPoint,
+    build_nutrition_history_series,
     build_training_calendar,
     build_weight_history_series,
     history_date_range,
+    nutrition_history_averages,
     shift_training_period,
     training_period_bounds,
 )
 from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, calculate_tdee
 from pages.common import (
     DEFAULT_GOALS, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
-    _fetch_records_cached, _today_range, _week_range, do_logout,
+    _fetch_records_cached, _today_range, do_logout,
     get_default_avatar_source,
 )
 
@@ -1156,6 +1159,10 @@ def build_weight_history_figure(
 ) -> go.Figure:
     x_values = [point.day for point in points]
     y_values = [point.weight_kg for point in points]
+    point_labels = [
+        f"{point.weight_kg:.1f}" if point.weight_kg is not None else ""
+        for point in points
+    ]
     hover_status = [
         (
             "實際紀錄"
@@ -1179,7 +1186,7 @@ def build_weight_history_figure(
         go.Scatter(
             x=x_values,
             y=y_values,
-            mode="lines",
+            mode="lines+markers+text",
             line={
                 "color": "#16a77a",
                 "width": 3,
@@ -1194,6 +1201,11 @@ def build_weight_history_figure(
                     [1.0, "rgba(22,167,122,0.18)"],
                 ],
             },
+            marker={"size": 5, "color": "#16a77a"},
+            text=point_labels,
+            textposition="top center",
+            textfont={"size": 9, "color": "#397565"},
+            cliponaxis=False,
             customdata=hover_status,
             connectgaps=False,
             hovertemplate=(
@@ -1223,14 +1235,14 @@ def build_weight_history_figure(
     y_range = None
     if weights:
         low, high = min(weights), max(weights)
-        padding = max((high - low) * 0.2, 1.0 if low == high else 0.5)
+        padding = max((high - low) * 0.12, 0.5 if low == high else 0.3)
         y_range = [low - padding, high + padding]
 
     tick_values = _weight_history_tick_values(x_values, day_count)
 
     figure.update_layout(
-        height=280,
-        margin={"l": 4, "r": 4, "t": 8, "b": 4},
+        height=220,
+        margin={"l": 18, "r": 18, "t": 22, "b": 22},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
@@ -1241,7 +1253,8 @@ def build_weight_history_figure(
             "tickvals": tick_values,
             "tickformat": "%m/%d",
             "tickfont": {"size": 11, "color": "#7a7a7a"},
-            "automargin": True,
+            "range": [x_values[0], x_values[-1]] if x_values else None,
+            "automargin": False,
             "fixedrange": True,
         },
         yaxis={
@@ -1445,6 +1458,177 @@ def _render_student_training_history(user_id: str) -> None:
             )
 
 
+def build_nutrition_history_summary_html(
+    points: list[NutritionHistoryPoint],
+) -> str:
+    averages = nutrition_history_averages(points)
+    if averages is None:
+        return ""
+    calories, protein, _ = averages
+    return (
+        '<section class="nutrition-history-summary" '
+        'aria-label="期間每日平均攝取">'
+        '<div class="is-calories"><span>平均熱量</span>'
+        f'<strong>{calories:.0f}</strong><small>kcal／日</small></div>'
+        '<div class="is-protein"><span>平均蛋白質</span>'
+        f'<strong>{protein:.1f}</strong><small>g／日</small></div>'
+        "</section>"
+    )
+
+
+def build_nutrition_history_figure(
+    points: list[NutritionHistoryPoint], day_count: int
+) -> go.Figure:
+    x_values = [point.day for point in points]
+    calorie_values = [point.calories for point in points]
+    protein_values = [point.protein for point in points]
+    seven_day_view = day_count <= 7
+    tick_values = (
+        x_values
+        if seven_day_view
+        else _weight_history_tick_values(x_values, day_count)
+    )
+    tick_text = (
+        [("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[day.weekday()]
+         for day in tick_values]
+        if seven_day_view
+        else None
+    )
+
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=calorie_values,
+            mode="lines+markers",
+            line={
+                "color": "#fd5424",
+                "width": 3,
+                "shape": "spline",
+                "smoothing": 1.0,
+            },
+            marker={
+                "size": 6,
+                "color": "#fd5424",
+                "line": {"color": "#ffffff", "width": 1.2},
+            },
+            connectgaps=False,
+            hovertemplate="熱量 %{y:.0f} kcal<extra></extra>",
+            name="熱量",
+            yaxis="y",
+        )
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=protein_values,
+            mode="lines+markers",
+            line={
+                "color": "#f1b725",
+                "width": 3,
+                "shape": "spline",
+                "smoothing": 1.0,
+            },
+            marker={
+                "size": 6,
+                "color": "#f1b725",
+                "line": {"color": "#ffffff", "width": 1.2},
+            },
+            connectgaps=False,
+            hovertemplate="蛋白質 %{y:.1f} g<extra></extra>",
+            name="蛋白質",
+            yaxis="y2",
+        )
+    )
+    figure.update_layout(
+        height=250,
+        margin={"l": 4, "r": 4, "t": 10, "b": 30},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        hovermode="x unified",
+        xaxis={
+            "showgrid": False,
+            "zeroline": False,
+            "tickvals": tick_values,
+            "ticktext": tick_text,
+            "tickformat": "%m/%d",
+            "tickfont": {"size": 11, "color": "#7a7a7a"},
+            "fixedrange": True,
+        },
+        yaxis={
+            "tickfont": {"size": 10, "color": "#b84b2d"},
+            "ticklabelposition": "inside",
+            "showgrid": False,
+            "zeroline": False,
+            "rangemode": "tozero",
+            "automargin": False,
+            "fixedrange": True,
+        },
+        yaxis2={
+            "tickfont": {"size": 10, "color": "#a17b1d"},
+            "ticklabelposition": "inside",
+            "overlaying": "y",
+            "side": "right",
+            "showgrid": False,
+            "zeroline": False,
+            "rangemode": "tozero",
+            "automargin": False,
+            "fixedrange": True,
+        },
+        font={"family": "system-ui, -apple-system, sans-serif"},
+    )
+    return figure
+
+
+def _render_student_nutrition_history(user_id: str) -> None:
+    with st.container(key="student_nutrition_history"):
+        st.subheader("攝取趨勢")
+        selected_range = st.session_state.get(
+            "nutrition_history_range", "7 天"
+        )
+        if selected_range not in ("7 天", "30 天"):
+            selected_range = "7 天"
+        day_count = 30 if selected_range == "30 天" else 7
+        start_date, end_date = history_date_range(date.today(), day_count)
+
+        try:
+            records = _fetch_records_cached(user_id)
+        except Exception:
+            st.error("取得飲食紀錄失敗，請稍後再試。")
+            return
+
+        points = build_nutrition_history_series(
+            records,
+            start_date,
+            end_date,
+            today=date.today(),
+        )
+        with st.container(key="student_nutrition_history_card"):
+            st.segmented_control(
+                "期間",
+                ("7 天", "30 天"),
+                default=selected_range,
+                key="nutrition_history_range",
+                required=True,
+                label_visibility="collapsed",
+                width="stretch",
+            )
+            if nutrition_history_averages(points) is None:
+                st.info("所選期間尚無飲食紀錄。")
+                return
+            st.markdown(
+                build_nutrition_history_summary_html(points),
+                unsafe_allow_html=True,
+            )
+            st.plotly_chart(
+                build_nutrition_history_figure(points, day_count),
+                key="student_nutrition_history_chart",
+                width="stretch",
+                config={"displayModeBar": False, "responsive": True},
+            )
+
+
 def page_log_meal() -> None:
     """學員日常紀錄入口，只渲染目前開啟的分段。"""
     target_tab = st.session_state.pop(DAILY_RECORD_TAB_TARGET_KEY, None)
@@ -1486,106 +1670,13 @@ def page_log_meal() -> None:
 # =============================================================================
 
 def page_history() -> None:
+    with st.container(key="student_history_page"):
+        st.header("歷史紀錄")
 
-    st.header("📜 歷史記錄")
-
-    uid = st.session_state.user_id
-
-    _render_student_weight_history(uid)
-
-    _render_student_training_history(uid)
-
-    st.divider()
-
-    try:
-
-        records = _fetch_records_cached(uid)
-
-        goals = _fetch_goals_cached(uid)
-
-    except Exception as exc:
-
-        st.error("取得記錄失敗: " + str(exc))
-
-        return
-
-    bmr = goals.get("bmr", 0)
-
-    calorie_goal = goals.get("calorie", 0)
-
-    if bmr <= 0 or calorie_goal <= 0:
-
-        st.info("營養目標尚未設定，暫時無法顯示攝取歷史。")
-
-        return
-
-    ws, we = _week_range()
-
-    days = (we - ws).days + 1
-
-    st.subheader("每日攝取")
-
-    daily_data = []
-
-    for i in range(days):
-
-        d = ws + timedelta(days=i)
-
-        day_recs = metrics.filter_records(records, d, d)
-
-        day_totals = metrics.sum_totals(day_recs).as_dict()
-
-        day_cal = float(day_totals.get("calories", 0.0))
-
-        day_pro = float(day_totals.get("protein", 0.0))
-
-        cal_ratio = (day_cal / calorie_goal) if calorie_goal > 0 else 0.0
-
-        pro_ratio = (day_pro / goals.get("protein", 1)) if goals.get("protein", 0) > 0 else 0.0
-
-        date_str = d.strftime("%m/%d")
-
-        weekday = ["一", "二", "三", "四", "五", "六", "日"][d.weekday()]
-
-        daily_data.append({
-
-            "日期": f"{date_str}({weekday})",
-
-            "熱量": f"{day_cal:.0f}",
-
-            "熱量目標": f"{calorie_goal:.0f}",
-
-            "熱量%": f"{cal_ratio:.0%}",
-
-            "蛋白質": f"{day_pro:.0f}g",
-
-            "蛋白質%": f"{pro_ratio:.0%}",
-
-        })
-
-    st.dataframe(daily_data, width="stretch", hide_index=True)
-
-    st.subheader("熱量達成率")
-
-    calorie_chart = {"日期": [], "達成率(%)": []}
-
-    for i in range(days):
-
-        d = ws + timedelta(days=i)
-
-        day_recs = metrics.filter_records(records, d, d)
-
-        day_totals = metrics.sum_totals(day_recs).as_dict()
-
-        day_cal = float(day_totals.get("calories", 0.0))
-
-        cal_ratio = (day_cal / calorie_goal * 100) if calorie_goal > 0 else 0.0
-
-        calorie_chart["日期"].append(d.strftime("%m/%d"))
-
-        calorie_chart["達成率(%)"].append(min(cal_ratio, 100))
-
-    st.bar_chart(calorie_chart, x="日期", y="達成率(%)")
+        uid = st.session_state.user_id
+        _render_student_weight_history(uid)
+        _render_student_training_history(uid)
+        _render_student_nutrition_history(uid)
 
 # =============================================================================
 

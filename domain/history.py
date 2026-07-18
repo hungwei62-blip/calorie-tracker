@@ -23,6 +23,14 @@ class TrainingCalendarDay:
     has_training: bool
 
 
+@dataclass(frozen=True)
+class NutritionHistoryPoint:
+    day: date
+    calories: float | None
+    protein: float | None
+    recorded: bool
+
+
 def parse_record_date(timestamp: Any) -> date:
     try:
         return date.fromisoformat(str(timestamp)[:10])
@@ -116,6 +124,82 @@ def build_weight_history_series(
         )
         current_day += timedelta(days=1)
     return points
+
+
+def _nonnegative_finite(value: object) -> float | None:
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or number < 0:
+        return None
+    return number
+
+
+def build_nutrition_history_series(
+    records: list[dict[str, Any]],
+    start_date: date,
+    end_date: date,
+    *,
+    today: date,
+) -> list[NutritionHistoryPoint]:
+    """Aggregate food intake by day while leaving unrecorded days empty."""
+    if end_date < start_date:
+        raise ValueError("end_date must not be earlier than start_date")
+
+    totals: dict[date, list[float]] = {}
+    for record in records:
+        if str(record.get("meal_type", "") or "").strip() != "食物":
+            continue
+        record_date = parse_record_date(record.get("timestamp", ""))
+        if (
+            record_date == date.min
+            or record_date < start_date
+            or record_date > end_date
+            or record_date > today
+        ):
+            continue
+
+        calories = _nonnegative_finite(record.get("calories", 0))
+        protein = _nonnegative_finite(record.get("protein", 0))
+        valid_calories = calories if calories is not None else 0.0
+        valid_protein = protein if protein is not None else 0.0
+        if valid_calories <= 0 and valid_protein <= 0:
+            continue
+
+        daily = totals.setdefault(record_date, [0.0, 0.0])
+        daily[0] += valid_calories
+        daily[1] += valid_protein
+
+    points: list[NutritionHistoryPoint] = []
+    current = start_date
+    while current <= end_date:
+        daily = totals.get(current)
+        points.append(
+            NutritionHistoryPoint(
+                day=current,
+                calories=daily[0] if daily is not None else None,
+                protein=daily[1] if daily is not None else None,
+                recorded=daily is not None,
+            )
+        )
+        current += timedelta(days=1)
+    return points
+
+
+def nutrition_history_averages(
+    points: list[NutritionHistoryPoint],
+) -> tuple[float, float, int] | None:
+    """Return daily calorie/protein averages over recorded food days only."""
+    recorded = [point for point in points if point.recorded]
+    if not recorded:
+        return None
+    count = len(recorded)
+    return (
+        sum(float(point.calories or 0) for point in recorded) / count,
+        sum(float(point.protein or 0) for point in recorded) / count,
+        count,
+    )
 
 
 def _has_training_types(value: object) -> bool:
