@@ -398,8 +398,24 @@ def page_tdee_questionnaire() -> None:
 
 
 def page_login() -> None:
-    st.title("飲食控制管理系統")
-    st.caption("輕鬆記錄飲食，追蹤你的營養目標")
+    with st.container(key="auth_brand"):
+        st.markdown(
+            """
+            <div class="auth-brand-lockup">
+                <h1 class="auth-brand-title">
+                    <span class="auth-brand-english">PROJECT PRIME</span>
+                    <span class="auth-brand-divider">|</span>
+                    <span class="auth-brand-chinese">巔峰計畫</span>
+                </h1>
+                <p class="auth-brand-tagline">
+                    <span>吃對、練對持續做。</span>
+                    <span>剩下交給時間，進化沒有捷徑，</span>
+                    <span>但每一步都算數，把自己推向人生最好的狀態</span>
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # 確保 auth_mode 存在
     if "auth_mode" not in st.session_state:

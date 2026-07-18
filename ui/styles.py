@@ -854,6 +854,72 @@ def apply_global_styles() -> None:
             /* ============================================================
                強制限制登入表單（st.form）寬度並使其水平置中
                ============================================================ */
+            .st-key-auth_brand .auth-brand-lockup {
+                width: 100% !important;
+                margin: 0 auto !important;
+                text-align: center !important;
+                font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
+            }
+
+            .st-key-auth_brand .auth-brand-title {
+                display: flex !important;
+                align-items: baseline !important;
+                justify-content: center !important;
+                gap: 0.34em !important;
+                margin: 0 !important;
+                color: #2f3e46 !important;
+                font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
+                font-size: clamp(21px, 4vw, 32px) !important;
+                font-weight: 600 !important;
+                line-height: 1.25 !important;
+                white-space: nowrap !important;
+            }
+
+            .st-key-auth_brand .auth-brand-english {
+                letter-spacing: 0.06em !important;
+            }
+
+            .st-key-auth_brand .auth-brand-divider {
+                color: #a3aaa7 !important;
+                font-weight: 300 !important;
+            }
+
+            .st-key-auth_brand .auth-brand-chinese {
+                letter-spacing: 0.04em !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-auth_brand .auth-brand-tagline {
+                max-width: 680px !important;
+                margin: 14px auto 0 !important;
+                color: #6f7774 !important;
+                font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
+                font-size: 15px !important;
+                font-weight: 400 !important;
+                line-height: 1.8 !important;
+                letter-spacing: 0.025em !important;
+                text-align: center !important;
+            }
+
+            .st-key-auth_brand .auth-brand-tagline span {
+                display: block !important;
+            }
+
+            @media (max-width: 768px) {
+                .st-key-auth_brand .auth-brand-title {
+                    font-size: clamp(21px, 6.4vw, 26px) !important;
+                    gap: 0.26em !important;
+                }
+
+                .st-key-auth_brand .auth-brand-tagline {
+                    max-width: 360px !important;
+                    margin-top: 12px !important;
+                    padding: 0 6px !important;
+                    font-size: 14px !important;
+                    line-height: 1.75 !important;
+                }
+            }
+
             div[data-testid="stForm"] {
                 max-width: 400px !important;              /* 限制最大寬度，防止橫向拉長 */
                 width: 100% !important;
