@@ -42,7 +42,7 @@ archive/                不參與部署的舊版腳本與實驗檔
 - `Users`：帳號、bcrypt 密碼雜湊、`admin/coach/student` 角色、營養目標、`coach_id`
 - `Records`：飲食及飲水紀錄
 - `Weight`：體重紀錄
-- `Training`：訓練紀錄
+- `Training`：分類訓練紀錄，包含訓練類型及重量／有氧／其他的獨立內容
 - `Notes`：教練備註
 
 營養目標直接存放在 `Users`，沒有獨立的 `Goals` 工作表。
@@ -66,3 +66,25 @@ python tools/audit_and_migrate.py
 ```bash
 python tools/audit_and_migrate.py --apply
 ```
+
+### Training 結構遷移
+
+新版 `Training` 使用以下欄位：
+
+```text
+timestamp, user_id, training_types, strength_detail, cardio_detail, other_detail
+```
+
+先預覽並備份現有 Training：
+
+```bash
+python tools/migrate_training_schema.py
+```
+
+確認 `backups/migrate_training_<時間>/report.json` 後才清除舊訓練資料並套用新表頭：
+
+```bash
+python tools/migrate_training_schema.py --apply
+```
+
+這項遷移不轉換舊的背、胸、腿、核心與有氧欄位；`--apply` 會在完整備份後刪除全部舊 Training 資料。
