@@ -44,7 +44,7 @@ def test_progress_figure_contains_expected_values_labels_and_units():
 
     assert list(figure.data[0].values) == [63, 37]
     assert figure.data[0].hole == 0.68
-    assert figure.layout.height == 150
+    assert figure.layout.height == 180
     annotation_text = [annotation.text for annotation in figure.layout.annotations]
     assert annotation_text == [
         "水量",
@@ -100,6 +100,8 @@ def test_calorie_figure_contains_expected_values_and_labels():
     assert title.font.size == 15
     assert title.font.weight == 500
     assert title.font.color == "#1a1a1a"
+    assert title.xanchor == "left"
+    assert title.yanchor == "top"
 
 
 def test_calorie_figure_clamps_invalid_values():
@@ -146,6 +148,9 @@ def test_progress_cards_have_scoped_fixed_two_column_styles():
     assert 'width: calc(50% - 5px) !important;' in stylesheet
     assert 'max-width: calc(50% - 5px) !important;' in stylesheet
     assert 'min-width: 0 !important;' in stylesheet
+    assert 'height: 180px !important;' in stylesheet
+    assert 'min-height: 180px !important;' in stylesheet
+    assert 'max-height: 180px !important;' in stylesheet
 
 
 def test_daily_summary_cards_have_scoped_equal_height_two_column_styles():
@@ -166,6 +171,7 @@ def test_daily_summary_cards_have_scoped_equal_height_two_column_styles():
     assert 'font-size: 15px !important;' in stylesheet
     assert 'font-weight: 500 !important;' in stylesheet
     assert 'color: #1a1a1a !important;' in stylesheet
+    assert 'padding: 24px 14px !important;' in stylesheet
     assert 'background-color: rgba(255, 255, 255, 0.76) !important;' in stylesheet
     assert '.st-key-weight_add_btn [data-testid="stMarkdownContainer"]' in stylesheet
     assert '.st-key-weight_add_btn [data-testid="stIconMaterial"]' in stylesheet

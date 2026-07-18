@@ -156,7 +156,7 @@ def build_daily_progress_figure(
     figure.update_layout(
         paper_bgcolor="#c7edf6",
         plot_bgcolor="#c7edf6",
-        height=150,
+        height=180,
         margin={"l": 8, "r": 8, "t": 8, "b": 8},
         showlegend=False,
         annotations=annotations,
@@ -199,6 +199,8 @@ def build_calorie_figure(actual: object, goal: object) -> go.Figure:
             },
             "showarrow": False,
             "align": "left",
+            "xanchor": "left",
+            "yanchor": "top",
         },
         {
             "x": 0.5,

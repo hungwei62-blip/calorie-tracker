@@ -293,6 +293,9 @@ def apply_global_styles() -> None:
             }
 
             .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
+                height: 180px !important;
+                min-height: 180px !important;
+                max-height: 180px !important;
                 margin: 0 !important;
                 overflow: hidden !important;
                 border-radius: 24px !important;
@@ -433,7 +436,7 @@ def apply_global_styles() -> None:
                 }
 
                 .st-key-daily_summary_cards .weight-card {
-                    padding: 18px 14px !important;
+                    padding: 24px 14px !important;
                 }
 
                 .st-key-daily_summary_cards .weight-title {
