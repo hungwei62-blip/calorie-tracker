@@ -5,6 +5,7 @@ import inspect
 
 import pages.student as student_pages
 from pages.student import (
+    _goal_status,
     _progress_percentage,
     _weight_summary,
     build_calorie_figure,
@@ -21,12 +22,23 @@ def test_progress_percentage_is_clamped_and_handles_invalid_goals():
     assert _progress_percentage(500, None) == 0
 
 
+def test_goal_status_handles_thresholds_and_invalid_goals():
+    assert _goal_status(99, 100) == ("不足", "#b85c5c")
+    assert _goal_status(100, 100) == ("達成", "#3f7d5a")
+    assert _goal_status(101, 100) == ("達成", "#3f7d5a")
+    assert _goal_status(-1, 100) == ("不足", "#b85c5c")
+    assert _goal_status(1, 0) is None
+    assert _goal_status(1, None) is None
+    assert _goal_status(100, 100, over_only=True) is None
+    assert _goal_status(101, 100, over_only=True) == ("超過", "#b85c5c")
+
+
 def test_progress_figure_contains_expected_values_labels_and_units():
     figure = build_daily_progress_figure(
-        "飲食進度",
+        "水量",
         actual=1260,
         goal=2000,
-        unit="kcal",
+        unit="ml",
         display_date=date(2026, 7, 18),
     )
 
@@ -35,20 +47,41 @@ def test_progress_figure_contains_expected_values_labels_and_units():
     assert figure.layout.height == 150
     annotation_text = [annotation.text for annotation in figure.layout.annotations]
     assert annotation_text == [
-        "<b>飲食進度</b>",
+        "水量",
         "<b>63%</b>",
         "18 July",
         "<b>1260</b>",
-        "kcal",
+        "ml",
+        "<b>不足</b>",
     ]
+    percentage, date_annotation, actual = figure.layout.annotations[1:4]
+    assert percentage.font.size == 26
+    assert date_annotation.font.size == 11
+    assert (actual.x, actual.y) == (0.74, 0.50)
+    assert (actual.xanchor, actual.yanchor) == ("center", "middle")
+    assert actual.font.size == 18
+    title = figure.layout.annotations[0]
+    assert title.text == "水量"
+    assert title.font.family == "system-ui, -apple-system, sans-serif"
+    assert title.font.size == 15
+    assert title.font.weight == 500
+    assert title.font.color == "#1a1a1a"
 
 
 def test_progress_figure_clamps_over_goal_and_handles_zero_goal():
-    over_goal = build_daily_progress_figure("水量進度", 3000, 2000, "ml")
-    zero_goal = build_daily_progress_figure("蛋白質進度", 50, 0, "g")
+    over_goal = build_daily_progress_figure("水量", 3000, 2000, "ml")
+    zero_goal = build_daily_progress_figure("蛋白質", 50, 0, "g")
 
     assert list(over_goal.data[0].values) == [100, 0]
     assert list(zero_goal.data[0].values) == [0, 100]
+    assert over_goal.layout.annotations[-1].text == "<b>達成</b>"
+    assert len(zero_goal.layout.annotations) == 5
+    protein_title = zero_goal.layout.annotations[0]
+    assert protein_title.text == "蛋白質"
+    assert protein_title.font.family == "system-ui, -apple-system, sans-serif"
+    assert protein_title.font.size == 15
+    assert protein_title.font.weight == 500
+    assert protein_title.font.color == "#1a1a1a"
 
 
 def test_calorie_figure_contains_expected_values_and_labels():
@@ -58,9 +91,15 @@ def test_calorie_figure_contains_expected_values_and_labels():
     assert figure.data[0].hole == 0.76
     assert figure.layout.height == 180
     annotation_text = [annotation.text for annotation in figure.layout.annotations]
-    assert "Calories" in annotation_text[0]
+    assert "卡路里" in annotation_text[0]
     assert ">1260</b>" in annotation_text[1]
     assert "Kcal" in annotation_text[2]
+    title = figure.layout.annotations[0]
+    assert title.text == "卡路里"
+    assert title.font.family == "system-ui, -apple-system, sans-serif"
+    assert title.font.size == 15
+    assert title.font.weight == 500
+    assert title.font.color == "#1a1a1a"
 
 
 def test_calorie_figure_clamps_invalid_values():
@@ -69,6 +108,8 @@ def test_calorie_figure_clamps_invalid_values():
 
     assert list(over_goal.data[0].values) == [100, 0]
     assert list(invalid_goal.data[0].values) == [0, 100]
+    assert over_goal.layout.annotations[-1].text == "<b>超過</b>"
+    assert len(invalid_goal.layout.annotations) == 3
 
 
 def test_weight_summary_uses_weight_records_for_latest_value_and_trend():
@@ -119,7 +160,15 @@ def test_daily_summary_cards_have_scoped_equal_height_two_column_styles():
     assert 'flex: 0 0 calc(50% - 5px) !important;' in stylesheet
     assert '.st-key-daily_summary_cards .weight-card' in stylesheet
     assert 'height: 180px !important;' in stylesheet
-    assert '.st-key-daily_summary_cards .st-key-weight_lightning_btn button' in stylesheet
+    assert '.st-key-daily_summary_cards .st-key-weight_add_btn button' in stylesheet
+    assert '.st-key-daily_summary_cards .weight-title' in stylesheet
+    assert 'font-family: system-ui, -apple-system, sans-serif !important;' in stylesheet
+    assert 'font-size: 15px !important;' in stylesheet
+    assert 'font-weight: 500 !important;' in stylesheet
+    assert 'color: #1a1a1a !important;' in stylesheet
+    assert 'background-color: rgba(255, 255, 255, 0.76) !important;' in stylesheet
+    assert '.st-key-weight_add_btn [data-testid="stMarkdownContainer"]' in stylesheet
+    assert '.st-key-weight_add_btn [data-testid="stIconMaterial"]' in stylesheet
 
 
 def test_student_home_has_scoped_desktop_and_mobile_top_spacing():
@@ -157,8 +206,14 @@ def test_personal_page_is_simplified_and_orders_summary_before_progress():
     assert 'st.metric("脂肪"' not in source
     assert "get_user_record_mode" not in source
     assert '"飲食進度"' not in source
-    assert '"水量進度"' in source
-    assert '"蛋白質進度"' in source
+    assert '"水量"' in source
+    assert '"蛋白質"' in source
+    assert '"水量進度"' not in source
+    assert '"蛋白質進度"' not in source
+    assert 'class="weight-title">體重' in source
+    assert 'key="weight_add_btn"' in source
+    assert 'icon=":material/add:"' in source
+    assert 'weight_lightning_btn' not in source
     assert 'st.subheader("今日概況")' not in source
     assert 'st.subheader("今日目標進度")' not in source
     assert "st.divider()" not in source

@@ -348,14 +348,14 @@ def apply_global_styles() -> None:
                 margin-bottom: 12px !important;
                 color: #1a1a1a !important;
                 font-family: system-ui, -apple-system, sans-serif !important;
-                font-size: 16px !important;
+                font-size: 15px !important;
                 font-weight: 500 !important;
             }
 
             .st-key-daily_summary_cards .weight-value {
                 color: #1a1a1a !important;
                 font-family: system-ui, -apple-system, sans-serif !important;
-                font-size: 36px !important;
+                font-size: 28px !important;
                 font-weight: 700 !important;
                 line-height: 1 !important;
             }
@@ -377,7 +377,7 @@ def apply_global_styles() -> None:
                 font-weight: 500 !important;
             }
 
-            .st-key-daily_summary_cards .st-key-weight_lightning_btn {
+            .st-key-daily_summary_cards .st-key-weight_add_btn {
                 position: absolute !important;
                 top: 16px !important;
                 right: 16px !important;
@@ -386,7 +386,7 @@ def apply_global_styles() -> None:
                 z-index: 10 !important;
             }
 
-            .st-key-daily_summary_cards .st-key-weight_lightning_btn button {
+            .st-key-daily_summary_cards .st-key-weight_add_btn button {
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
@@ -396,18 +396,34 @@ def apply_global_styles() -> None:
                 height: 40px !important;
                 min-height: 40px !important;
                 padding: 0 !important;
-                color: #1a1a1a !important;
-                background-color: #ffffff !important;
-                border: none !important;
+                color: #6f6f6a !important;
+                background-color: rgba(255, 255, 255, 0.76) !important;
+                border: 1px solid rgba(120, 120, 115, 0.14) !important;
                 border-radius: 50% !important;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
                 font-size: 18px !important;
             }
 
-            .st-key-daily_summary_cards .st-key-weight_lightning_btn button:hover {
-                background-color: #f3f3f3 !important;
-                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.10) !important;
-                transform: scale(1.06) !important;
+            .st-key-daily_summary_cards .st-key-weight_add_btn button:hover {
+                background-color: rgba(255, 255, 255, 0.94) !important;
+                box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05) !important;
+            }
+
+            .st-key-daily_summary_cards .st-key-weight_add_btn [data-testid="stMarkdownContainer"] {
+                position: absolute !important;
+                width: 1px !important;
+                height: 1px !important;
+                padding: 0 !important;
+                margin: -1px !important;
+                overflow: hidden !important;
+                clip: rect(0, 0, 0, 0) !important;
+                white-space: nowrap !important;
+                border: 0 !important;
+            }
+
+            .st-key-daily_summary_cards .st-key-weight_add_btn [data-testid="stIconMaterial"] {
+                margin: 0 !important;
+                color: #6f6f6a !important;
             }
 
             @media (max-width: 768px) {
@@ -422,7 +438,7 @@ def apply_global_styles() -> None:
 
                 .st-key-daily_summary_cards .weight-title {
                     max-width: calc(100% - 38px) !important;
-                    font-size: 13px !important;
+                    font-size: 15px !important;
                 }
 
                 .st-key-daily_summary_cards .weight-value {
@@ -438,14 +454,14 @@ def apply_global_styles() -> None:
                     font-size: 11px !important;
                 }
 
-                .st-key-daily_summary_cards .st-key-weight_lightning_btn {
+                .st-key-daily_summary_cards .st-key-weight_add_btn {
                     top: 12px !important;
                     right: 12px !important;
                     width: 34px !important;
                     height: 34px !important;
                 }
 
-                .st-key-daily_summary_cards .st-key-weight_lightning_btn button {
+                .st-key-daily_summary_cards .st-key-weight_add_btn button {
                     width: 34px !important;
                     min-width: 34px !important;
                     max-width: 34px !important;

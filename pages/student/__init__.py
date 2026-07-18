@@ -32,6 +32,24 @@ def _progress_percentage(actual: object, goal: object) -> float:
     return min(actual_value / goal_value * 100, 100.0)
 
 
+def _goal_status(
+    actual: object,
+    goal: object,
+    *,
+    over_only: bool = False,
+) -> tuple[str, str] | None:
+    """Return the compact card status, or nothing when no valid goal exists."""
+    actual_value = max(_to_float(actual), 0.0)
+    goal_value = _to_float(goal)
+    if goal_value <= 0:
+        return None
+    if over_only:
+        return ("超過", "#b85c5c") if actual_value > goal_value else None
+    if actual_value >= goal_value:
+        return "達成", "#3f7d5a"
+    return "不足", "#b85c5c"
+
+
 def build_daily_progress_figure(
     label: str,
     actual: object,
@@ -59,20 +77,19 @@ def build_daily_progress_figure(
             )
         ]
     )
-    figure.update_layout(
-        paper_bgcolor="#c7edf6",
-        plot_bgcolor="#c7edf6",
-        height=150,
-        margin={"l": 8, "r": 8, "t": 8, "b": 8},
-        showlegend=False,
-        annotations=[
+    annotations = [
             {
                 "x": 0.03,
                 "y": 0.84,
                 "xref": "paper",
                 "yref": "paper",
-                "text": f"<b>{label}</b>",
-                "font": {"size": 10, "color": "#5a6e7f"},
+                "text": label,
+                "font": {
+                    "family": "system-ui, -apple-system, sans-serif",
+                    "size": 15,
+                    "weight": 500,
+                    "color": "#1a1a1a",
+                },
                 "showarrow": False,
                 "xanchor": "left",
             },
@@ -82,9 +99,10 @@ def build_daily_progress_figure(
                 "xref": "paper",
                 "yref": "paper",
                 "text": f"<b>{percentage:.0f}%</b>",
-                "font": {"size": 22, "color": "#1a2530"},
+                "font": {"size": 26, "color": "#1a2530"},
                 "showarrow": False,
                 "xanchor": "left",
+                "yanchor": "middle",
             },
             {
                 "x": 0.03,
@@ -92,29 +110,56 @@ def build_daily_progress_figure(
                 "xref": "paper",
                 "yref": "paper",
                 "text": date_label,
-                "font": {"size": 9, "color": "#5a6e7f"},
+                "font": {"size": 11, "color": "#5a6e7f"},
                 "showarrow": False,
                 "xanchor": "left",
             },
             {
                 "x": 0.74,
-                "y": 0.55,
+                "y": 0.50,
                 "xref": "paper",
                 "yref": "paper",
                 "text": f"<b>{actual_value:.0f}</b>",
-                "font": {"size": 14, "color": "#1a2530"},
+                "font": {"size": 18, "color": "#1a2530"},
                 "showarrow": False,
+                "xanchor": "center",
+                "yanchor": "middle",
             },
             {
                 "x": 0.74,
-                "y": 0.40,
+                "y": 0.34,
                 "xref": "paper",
                 "yref": "paper",
                 "text": unit,
                 "font": {"size": 8, "color": "#5a6e7f"},
                 "showarrow": False,
+                "xanchor": "center",
             },
-        ],
+        ]
+    status = _goal_status(actual_value, goal)
+    if status:
+        status_text, status_color = status
+        annotations.append(
+            {
+                "x": 0.96,
+                "y": 0.04,
+                "xref": "paper",
+                "yref": "paper",
+                "text": f"<b>{status_text}</b>",
+                "font": {"size": 11, "color": status_color},
+                "showarrow": False,
+                "xanchor": "right",
+                "yanchor": "bottom",
+            }
+        )
+
+    figure.update_layout(
+        paper_bgcolor="#c7edf6",
+        plot_bgcolor="#c7edf6",
+        height=150,
+        margin={"l": 8, "r": 8, "t": 8, "b": 8},
+        showlegend=False,
+        annotations=annotations,
     )
     return figure
 
@@ -139,6 +184,61 @@ def build_calorie_figure(actual: object, goal: object) -> go.Figure:
             )
         ]
     )
+    annotations = [
+        {
+            "x": 0.02,
+            "y": 1.22,
+            "xref": "paper",
+            "yref": "paper",
+            "text": "卡路里",
+            "font": {
+                "family": "system-ui, -apple-system, sans-serif",
+                "size": 15,
+                "weight": 500,
+                "color": "#1a1a1a",
+            },
+            "showarrow": False,
+            "align": "left",
+        },
+        {
+            "x": 0.5,
+            "y": 0.5,
+            "xref": "paper",
+            "yref": "paper",
+            "text": f"<b style='font-size:28px; color:#1a1a1a;'>{actual_value:.0f}</b>",
+            "showarrow": False,
+            "align": "center",
+        },
+        {
+            "x": 0.5,
+            "y": 0.22,
+            "xref": "paper",
+            "yref": "paper",
+            "text": (
+                "<span style='font-size:12px; color:#666666; "
+                "font-weight:500;'>Kcal</span>"
+            ),
+            "showarrow": False,
+            "align": "center",
+        },
+    ]
+    status = _goal_status(actual_value, goal, over_only=True)
+    if status:
+        status_text, status_color = status
+        annotations.append(
+            {
+                "x": 0.96,
+                "y": 0.04,
+                "xref": "paper",
+                "yref": "paper",
+                "text": f"<b>{status_text}</b>",
+                "font": {"size": 11, "color": status_color},
+                "showarrow": False,
+                "xanchor": "right",
+                "yanchor": "bottom",
+            }
+        )
+
     figure.update_layout(
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
@@ -151,41 +251,7 @@ def build_calorie_figure(actual: object, goal: object) -> go.Figure:
             )
         },
         showlegend=False,
-        annotations=[
-            {
-                "x": 0.02,
-                "y": 1.22,
-                "xref": "paper",
-                "yref": "paper",
-                "text": (
-                    "<span style='font-size:15px; color:#1a1a1a; "
-                    "font-weight:600; font-family:sans-serif;'>Calories</span>"
-                ),
-                "showarrow": False,
-                "align": "left",
-            },
-            {
-                "x": 0.5,
-                "y": 0.5,
-                "xref": "paper",
-                "yref": "paper",
-                "text": f"<b style='font-size:28px; color:#1a1a1a;'>{actual_value:.0f}</b>",
-                "showarrow": False,
-                "align": "center",
-            },
-            {
-                "x": 0.5,
-                "y": 0.22,
-                "xref": "paper",
-                "yref": "paper",
-                "text": (
-                    "<span style='font-size:12px; color:#666666; "
-                    "font-weight:500;'>Kcal</span>"
-                ),
-                "showarrow": False,
-                "align": "center",
-            },
-        ],
+        annotations=annotations,
     )
     return figure
 
@@ -519,7 +585,7 @@ def page_personal() -> None:
 
     card_html = f"""
     <div class="weight-card">
-        <div class="weight-title">Current Weight</div>
+        <div class="weight-title">體重</div>
         <div class="weight-value">
             {weight_display_str}<span class="weight-unit">Kg</span>
         </div>"""
@@ -538,7 +604,12 @@ def page_personal() -> None:
 
         with weight_column:
             st.markdown(card_html, unsafe_allow_html=True)
-            if st.button("⚡", key="weight_lightning_btn", help="記錄體重"):
+            if st.button(
+                "新增體重",
+                key="weight_add_btn",
+                help="新增體重",
+                icon=":material/add:",
+            ):
                 open_daily_record_tab("⚖️ 體重")
                 st.rerun()
 
@@ -553,14 +624,14 @@ def page_personal() -> None:
     progress_cards = (
         (
             "water",
-            "水量進度",
+            "水量",
             totals.get("water", 0),
             goals.get("water", 0),
             "ml",
         ),
         (
             "protein",
-            "蛋白質進度",
+            "蛋白質",
             totals.get("protein", 0),
             goals.get("protein", 0),
             "g",
