@@ -62,6 +62,7 @@ def init_session() -> None:
 
         "pending_student_id": None,
         "needs_tdee_setup": False,
+        "initial_weight_save_warning": None,
         "auth_mode": "login",
 
     }

@@ -364,6 +364,17 @@ def open_daily_record_tab(tab: str) -> None:
     st.session_state[DAILY_RECORD_TAB_TARGET_KEY] = tab
 
 
+def _save_initial_registration_weight(
+    timestamp: str, user_id: str, initial_weight: float
+) -> str | None:
+    """Persist the registration weight without turning a partial write into failure."""
+    try:
+        sheets.append_weight(timestamp, user_id, float(initial_weight))
+    except Exception:
+        return "帳號已建立，但初始體重尚未儲存，請到日常紀錄補填體重。"
+    return None
+
+
 def page_tdee_questionnaire() -> None:
 
     st.header("📋 設定你的營養目標")
@@ -585,12 +596,18 @@ def page_login() -> None:
                 }
 
                 primary_coach_id = sheets.get_primary_coach_id()
+                registration_timestamp = auth.now_iso()
                 sheets.append_user(
-                    uid, new_user, new_name, pwd_hash, auth.now_iso(),
+                    uid, new_user, new_name, pwd_hash, registration_timestamp,
                     goals=goals,
                     coach_id=primary_coach_id,
                     record_mode="simple" if "簡易" in record_mode else "full",
                     weekly_training=4,
+                )
+                st.session_state.initial_weight_save_warning = (
+                    _save_initial_registration_weight(
+                        registration_timestamp, uid, initial_weight
+                    )
                 )
 
                 st.session_state.user_id = uid
@@ -656,6 +673,12 @@ def page_personal() -> None:
     with st.container(key="student_home_header"):
         st.markdown(welcome_html, unsafe_allow_html=True)
         st.header("Overview")
+
+    initial_weight_warning = st.session_state.pop(
+        "initial_weight_save_warning", None
+    )
+    if initial_weight_warning:
+        st.warning(initial_weight_warning)
 
     uid = st.session_state.user_id
 
