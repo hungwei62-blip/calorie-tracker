@@ -57,6 +57,14 @@ def _get_api_key() -> str:
     )
 
 
+def is_configured() -> bool:
+    """Return configuration presence without exposing the secret value."""
+    try:
+        return bool(_get_api_key())
+    except EnvironmentError:
+        return False
+
+
 def _get_client() -> genai.Client:
     return genai.Client(api_key=_get_api_key())
 

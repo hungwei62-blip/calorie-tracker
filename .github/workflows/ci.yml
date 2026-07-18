@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.lock
+          python -m pip install bandit pip-audit
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Compile and import entry point
+        run: |
+          python -m compileall -q app.py config domain pages services tools ui
+          python -c "import app"
+
+      - name: Static security scan
+        run: python -m bandit -q -r app.py config domain pages services tools ui -x tests -ll
+
+      - name: Dependency audit
+        run: python -m pip_audit -r requirements.lock
+
+      - name: Check formatting artifacts
+        run: git diff --check
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

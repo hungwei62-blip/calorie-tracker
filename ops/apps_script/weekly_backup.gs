@@ -24,7 +24,17 @@ function backupNow() {
   const stamp = Utilities.formatDate(new Date(), timezone, 'yyyyMMdd_HHmmss');
   const folder = DriveApp.getFolderById(folderId);
   DriveApp.getFileById(sourceId).makeCopy(`${BACKUP_PREFIX}${stamp}`, folder);
+  recordBackupAudit_(sourceId, stamp);
   pruneOldBackups_(folder);
+}
+
+function recordBackupAudit_(sourceId, stamp) {
+  const audit = SpreadsheetApp.openById(sourceId).getSheetByName('AuditLog');
+  if (!audit) return;
+  audit.appendRow([
+    new Date().toISOString(), `backup-${stamp}`, '', 'system',
+    'backup.complete', 'spreadsheet', '', 'success', '{}'
+  ]);
 }
 
 function pruneOldBackups_(folder) {
@@ -50,4 +60,3 @@ function installWeeklyTrigger() {
     .atHour(3)
     .create();
 }
-

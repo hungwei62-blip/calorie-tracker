@@ -479,7 +479,7 @@ def page_tdee_questionnaire() -> None:
 
         except Exception as exc:
 
-            st.error("儲存失敗: " + str(exc))
+            st.error(safe_failure_message("tdee.save", exc))
 
 # =============================================================================
 
@@ -594,7 +594,7 @@ def page_login() -> None:
             try:
                 rows = sheets.get_users_rows()
             except Exception as exc:
-                st.error("取得使用者失敗: " + str(exc))
+                st.error(safe_failure_message("registration.read_users", exc))
                 return
 
             if auth.find_user(rows, new_user):
@@ -720,7 +720,7 @@ def page_personal() -> None:
 
     except Exception as exc:
 
-        st.error("取得資料失敗: " + str(exc))
+        st.error(safe_failure_message("student_home.read", exc))
 
         return
 

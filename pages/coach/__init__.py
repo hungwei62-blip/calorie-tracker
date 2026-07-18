@@ -13,6 +13,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from services import application, metrics, sheets
+from services.health import run_health_checks
+from services.security import safe_failure_message
 from domain.history import aggregate_daily as _history_aggregate_daily
 from domain.history import parse_record_date as _parse_record_date
 from services.exports import build_history_csv
@@ -175,12 +177,18 @@ def page_coach_overview() -> None:
         )
         st.header("本日學員狀態")
 
+    if st.session_state.get("role") == "admin":
+        with st.expander("系統健康狀態"):
+            for check in run_health_checks():
+                prefix = {"ok": "正常", "warning": "注意", "error": "異常"}[check.status]
+                st.write(f"{check.name}｜{prefix}｜{check.detail}")
+
     try:
         students = application.get_students(current_auth_context())
         all_records = sheets.get_records()
         all_trainings = sheets.get_training_records()
     except Exception as exc:
-        st.error("Failed to get students: " + str(exc))
+        st.error(safe_failure_message("coach_overview.read", exc))
         return
 
     if not students:
@@ -319,7 +327,7 @@ def page_coach_student_detail() -> None:
                 st.info("沒有找到可匯入的資料")
 
         except Exception as exc:
-            st.error(f"讀取 Excel 失敗：{str(exc)}")
+            st.error(safe_failure_message("coach_import.preview", exc))
 
     st.divider()
 
@@ -394,7 +402,7 @@ def page_coach_student_detail() -> None:
 
         except Exception as exc:
 
-            st.error("更新失敗: " + str(exc))
+            st.error(safe_failure_message("coach_goals.update", exc))
 
     st.divider()
 
@@ -599,7 +607,7 @@ def page_coach_student_history():
         try:
             students = application.get_students(current_auth_context())
         except Exception as exc:
-            st.error("取得學員列表失敗：" + str(exc))
+            st.error(safe_failure_message("coach_history.list_students", exc))
             return
         st.header("學員歷史")
         if not students:
@@ -709,7 +717,7 @@ def page_coach_student_history():
                     st.info("沒有找到可匯入的資料")
 
             except Exception as exc:
-                st.error(f"讀取 Excel 失敗：{str(exc)}")
+                st.error(safe_failure_message("coach_history.import", exc))
 
     st.divider()
 
@@ -765,7 +773,7 @@ def page_coach_student_history():
         all_notes = sheets.get_notes(uid)
         goals = sheets.get_user_goals(uid)
     except Exception as exc:
-        st.error("取得資料失敗：" + str(exc))
+        st.error(safe_failure_message("coach_history.read", exc))
         return
 
     daily = _history_aggregate_daily(all_records, start_date, end_date)

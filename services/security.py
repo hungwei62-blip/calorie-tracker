@@ -107,6 +107,7 @@ def log_event(
     target_type: str = "",
     target_id: str = "",
     metadata: dict[str, object] | None = None,
+    duration_ms: float | None = None,
     exc: BaseException | None = None,
 ) -> str:
     request_id = request_id or new_request_id()
@@ -119,11 +120,15 @@ def log_event(
         "target_type": target_type,
         "target_id": target_id,
         "result": result,
+        "duration_ms": round(max(duration_ms or 0.0, 0.0), 2),
     }
     if exc is None:
-        LOGGER.info("security_event %s", payload)
+        LOGGER.info("security_event", extra={"event": payload})
     else:
-        LOGGER.exception("security_event %s exception_type=%s", payload, type(exc).__name__)
+        LOGGER.exception(
+            "security_event",
+            extra={"event": payload, "error_type": type(exc).__name__},
+        )
     try:
         from services import sheets
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import streamlit as st
 from services import sheets
+from services.observability import configure_logging
 from services.security import clear_auth_session, resolve_auth_context, safe_failure_message
 from pages.common import init_session
 from ui.navigation import render_bottom_navigation
@@ -35,6 +36,8 @@ def track_student_page_entry(current_page: str) -> None:
 
 
 def main() -> None:
+
+    configure_logging()
 
     st.set_page_config(page_title="飲食控制管理系統", layout="wide")
 
