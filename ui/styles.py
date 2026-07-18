@@ -664,16 +664,41 @@ def apply_global_styles() -> None:
                 }
             }
 
+            /* ===== 學員歷史：統一的清新健康色票 ===== */
+            .stApp:has(.st-key-student_history_page),
+            .stApp:has(.st-key-student_history_page) .main,
+            .stApp:has(.st-key-student_history_page) [data-testid="stAppViewContainer"],
+            .stApp:has(.st-key-student_history_page) [data-testid="stMain"] {
+                background: #F7FAF8 !important;
+            }
+
+            .st-key-student_history_page {
+                --history-primary: #A8D5C2;
+                --history-primary-dark: #5A9C84;
+                --history-accent: #F4B183;
+                --history-accent-dark: #C87943;
+                --history-surface: #FFFFFF;
+                --history-background: #F7FAF8;
+                --history-secondary: #7D8C8A;
+                --history-border: #E6EDEB;
+            }
+
+            .st-key-student_history_page h1,
+            .st-key-student_history_page h2,
+            .st-key-student_history_page h3 {
+                color: #34423E !important;
+            }
+
             /* ===== 學員歷史：參考健康儀表板的體重圖卡 ===== */
             .st-key-student_weight_history_card {
                 box-sizing: border-box !important;
                 width: 100% !important;
                 padding: 18px 18px 4px !important;
                 overflow: hidden !important;
-                background: #ffffff !important;
-                border: 1px solid rgba(47, 62, 70, 0.08) !important;
+                background: var(--history-surface) !important;
+                border: 1px solid var(--history-border) !important;
                 border-radius: 20px !important;
-                box-shadow: 0 8px 28px rgba(47, 62, 70, 0.055) !important;
+                box-shadow: 0 8px 28px rgba(125, 140, 138, 0.08) !important;
             }
 
             .st-key-student_weight_history_card > div[data-testid="stVerticalBlock"] {
@@ -717,14 +742,14 @@ def apply_global_styles() -> None:
             }
 
             .st-key-student_weight_history_card .weight-history-change {
-                color: #16a77a !important;
+                color: var(--history-primary-dark) !important;
                 font-size: 13px !important;
                 font-variant-numeric: tabular-nums !important;
                 font-weight: 550 !important;
             }
 
             .st-key-student_weight_history_card .weight-history-change.is-flat {
-                color: #888d89 !important;
+                color: var(--history-secondary) !important;
             }
 
             .st-key-student_weight_history_card [data-testid="stButtonGroup"] {
@@ -735,8 +760,8 @@ def apply_global_styles() -> None:
             .st-key-student_weight_history_card button[data-testid="stBaseButton-segmented_control"] {
                 min-height: 34px !important;
                 padding: 5px 12px !important;
-                color: #6f7471 !important;
-                background: #f5f6f5 !important;
+                color: var(--history-secondary) !important;
+                background: var(--history-background) !important;
                 border: none !important;
                 border-radius: 10px !important;
                 box-shadow: none !important;
@@ -745,9 +770,9 @@ def apply_global_styles() -> None:
 
             .st-key-student_weight_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
             .st-key-student_weight_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
-                color: #252a27 !important;
-                background: #ffffff !important;
-                box-shadow: 0 2px 8px rgba(47, 62, 70, 0.08) !important;
+                color: #3E7664 !important;
+                background: rgba(168, 213, 194, 0.30) !important;
+                box-shadow: 0 2px 8px rgba(125, 140, 138, 0.08) !important;
             }
 
             .st-key-student_weight_history_chart,
@@ -812,10 +837,10 @@ def apply_global_styles() -> None:
                 width: 100% !important;
                 padding: 16px 18px 26px !important;
                 overflow: hidden !important;
-                background: #ffffff !important;
-                border: 1px solid rgba(47, 62, 70, 0.08) !important;
+                background: var(--history-surface) !important;
+                border: 1px solid var(--history-border) !important;
                 border-radius: 20px !important;
-                box-shadow: 0 8px 28px rgba(47, 62, 70, 0.055) !important;
+                box-shadow: 0 8px 28px rgba(125, 140, 138, 0.08) !important;
             }
 
             .st-key-student_training_history_card > div[data-testid="stVerticalBlock"] {
@@ -826,14 +851,14 @@ def apply_global_styles() -> None:
                 width: min(230px, 100%) !important;
                 margin: 0 auto 2px !important;
                 padding: 3px !important;
-                background: #f3f4f2 !important;
+                background: var(--history-background) !important;
                 border-radius: 999px !important;
             }
 
             .st-key-student_training_history_card [data-testid="stButtonGroup"] button,
             .st-key-student_training_history_card button[data-testid="stBaseButton-segmented_control"] {
                 min-height: 34px !important;
-                color: #777c79 !important;
+                color: var(--history-secondary) !important;
                 background: transparent !important;
                 border: none !important;
                 border-radius: 999px !important;
@@ -844,8 +869,8 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
             .st-key-student_training_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
-                color: #ffffff !important;
-                background: #252826 !important;
+                color: #3E7664 !important;
+                background: rgba(168, 213, 194, 0.30) !important;
             }
 
             .st-key-student_training_history_card div[data-testid="stHorizontalBlock"] {
@@ -866,8 +891,8 @@ def apply_global_styles() -> None:
                 height: 36px !important;
                 min-height: 36px !important;
                 padding: 0 !important;
-                color: #4d5551 !important;
-                background: #f6f7f6 !important;
+                color: var(--history-primary-dark) !important;
+                background: rgba(168, 213, 194, 0.16) !important;
                 border: none !important;
                 border-radius: 50% !important;
                 box-shadow: none !important;
@@ -875,13 +900,13 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card .st-key-training_history_previous button:hover,
             .st-key-student_training_history_card .st-key-training_history_next button:hover {
-                background: #ecefec !important;
+                background: rgba(168, 213, 194, 0.28) !important;
             }
 
             .st-key-student_training_history_card .st-key-training_history_previous button:focus-visible,
             .st-key-student_training_history_card .st-key-training_history_next button:focus-visible {
                 outline: none !important;
-                box-shadow: 0 0 0 3px rgba(22, 167, 122, 0.18) !important;
+                box-shadow: 0 0 0 3px rgba(168, 213, 194, 0.35) !important;
             }
 
             .st-key-student_training_history_card .st-key-training_history_previous button:disabled,
@@ -891,7 +916,7 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card .training-calendar-period {
                 overflow: hidden !important;
-                color: #272c29 !important;
+                color: #34423E !important;
                 font-size: 15px !important;
                 font-variant-numeric: tabular-nums !important;
                 font-weight: 550 !important;
@@ -917,7 +942,7 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card .training-calendar-weekdays {
                 margin-bottom: 9px !important;
-                color: #8a8f8c !important;
+                color: var(--history-secondary) !important;
                 font-size: 11px !important;
                 font-weight: 500 !important;
                 text-align: center !important;
@@ -933,8 +958,8 @@ def apply_global_styles() -> None:
                 justify-self: center !important;
                 width: min(42px, 100%) !important;
                 aspect-ratio: 1 / 1 !important;
-                color: #505652 !important;
-                background: #f1f2f1 !important;
+                color: var(--history-secondary) !important;
+                background: var(--history-background) !important;
                 border-radius: 50% !important;
                 font-size: 13px !important;
                 font-variant-numeric: tabular-nums !important;
@@ -943,9 +968,9 @@ def apply_global_styles() -> None:
             }
 
             .st-key-student_training_history_card .training-calendar-day.is-complete {
-                color: #ffffff !important;
-                background: #16a77a !important;
-                box-shadow: 0 4px 12px rgba(22, 167, 122, 0.20) !important;
+                color: #345E51 !important;
+                background: var(--history-primary) !important;
+                box-shadow: 0 4px 12px rgba(168, 213, 194, 0.34) !important;
             }
 
             .st-key-student_training_history_card .training-calendar-day.is-empty {
@@ -1007,10 +1032,10 @@ def apply_global_styles() -> None:
                 width: 100% !important;
                 padding: 16px 0 8px !important;
                 overflow: hidden !important;
-                background: #ffffff !important;
-                border: 1px solid rgba(47, 62, 70, 0.08) !important;
+                background: var(--history-surface) !important;
+                border: 1px solid var(--history-border) !important;
                 border-radius: 20px !important;
-                box-shadow: 0 8px 28px rgba(47, 62, 70, 0.055) !important;
+                box-shadow: 0 8px 28px rgba(125, 140, 138, 0.08) !important;
             }
 
             .st-key-student_nutrition_history_card > div[data-testid="stVerticalBlock"] {
@@ -1022,7 +1047,7 @@ def apply_global_styles() -> None:
                 margin-left: auto !important;
                 margin-right: 18px !important;
                 padding: 3px !important;
-                background: #f3f4f2 !important;
+                background: var(--history-background) !important;
                 border-radius: 12px !important;
             }
 
@@ -1030,7 +1055,7 @@ def apply_global_styles() -> None:
             .st-key-student_nutrition_history_card button[data-testid="stBaseButton-segmented_control"] {
                 min-height: 32px !important;
                 padding: 4px 10px !important;
-                color: #777c79 !important;
+                color: var(--history-secondary) !important;
                 background: transparent !important;
                 border: none !important;
                 border-radius: 9px !important;
@@ -1041,9 +1066,9 @@ def apply_global_styles() -> None:
 
             .st-key-student_nutrition_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
             .st-key-student_nutrition_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
-                color: #252a27 !important;
-                background: #ffffff !important;
-                box-shadow: 0 2px 8px rgba(47, 62, 70, 0.08) !important;
+                color: #3E7664 !important;
+                background: rgba(168, 213, 194, 0.30) !important;
+                box-shadow: 0 2px 8px rgba(125, 140, 138, 0.08) !important;
             }
 
             .st-key-student_nutrition_history_card .nutrition-history-summary {
@@ -1060,7 +1085,7 @@ def apply_global_styles() -> None:
 
             .st-key-student_nutrition_history_card .nutrition-history-summary > div + div {
                 padding-left: 14px !important;
-                border-left: 1px solid rgba(47, 62, 70, 0.08) !important;
+                border-left: 1px solid var(--history-border) !important;
             }
 
             .st-key-student_nutrition_history_card .nutrition-history-summary span,
@@ -1072,7 +1097,7 @@ def apply_global_styles() -> None:
             .st-key-student_nutrition_history_card .nutrition-history-summary > div > span {
                 display: block !important;
                 margin-bottom: 3px !important;
-                color: #737875 !important;
+                color: var(--history-secondary) !important;
                 font-size: 11px !important;
                 font-weight: 500 !important;
             }
@@ -1085,15 +1110,15 @@ def apply_global_styles() -> None:
             }
 
             .st-key-student_nutrition_history_card .nutrition-history-summary .is-calories strong {
-                color: #fd5424 !important;
+                color: var(--history-primary-dark) !important;
             }
 
             .st-key-student_nutrition_history_card .nutrition-history-summary .is-protein strong {
-                color: #c18b00 !important;
+                color: var(--history-accent-dark) !important;
             }
 
             .st-key-student_nutrition_history_card .nutrition-history-summary small {
-                color: #858a87 !important;
+                color: var(--history-secondary) !important;
                 font-size: 10px !important;
             }
 

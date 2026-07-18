@@ -39,6 +39,11 @@ LEGACY_DAILY_RECORD_TABS = {
     "🏋️ 訓練": "訓練",
 }
 BRAND_MARK_PATH = Path(__file__).resolve().parents[2] / "static" / "peak_plan_logo.png"
+HISTORY_PRIMARY = "#A8D5C2"
+HISTORY_PRIMARY_DARK = "#5A9C84"
+HISTORY_ACCENT = "#F4B183"
+HISTORY_ACCENT_DARK = "#C87943"
+HISTORY_SECONDARY_TEXT = "#7D8C8A"
 
 
 @st.cache_data(show_spinner=False)
@@ -1188,7 +1193,7 @@ def build_weight_history_figure(
             y=y_values,
             mode="lines+markers+text",
             line={
-                "color": "#16a77a",
+                "color": HISTORY_PRIMARY,
                 "width": 3,
                 "shape": "spline",
                 "smoothing": 1.05,
@@ -1197,14 +1202,14 @@ def build_weight_history_figure(
             fillgradient={
                 "type": "vertical",
                 "colorscale": [
-                    [0.0, "rgba(22,167,122,0.00)"],
-                    [1.0, "rgba(22,167,122,0.18)"],
+                    [0.0, "rgba(168,213,194,0.00)"],
+                    [1.0, "rgba(168,213,194,0.30)"],
                 ],
             },
-            marker={"size": 5, "color": "#16a77a"},
+            marker={"size": 5, "color": HISTORY_PRIMARY},
             text=point_labels,
             textposition="top center",
-            textfont={"size": 9, "color": "#397565"},
+            textfont={"size": 9, "color": HISTORY_PRIMARY_DARK},
             cliponaxis=False,
             customdata=hover_status,
             connectgaps=False,
@@ -1221,7 +1226,7 @@ def build_weight_history_figure(
             mode="markers",
             marker={
                 "size": 7,
-                "color": "#16a77a",
+                "color": HISTORY_PRIMARY,
                 "line": {"color": "#ffffff", "width": 1.5},
             },
             hovertemplate=(
@@ -1252,7 +1257,7 @@ def build_weight_history_figure(
             "zeroline": False,
             "tickvals": tick_values,
             "tickformat": "%m/%d",
-            "tickfont": {"size": 11, "color": "#7a7a7a"},
+            "tickfont": {"size": 11, "color": HISTORY_SECONDARY_TEXT},
             "range": [x_values[0], x_values[-1]] if x_values else None,
             "automargin": False,
             "fixedrange": True,
@@ -1502,14 +1507,14 @@ def build_nutrition_history_figure(
             y=calorie_values,
             mode="lines+markers",
             line={
-                "color": "#fd5424",
+                "color": HISTORY_PRIMARY,
                 "width": 3,
                 "shape": "spline",
                 "smoothing": 1.0,
             },
             marker={
                 "size": 6,
-                "color": "#fd5424",
+                "color": HISTORY_PRIMARY,
                 "line": {"color": "#ffffff", "width": 1.2},
             },
             connectgaps=False,
@@ -1524,14 +1529,14 @@ def build_nutrition_history_figure(
             y=protein_values,
             mode="lines+markers",
             line={
-                "color": "#f1b725",
+                "color": HISTORY_ACCENT,
                 "width": 3,
                 "shape": "spline",
                 "smoothing": 1.0,
             },
             marker={
                 "size": 6,
-                "color": "#f1b725",
+                "color": HISTORY_ACCENT,
                 "line": {"color": "#ffffff", "width": 1.2},
             },
             connectgaps=False,
@@ -1542,7 +1547,7 @@ def build_nutrition_history_figure(
     )
     figure.update_layout(
         height=250,
-        margin={"l": 4, "r": 4, "t": 10, "b": 30},
+        margin={"l": 28, "r": 28, "t": 10, "b": 30},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
@@ -1553,11 +1558,11 @@ def build_nutrition_history_figure(
             "tickvals": tick_values,
             "ticktext": tick_text,
             "tickformat": "%m/%d",
-            "tickfont": {"size": 11, "color": "#7a7a7a"},
+            "tickfont": {"size": 11, "color": HISTORY_SECONDARY_TEXT},
             "fixedrange": True,
         },
         yaxis={
-            "tickfont": {"size": 10, "color": "#b84b2d"},
+            "tickfont": {"size": 10, "color": HISTORY_PRIMARY_DARK},
             "ticklabelposition": "inside",
             "showgrid": False,
             "zeroline": False,
@@ -1566,7 +1571,7 @@ def build_nutrition_history_figure(
             "fixedrange": True,
         },
         yaxis2={
-            "tickfont": {"size": 10, "color": "#a17b1d"},
+            "tickfont": {"size": 10, "color": HISTORY_ACCENT_DARK},
             "ticklabelposition": "inside",
             "overlaying": "y",
             "side": "right",
@@ -1583,7 +1588,7 @@ def build_nutrition_history_figure(
 
 def _render_student_nutrition_history(user_id: str) -> None:
     with st.container(key="student_nutrition_history"):
-        st.subheader("攝取趨勢")
+        st.subheader("養分攝取")
         selected_range = st.session_state.get(
             "nutrition_history_range", "7 天"
         )

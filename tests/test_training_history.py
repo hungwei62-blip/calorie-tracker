@@ -141,7 +141,7 @@ def test_training_history_styles_keep_seven_columns_on_mobile():
     assert ".st-key-student_training_history_card" in stylesheet
     assert "grid-template-columns: repeat(7, minmax(0, 1fr))" in stylesheet
     assert "aspect-ratio: 1 / 1" in stylesheet
-    assert "background: #16a77a" in stylesheet
+    assert "background: var(--history-primary)" in stylesheet
     assert "padding: 16px 18px 26px !important;" in stylesheet
     assert "padding: 14px 10px 24px !important;" in stylesheet
     assert "@media (max-width: 480px)" in stylesheet

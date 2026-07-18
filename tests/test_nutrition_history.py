@@ -162,9 +162,9 @@ def test_nutrition_figure_uses_dual_axes_colors_and_shared_dates():
     figure = student_pages.build_nutrition_history_figure(points, 7)
 
     assert len(figure.data) == 2
-    assert figure.data[0].line.color == "#fd5424"
+    assert figure.data[0].line.color == "#A8D5C2"
     assert figure.data[0].yaxis == "y"
-    assert figure.data[1].line.color == "#f1b725"
+    assert figure.data[1].line.color == "#F4B183"
     assert figure.data[1].yaxis == "y2"
     assert figure.data[0].connectgaps is False
     assert figure.data[1].connectgaps is False
@@ -179,8 +179,8 @@ def test_nutrition_figure_uses_dual_axes_colors_and_shared_dates():
     assert list(figure.layout.xaxis.ticktext) == [
         "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
     ]
-    assert figure.layout.margin.l == 4
-    assert figure.layout.margin.r == 4
+    assert figure.layout.margin.l == 28
+    assert figure.layout.margin.r == 28
     assert figure.layout.height == 250
 
 
@@ -208,6 +208,8 @@ def test_nutrition_renderer_does_not_depend_on_goals_or_legacy_charts():
     assert "st.dataframe" not in source
     assert "st.bar_chart" not in source
     assert "所選期間尚無飲食紀錄" in source
+    assert 'st.subheader("養分攝取")' in source
+    assert "攝取趨勢" not in source
 
 
 def test_nutrition_history_has_scoped_dual_axis_card_styles():
@@ -220,7 +222,8 @@ def test_nutrition_history_has_scoped_dual_axis_card_styles():
     assert ".st-key-student_nutrition_history_card" in stylesheet
     assert ".nutrition-history-summary" in stylesheet
     assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in stylesheet
-    assert "color: #fd5424" in stylesheet
+    assert "color: var(--history-primary-dark)" in stylesheet
+    assert "color: var(--history-accent-dark)" in stylesheet
     assert ".st-key-student_nutrition_history_chart" in stylesheet
     assert "padding: 16px 0 8px !important;" in stylesheet
     assert "height: 245px !important;" not in stylesheet

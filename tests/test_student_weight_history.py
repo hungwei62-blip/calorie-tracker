@@ -40,7 +40,7 @@ def test_flat_weight_figure_has_padding_and_only_measured_markers():
     assert list(figure.layout.yaxis.range) == [49.5, 50.5]
     assert len(figure.layout.xaxis.tickvals) == 4
     assert figure.data[0].line.shape == "spline"
-    assert figure.data[0].line.color == "#16a77a"
+    assert figure.data[0].line.color == "#A8D5C2"
     assert figure.data[0].mode == "lines+markers+text"
     assert list(figure.data[0].text) == ["50.0"] * 7
     assert figure.data[0].textposition == "top center"
@@ -67,7 +67,7 @@ def test_thirty_day_figure_reduces_tick_density_and_marks_real_records():
 
     assert len(figure.layout.xaxis.tickvals) == 5
     assert list(figure.data[1].y) == [52.0, 51.0]
-    assert figure.data[1].marker.color == "#16a77a"
+    assert figure.data[1].marker.color == "#A8D5C2"
     assert figure.layout.height == 220
 
 
@@ -115,3 +115,8 @@ def test_weight_history_has_scoped_card_and_mobile_styles():
     assert "margin-bottom: 0 !important;" in stylesheet
     assert ".st-key-student_history_page" in stylesheet
     assert "padding-top: 32px !important;" in stylesheet
+    assert "--history-primary: #A8D5C2;" in stylesheet
+    assert "--history-background: #F7FAF8;" in stylesheet
+    assert "--history-secondary: #7D8C8A;" in stylesheet
+    assert "--history-border: #E6EDEB;" in stylesheet
+    assert ".stApp:has(.st-key-student_history_page)" in stylesheet
