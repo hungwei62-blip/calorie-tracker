@@ -25,6 +25,7 @@ from datetime import date
 from collections.abc import Iterable
 import hashlib
 import json
+import os
 import threading
 import time
 from typing import Any
@@ -182,6 +183,8 @@ def _get_client() -> gspread.Client:
 
 @st.cache_resource(show_spinner=False)
 def _get_sheet() -> gspread.Spreadsheet:
+    if os.environ.get("PROJECT_PRIME_TESTING") == "1":
+        raise RuntimeError("測試環境禁止連線正式 Google Sheet")
     sec = _get_secrets()
     return _get_client().open_by_key(sec["SPREADSHEET_ID"])
 

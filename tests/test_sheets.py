@@ -292,3 +292,9 @@ def test_training_update_overwrites_all_category_fields(monkeypatch):
         (2, 3, "有氧訓練"), (2, 4, ""),
         (2, 5, "單車 30 分鐘"), (2, 6, ""),
     ]
+
+
+def test_test_environment_blocks_live_spreadsheet_access():
+    sheets._get_sheet.clear()
+    with pytest.raises(RuntimeError, match="測試環境禁止連線正式 Google Sheet"):
+        sheets._get_sheet()

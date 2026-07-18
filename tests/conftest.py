@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 
 import pytest
+
+
+# Tests must never fall through to credentials from the developer's local secrets.
+os.environ["PROJECT_PRIME_TESTING"] = "1"
 
 
 @dataclass
