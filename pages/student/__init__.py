@@ -741,10 +741,9 @@ def _clear_pending_food_analysis() -> None:
 
 def _render_water_records() -> None:
     uid = st.session_state.user_id
-    st.subheader("飲水")
     st.caption("記錄這次喝下的水量，今日進度會自動累加。")
     with st.form("water_record_form"):
-        water_ml = st.number_input("飲水量 (ml)", min_value=0, value=250, step=50)
+        water_ml = st.number_input("飲水量 (ml)", min_value=0, value=200, step=100)
         submitted = st.form_submit_button("儲存飲水紀錄", width="stretch")
     if submitted:
         try:
@@ -856,7 +855,6 @@ def _render_manual_food_input(uid: str) -> None:
 
 def _render_food_records() -> None:
     uid = st.session_state.user_id
-    st.subheader("食物")
     input_mode = st.segmented_control(
         "輸入方式", ("照片辨識", "手動輸入"),
         default="手動輸入", key="food_input_mode",
@@ -945,23 +943,6 @@ def _render_weight_records() -> None:
         else:
             st.success("體重紀錄已儲存")
             st.rerun()
-
-    st.subheader("體重趨勢")
-    weight_records = sheets.get_weight_records(uid)
-    if not weight_records:
-        st.info("尚無體重紀錄")
-        return
-    weight_data = {"日期": [], "體重 (kg)": []}
-    for record in weight_records[-30:]:
-        weight_data["日期"].append(record.get("timestamp", "")[:10])
-        weight_data["體重 (kg)"].append(record.get("weight_kg", 0))
-    st.line_chart(weight_data, x="日期", y="體重 (kg)")
-    if len(weight_data["體重 (kg)"]) >= 2:
-        weights = weight_data["體重 (kg)"]
-        change = weights[-1] - weights[0]
-        st.caption(
-            f'起始 {weights[0]:.1f} kg；目前 {weights[-1]:.1f} kg；變化 {change:+.1f} kg'
-        )
 
 
 def page_log_meal() -> None:

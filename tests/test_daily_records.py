@@ -187,3 +187,17 @@ def test_food_input_defaults_to_manual_mode():
     food_renderer = source[source.index("def _render_food_records"):]
     assert '("照片辨識", "手動輸入")' in food_renderer
     assert 'default="手動輸入"' in food_renderer
+
+
+def test_daily_record_sections_remove_duplicate_headings_and_simplify_weight():
+    source = inspect.getsource(student_pages)
+    water_renderer = source[source.index("def _render_water_records"):source.index("def _selected_food_image_bytes")]
+    food_renderer = source[source.index("def _render_food_records"):source.index("def _render_training_records")]
+    weight_renderer = source[source.index("def _render_weight_records"):source.index("def page_log_meal")]
+
+    assert 'st.subheader("飲水")' not in water_renderer
+    assert 'value=200, step=100' in water_renderer
+    assert 'st.subheader("食物")' not in food_renderer
+    assert '體重趨勢' not in weight_renderer
+    assert 'get_weight_records' not in weight_renderer
+    assert 'line_chart' not in weight_renderer
