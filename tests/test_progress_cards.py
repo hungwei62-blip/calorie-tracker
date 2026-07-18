@@ -208,7 +208,8 @@ def test_personal_page_is_simplified_and_orders_summary_before_progress():
     welcome_source = inspect.getsource(student_pages._build_student_welcome_html)
 
     assert 'key="student_home_header"' in source
-    assert '_build_student_welcome_html(user_name, avatar_base64)' in source
+    assert '_build_student_welcome_html(user_name, avatar_source)' in source
+    assert 'avatar_source = get_default_avatar_source()' in source
     assert 'class="student-home-welcome"' in welcome_source
     assert 'margin-top: 0;' in welcome_source
     assert 'st.header("Overview")' in source

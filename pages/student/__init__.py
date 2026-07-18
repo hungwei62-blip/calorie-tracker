@@ -16,6 +16,7 @@ from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, ca
 from pages.common import (
     DEFAULT_GOALS, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
     _fetch_records_cached, _today_range, _week_range, do_logout,
+    get_default_avatar_source,
 )
 
 DAILY_RECORD_TABS = ("食物", "飲水", "訓練", "體重")
@@ -648,20 +649,9 @@ def page_personal() -> None:
     # ============================================================
     # 👋 1. 個人化頭像歡迎區 (單行無縮排安全版)
     # ============================================================
-    import os
-
     user_name = _resolve_student_name()
-    avatar_path = './static/avatar.jpg'
-
-    avatar_base64 = ""
-    if os.path.exists(avatar_path):
-        with open(avatar_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-            avatar_base64 = f"data:image/jpeg;base64,{encoded_string}"
-    else:
-        avatar_base64 = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200"
-
-    welcome_html = _build_student_welcome_html(user_name, avatar_base64)
+    avatar_source = get_default_avatar_source()
+    welcome_html = _build_student_welcome_html(user_name, avatar_source)
 
     with st.container(key="student_home_header"):
         st.markdown(welcome_html, unsafe_allow_html=True)

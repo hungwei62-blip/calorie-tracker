@@ -15,7 +15,7 @@ import streamlit as st
 from services import metrics, sheets
 from domain.history import aggregate_daily as _history_aggregate_daily
 from domain.history import parse_record_date as _parse_record_date
-from pages.common import _clear_analysis_cache
+from pages.common import _clear_analysis_cache, get_default_avatar_source
 
 
 COACH_NUTRIENT_SPECS = (
@@ -118,12 +118,24 @@ def build_coach_student_card_html(
     )
 
 
+def build_coach_welcome_html(display_name: object, avatar_source: str) -> str:
+    """Build the coach greeting with the same avatar treatment as students."""
+    safe_name = html.escape(str(display_name or "Coach"))
+    safe_avatar = html.escape(avatar_source, quote=True)
+    return (
+        '<div class="coach-home-welcome" style="display:flex;align-items:center;'
+        'gap:16px;margin-top:0;margin-bottom:25px;width:100%;">'
+        f'<img src="{safe_avatar}" alt="avatar" style="width:56px;height:56px;'
+        'border-radius:50%;object-fit:cover;box-shadow:0 4px 12px rgba(0,0,0,0.05);">'
+        f'<span style="font-size:24px;font-weight:400;color:#1F2937;'
+        'font-family:system-ui,-apple-system,sans-serif;white-space:nowrap;">'
+        f'Hello ! {safe_name}</span></div>'
+    )
+
+
 def page_coach_overview() -> None:
     st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-    .coach-header { display: flex; align-items: center; margin-bottom: 24px; }
-    .coach-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #BBE8EE 0%, #8B5CF6 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 16px; }
-    .coach-greeting { font-size: 24px; font-weight: 400; color: #1F2937; }
     .member-card { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 16px; }
     .member-top-row { display: flex; align-items: center; gap: 12px; }
     .member-avatar { width: 48px; height: 48px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
@@ -137,22 +149,27 @@ def page_coach_overview() -> None:
     .coach-nutrient-label { overflow: hidden; color: #4B5563; font-size: 12px; font-weight: 500; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
     .coach-nutrient-track { width: 100%; height: 5px; overflow: hidden; border-radius: 999px; background: #E9ECEF; }
     .coach-nutrient-track > span { display: block; height: 100%; border-radius: inherit; }
-    .coach-nutrient-value { overflow: hidden; color: #9CA3AF; font-size: 11px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-    .section-title { font-size: 18px; font-weight: 600; color: #1F2937; margin-bottom: 12px; }
+    .coach-nutrient-value { overflow: hidden; color: #9CA3AF; font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
     @media (max-width: 480px) {
         .member-card { gap: 12px; padding: 14px 12px; }
         .member-avatar { width: 48px; height: 48px; margin-right: 8px; font-size: 19px; }
         .member-name { min-width: 0; overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
         .training-badge { margin-left: auto; padding: 4px 7px; font-size: 10px; white-space: nowrap; }
-        .coach-nutrient-grid { gap: 10px; }
+        .coach-nutrient-grid { gap: 6px; }
         .coach-nutrient { gap: 6px; }
         .coach-nutrient-label { font-size: 11px; }
-        .coach-nutrient-value { font-size: 9px; }
+        .coach-nutrient-value { font-size: 11px; }
     }
     </style>""", unsafe_allow_html=True)
 
     coach_name = str(st.session_state.username or "Coach")
-    st.markdown("<div class=\"coach-header\"><div class=\"coach-avatar\"></div><div class=\"coach-greeting\">Hello ! " + coach_name + "</div></div>", unsafe_allow_html=True)
+    avatar_source = get_default_avatar_source()
+    with st.container(key="coach_overview_header"):
+        st.markdown(
+            build_coach_welcome_html(coach_name, avatar_source),
+            unsafe_allow_html=True,
+        )
+        st.header("本日學員狀態")
 
     try:
         students = sheets.get_students_for_manager(st.session_state.user_id)
@@ -176,8 +193,6 @@ def page_coach_overview() -> None:
     for training in all_trainings:
         if str(training.get("timestamp", ""))[:10] == today_prefix:
             training_by_student[training.get("user_id", "")] = training
-    st.markdown("<p class=\"section-title\">本日學員狀態</p>", unsafe_allow_html=True)
-
     for student in students:
         uid = student.get("user_id", "")
         name = student.get("name") or student.get("username") or "Unknown"

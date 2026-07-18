@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import base64
 from datetime import date
+from pathlib import Path
 import streamlit as st
 from services import metrics, sheets
 
@@ -20,9 +22,25 @@ CACHE_TTL = 60
 
 DEFAULT_GOALS = {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0, "water": 2000.0}
 
+DEFAULT_AVATAR_PATH = Path(__file__).resolve().parents[1] / "static" / "avatar.jpg"
+DEFAULT_AVATAR_FALLBACK = (
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb"
+    "?auto=format&fit=crop&q=80&w=200&h=200"
+)
+
 # 訓練項目
 
 TRAINING_TYPES = ("重量訓練", "有氧訓練", "其他")
+
+
+@st.cache_data(show_spinner=False)
+def get_default_avatar_source(avatar_path: str | None = None) -> str:
+    """Return the shared student/coach avatar as a JPEG data URI."""
+    path = Path(avatar_path) if avatar_path else DEFAULT_AVATAR_PATH
+    if not path.is_file():
+        return DEFAULT_AVATAR_FALLBACK
+    encoded_avatar = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/jpeg;base64,{encoded_avatar}"
 
 # ---------- Session 初始化 ----------
 

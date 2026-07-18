@@ -262,11 +262,14 @@ def apply_global_styles() -> None:
 
             /* ===== 學員首頁：縮小頂部留白且不影響其他頁面 ===== */
             .main .block-container:has(.st-key-student_home_header),
-            [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header) {
+            [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header),
+            .main .block-container:has(.st-key-coach_overview_header),
+            [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header) {
                 padding-top: 32px !important;
             }
 
-            .st-key-student_home_header .student-home-welcome {
+            .st-key-student_home_header .student-home-welcome,
+            .st-key-coach_overview_header .coach-home-welcome {
                 margin-top: 0 !important;
             }
 
@@ -279,7 +282,9 @@ def apply_global_styles() -> None:
 
             @media (max-width: 768px) {
                 .main .block-container:has(.st-key-student_home_header),
-                [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header) {
+                [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header),
+                .main .block-container:has(.st-key-coach_overview_header),
+                [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header) {
                     padding-top: 32px !important;
                 }
             }
@@ -792,7 +797,8 @@ def apply_global_styles() -> None:
             }
 
             @media (max-width: 768px) {
-                .st-key-student_home_header .student-home-welcome {
+                .st-key-student_home_header .student-home-welcome,
+                .st-key-coach_overview_header .coach-home-welcome {
                     margin-bottom: 14px !important;
                 }
 

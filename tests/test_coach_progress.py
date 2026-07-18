@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pages.coach import (
+    build_coach_welcome_html,
     build_coach_nutrient_progress_html,
     build_coach_student_card_html,
     calculate_coach_nutrient_progress,
@@ -72,3 +73,28 @@ def test_coach_overview_css_keeps_metrics_in_one_row():
     assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in source
     assert "@media (max-width: 480px)" in source
     assert ".capsule-track" not in source
+
+
+def test_coach_welcome_uses_avatar_and_escapes_dynamic_values():
+    markup = build_coach_welcome_html(
+        '<教練 & "Prime">', 'data:image/jpeg;base64,a&b'
+    )
+
+    assert 'src="data:image/jpeg;base64,a&amp;b"' in markup
+    assert '&lt;教練 &amp; &quot;Prime&quot;&gt;' in markup
+    assert "width:56px;height:56px" in markup
+    assert "object-fit:cover" in markup
+
+
+def test_coach_overview_matches_student_header_and_enlarges_values():
+    source = __import__("inspect").getsource(
+        __import__("pages.coach", fromlist=["page_coach_overview"]).page_coach_overview
+    )
+
+    assert 'key="coach_overview_header"' in source
+    assert 'st.header("本日學員狀態")' in source
+    assert "section-title" not in source
+    assert "font-size: 13px" in source
+    assert "font-size: 11px" in source
+    assert "font-variant-numeric: tabular-nums" in source
+    assert ".coach-nutrient-grid { gap: 6px; }" in source
