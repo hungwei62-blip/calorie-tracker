@@ -9,7 +9,7 @@ Google Sheets 存取層。
 - Training     ：學員訓練記錄（重量訓練/有氧訓練/其他）
 
 這些存取全走 .streamlit/secrets.toml 簡寫，沒有其他設定。
-學員工作表在本系統中由 sheets._ensure_worksheet 自動建立。
+工作表 schema 由 tools/init_sheets.py 明確建立；正式請求只驗證、不修改 schema。
 
 使用範例：
 - get_users_rows / append_user / set_user_role
@@ -166,6 +166,7 @@ def _get_secrets() -> dict[str, Any]:
     return gcp
 
 
+@st.cache_resource(show_spinner=False)
 def _get_client() -> gspread.Client:
     sec = _get_secrets()
     sa_info = {k: v for k, v in sec.items() if k != "SPREADSHEET_ID"}
@@ -179,6 +180,7 @@ def _get_client() -> gspread.Client:
     return gspread.authorize(creds)
 
 
+@st.cache_resource(show_spinner=False)
 def _get_sheet() -> gspread.Spreadsheet:
     sec = _get_secrets()
     return _get_client().open_by_key(sec["SPREADSHEET_ID"])

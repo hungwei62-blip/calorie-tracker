@@ -15,7 +15,7 @@ import streamlit as st
 from services import application, metrics, sheets
 from domain.history import aggregate_daily as _history_aggregate_daily
 from domain.history import parse_record_date as _parse_record_date
-from domain.validation import safe_csv_cell
+from services.exports import build_history_csv
 from pages.common import (
     _clear_analysis_cache,
     current_auth_context,
@@ -426,50 +426,9 @@ def page_coach_student_detail() -> None:
 # =============================================================================
 
 def _build_history_csv(student, daily, weights, trainings, notes, start_date, end_date):
-    import csv
-    buf = _io.StringIO()
-    w = csv.writer(buf)
-    write_row = lambda values: w.writerow([safe_csv_cell(value) for value in values])
-    name = student.get("name", student.get("username", "未知"))
-    write_row(["學員：" + str(name)])
-    write_row(["區間：" + str(start_date.isoformat()) + " ~ " + str(end_date.isoformat())])
-    write_row([])
-    write_row(["日期", "熱量 (kcal)", "蛋白質 (g)", "醣類 (g)", "脂質 (g)", "水量 (ml)", "體重 (kg)", "訓練項目"])
-    weight_by_day = {}
-    for r in weights:
-        d = _parse_record_date(r.get("timestamp", ""))
-        if d >= start_date:
-            weight_by_day[d] = r.get("weight_kg", "")
-    training_by_day = {}
-    for r in trainings:
-        d = _parse_record_date(r.get("timestamp", ""))
-        if start_date <= d <= end_date:
-            training_by_day[d] = sheets.format_training_record(r)
-    for d in sorted(daily.keys()):
-        v = daily[d]
-        wd = weight_by_day.get(d, "")
-        wd_str = (("%.1f" % wd) if isinstance(wd, (int, float)) else (wd if wd else ""))
-        write_row([
-            d.isoformat(),
-            "%.0f" % v["calorie"],
-            "%.0f" % v["protein"],
-            "%.0f" % v["carb"],
-            "%.0f" % v["fat"],
-            "%.0f" % v["water"],
-            wd_str,
-            training_by_day.get(d, ""),
-        ])
-    if notes:
-        write_row([])
-        write_row(["教練備註"])
-        write_row(["時間", "教練", "內容"])
-        for n in notes:
-            write_row([
-                n.get("timestamp", "")[:19],
-                n.get("coach_id", ""),
-                n.get("note", "").replace("\n", " "),
-            ])
-    return ("\ufeff" + buf.getvalue()).encode("utf-8")
+    return build_history_csv(
+        student, daily, weights, trainings, notes, start_date, end_date
+    )
 
 def _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date):
     # 中文字型設定
