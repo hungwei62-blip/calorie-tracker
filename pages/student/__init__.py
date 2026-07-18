@@ -865,36 +865,65 @@ def _render_food_records() -> None:
         _render_photo_food_input(uid)
 
 
+TRAINING_DETAIL_LABELS = {
+    "重量訓練": ("strength_detail", "重量訓練內容"),
+    "有氧訓練": ("cardio_detail", "有氧訓練內容"),
+    "其他": ("other_detail", "其他訓練內容"),
+}
+
+
+def _training_fields_for_types(selected_types: list[str]) -> list[tuple[str, str, str]]:
+    """依固定顯示順序回傳目前應呈現的訓練內容欄位。"""
+    return [
+        (training_type, *TRAINING_DETAIL_LABELS[training_type])
+        for training_type in TRAINING_TYPES
+        if training_type in selected_types
+    ]
+
+
+def _training_detail_placeholder(training_type: str) -> str:
+    return {
+        "重量訓練": "例如：深蹲 4 組、臥推 3 組",
+        "有氧訓練": "例如：跑步機 20 分鐘",
+        "其他": "請輸入訓練內容",
+    }[training_type]
+
+
 def _render_training_records() -> None:
-    st.subheader("訓練")
     uid = st.session_state.user_id
     today = date.today()
     today_training = sheets.get_training_by_date(uid, today)
-    field_keys = {
-        "背": "back", "胸": "chest", "腿": "legs",
-        "核心": "core", "有氧": "cardio",
-    }
+    default_types = today_training.get("training_types", []) if today_training else []
+    selected_types = st.pills(
+        "訓練類型",
+        TRAINING_TYPES,
+        selection_mode="multi",
+        default=default_types,
+        key="training_types",
+        width="stretch",
+    ) or []
+
     with st.form("training_form"):
-        st.caption(f'{today.strftime("%Y/%m/%d")} 訓練項目')
-        columns = st.columns(2)
-        training_values: dict[str, int] = {}
-        for index, training_type in enumerate(TRAINING_TYPES):
-            field_key = field_keys[training_type]
-            default = today_training.get(field_key, 0) if today_training else 0
-            with columns[index % 2]:
-                checked = st.checkbox(training_type, value=bool(default))
-            training_values[field_key] = 1 if checked else 0
+        st.caption(f'{today.strftime("%Y/%m/%d")} 訓練內容')
+        details = {field: "" for field in sheets.TRAINING_TYPE_FIELDS.values()}
+        for training_type, field, label in _training_fields_for_types(selected_types):
+            details[field] = st.text_input(
+                label,
+                value=(today_training or {}).get(field, ""),
+                key=f"training_{field}",
+                placeholder=_training_detail_placeholder(training_type),
+            )
         submitted = st.form_submit_button("儲存訓練紀錄", width="stretch")
     if submitted:
         try:
             sheets.update_training(
-                timestamp=today.isoformat(), user_id=uid,
-                training_back=training_values["back"],
-                training_chest=training_values["chest"],
-                training_legs=training_values["legs"],
-                training_core=training_values["core"],
-                training_cardio=training_values["cardio"],
+                timestamp=today.isoformat(),
+                user_id=uid,
+                training_types=selected_types,
+                **details,
             )
+        except ValueError as exc:
+            st.warning(str(exc))
         except Exception:
             st.error("訓練紀錄儲存失敗，請稍後再試。")
         else:
@@ -904,19 +933,18 @@ def _render_training_records() -> None:
     st.subheader("本週訓練紀錄")
     week_start, week_end = _week_range()
     rows = []
-    labels_by_key = {value: key for key, value in field_keys.items()}
-    for offset in range((week_end - week_start).days + 1):
-        target_date = week_start + timedelta(days=offset)
-        training = sheets.get_training_by_date(uid, target_date)
-        if training and any(value == 1 for value in training.values()):
-            labels = [
-                labels_by_key[key] for key, value in training.items()
-                if value == 1 and key in labels_by_key
-            ]
+    for training in sheets.get_training_records(uid):
+        timestamp = str(training.get("timestamp", ""))[:10]
+        try:
+            target_date = date.fromisoformat(timestamp)
+        except ValueError:
+            continue
+        if week_start <= target_date <= week_end and training.get("training_types"):
             rows.append({
                 "日期": target_date.strftime("%m/%d"),
-                "訓練項目": "、".join(labels),
+                "訓練內容": sheets.format_training_record(training),
             })
+    rows.sort(key=lambda row: row["日期"])
     if rows:
         st.dataframe(rows, width="stretch", hide_index=True)
     else:

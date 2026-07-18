@@ -22,7 +22,7 @@ DEFAULT_GOALS = {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0,
 
 # 訓練項目
 
-TRAINING_TYPES = ["背", "胸", "腿", "核心", "有氧"]
+TRAINING_TYPES = ("重量訓練", "有氧訓練", "其他")
 
 # ---------- Session 初始化 ----------
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
@@ -201,3 +202,46 @@ def test_daily_record_sections_remove_duplicate_headings_and_simplify_weight():
     assert '體重趨勢' not in weight_renderer
     assert 'get_weight_records' not in weight_renderer
     assert 'line_chart' not in weight_renderer
+
+
+@pytest.mark.parametrize(
+    ("selected", "expected"),
+    [
+        (["重量訓練"], [("重量訓練", "strength_detail", "重量訓練內容")]),
+        (
+            ["有氧訓練", "其他"],
+            [
+                ("有氧訓練", "cardio_detail", "有氧訓練內容"),
+                ("其他", "other_detail", "其他訓練內容"),
+            ],
+        ),
+        (
+            ["其他", "重量訓練", "有氧訓練"],
+            [
+                ("重量訓練", "strength_detail", "重量訓練內容"),
+                ("有氧訓練", "cardio_detail", "有氧訓練內容"),
+                ("其他", "other_detail", "其他訓練內容"),
+            ],
+        ),
+    ],
+)
+def test_training_selection_maps_to_independent_detail_fields(selected, expected):
+    assert student_pages._training_fields_for_types(selected) == expected
+
+
+def test_training_renderer_uses_multi_select_and_no_duplicate_heading():
+    module_source = Path(student_pages.__file__).read_text(encoding="utf-8")
+    source = module_source[
+        module_source.index("def _render_training_records"):
+        module_source.index("def _render_weight_records")
+    ]
+
+    assert 'selection_mode="multi"' in source
+    assert 'st.subheader("訓練")' not in source
+    assert 'st.text_input(' in source
+    assert 'training_types=selected_types' in source
+    for legacy_field in (
+        "training_back", "training_chest", "training_legs",
+        "training_core", "training_cardio",
+    ):
+        assert legacy_field not in source
