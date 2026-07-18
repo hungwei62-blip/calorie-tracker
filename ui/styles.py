@@ -525,6 +525,7 @@ def apply_global_styles() -> None:
 
             .st-key-daily_summary_cards .weight-trend {
                 display: flex !important;
+                flex-wrap: nowrap !important;
                 align-items: center !important;
                 margin-top: 12px !important;
                 color: #1a1a1a !important;
@@ -862,38 +863,58 @@ def apply_global_styles() -> None:
             }
 
             .st-key-auth_brand .auth-brand-title {
-                display: flex !important;
-                align-items: baseline !important;
+                display: grid !important;
+                grid-template-columns: max-content max-content 105px !important;
+                align-items: center !important;
                 justify-content: center !important;
-                gap: 0.34em !important;
-                margin: 0 !important;
+                gap: 0.22em !important;
+                width: max-content !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
                 color: #2f3e46 !important;
-                font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
-                font-size: clamp(21px, 4vw, 32px) !important;
+                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif !important;
+                font-size: clamp(18px, 2.8vw, 24px) !important;
                 font-weight: 600 !important;
                 line-height: 1.25 !important;
                 white-space: nowrap !important;
             }
 
             .st-key-auth_brand .auth-brand-english {
-                letter-spacing: 0.06em !important;
+                min-width: 0 !important;
+                white-space: nowrap !important;
+                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif !important;
+                letter-spacing: 0.045em !important;
+            }
+
+            .st-key-auth_brand .auth-brand-logo-frame {
+                display: block !important;
+                min-width: 0 !important;
+                width: 100% !important;
+                height: 31px !important;
+                overflow: hidden !important;
+                background: #ffffff !important;
+            }
+
+            .st-key-auth_brand .auth-brand-logo {
+                display: block !important;
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+                object-position: center !important;
             }
 
             .st-key-auth_brand .auth-brand-divider {
+                min-width: 0 !important;
+                white-space: nowrap !important;
                 color: #a3aaa7 !important;
                 font-weight: 300 !important;
-            }
-
-            .st-key-auth_brand .auth-brand-chinese {
-                letter-spacing: 0.04em !important;
-                font-weight: 500 !important;
             }
 
             .st-key-auth_brand .auth-brand-tagline {
                 max-width: 680px !important;
                 margin: 14px auto 0 !important;
                 color: #6f7774 !important;
-                font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;
+                font-family: "PingFang TC", "PingFang SC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;
                 font-size: 15px !important;
                 font-weight: 400 !important;
                 line-height: 1.8 !important;
@@ -907,8 +928,13 @@ def apply_global_styles() -> None:
 
             @media (max-width: 768px) {
                 .st-key-auth_brand .auth-brand-title {
-                    font-size: clamp(21px, 6.4vw, 26px) !important;
-                    gap: 0.26em !important;
+                    grid-template-columns: max-content max-content 80px !important;
+                    font-size: clamp(14px, 4.4vw, 18px) !important;
+                    gap: 0.14em !important;
+                }
+
+                .st-key-auth_brand .auth-brand-logo-frame {
+                    height: 24px !important;
                 }
 
                 .st-key-auth_brand .auth-brand-tagline {
@@ -918,6 +944,62 @@ def apply_global_styles() -> None:
                     font-size: 14px !important;
                     line-height: 1.75 !important;
                 }
+            }
+
+            .st-key-login_panel div[data-testid="stFormSubmitButton"] button,
+            .st-key-login_secondary_action div.stButton > button {
+                min-height: 44px !important;
+                color: #414541 !important;
+                background: rgba(255, 255, 255, 0.72) !important;
+                background-color: rgba(255, 255, 255, 0.72) !important;
+                border: 1px solid rgba(112, 116, 110, 0.24) !important;
+                border-radius: 12px !important;
+                outline: none !important;
+                box-shadow: none !important;
+                font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease !important;
+            }
+
+            .st-key-login_panel div[data-testid="stFormSubmitButton"] button {
+                width: 100% !important;
+            }
+
+            .st-key-login_secondary_action,
+            .st-key-login_secondary_action div.stButton,
+            .st-key-login_secondary_action div.stButton > button {
+                width: fit-content !important;
+            }
+
+            .st-key-login_panel div[data-testid="stFormSubmitButton"] button:hover,
+            .st-key-login_secondary_action div.stButton > button:hover {
+                color: #2f332f !important;
+                background: rgba(247, 247, 244, 0.94) !important;
+                background-color: rgba(247, 247, 244, 0.94) !important;
+                border-color: rgba(96, 100, 94, 0.34) !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-login_panel div[data-testid="stFormSubmitButton"] button:active,
+            .st-key-login_secondary_action div.stButton > button:active {
+                background: rgba(237, 237, 232, 0.96) !important;
+                background-color: rgba(237, 237, 232, 0.96) !important;
+                transform: scale(0.99) !important;
+            }
+
+            .st-key-login_panel div[data-testid="stFormSubmitButton"] button:focus-visible,
+            .st-key-login_secondary_action div.stButton > button:focus-visible {
+                outline: 2px solid rgba(112, 116, 110, 0.30) !important;
+                outline-offset: 2px !important;
+            }
+
+            .st-key-login_panel div[data-testid="stFormSubmitButton"] button > div,
+            .st-key-login_panel div[data-testid="stFormSubmitButton"] button p,
+            .st-key-login_secondary_action div.stButton > button > div,
+            .st-key-login_secondary_action div.stButton > button p {
+                color: inherit !important;
+                background: transparent !important;
             }
 
             div[data-testid="stForm"] {

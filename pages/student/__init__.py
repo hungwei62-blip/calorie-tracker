@@ -1,9 +1,11 @@
 """學員端、登入與註冊頁面。"""
 from __future__ import annotations
+import base64
 from datetime import date, datetime, timedelta
 import hashlib
 from io import BytesIO
 import math
+from pathlib import Path
 import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
@@ -21,6 +23,14 @@ LEGACY_DAILY_RECORD_TABS = {
     "⚖️ 體重": "體重",
     "🏋️ 訓練": "訓練",
 }
+BRAND_MARK_PATH = Path(__file__).resolve().parents[2] / "static" / "peak_plan_logo.png"
+
+
+@st.cache_data(show_spinner=False)
+def _load_brand_mark_data_uri() -> str:
+    """Load the bundled Peak Plan mark as an embeddable PNG data URI."""
+    encoded_mark = base64.b64encode(BRAND_MARK_PATH.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded_mark}"
 
 
 def _to_float(value: object) -> float:
@@ -398,24 +408,25 @@ def page_tdee_questionnaire() -> None:
 
 
 def page_login() -> None:
+    brand_mark_uri = _load_brand_mark_data_uri()
+    brand_html = (
+        '<div class="auth-brand-lockup">'
+        '<div role="heading" aria-level="1" class="auth-brand-title">'
+        '<span class="auth-brand-english">Project Prime</span>'
+        '<span class="auth-brand-divider">|</span>'
+        '<span class="auth-brand-logo-frame">'
+        f'<img class="auth-brand-logo" src="{brand_mark_uri}" alt="巔峰計畫">'
+        "</span>"
+        "</div>"
+        '<p class="auth-brand-tagline">'
+        "<span>練對、吃對</span>"
+        "<span>剩下交給時間</span>"
+        "<span>把自己推向人生最好的狀態</span>"
+        "</p>"
+        "</div>"
+    )
     with st.container(key="auth_brand"):
-        st.markdown(
-            """
-            <div class="auth-brand-lockup">
-                <h1 class="auth-brand-title">
-                    <span class="auth-brand-english">PROJECT PRIME</span>
-                    <span class="auth-brand-divider">|</span>
-                    <span class="auth-brand-chinese">巔峰計畫</span>
-                </h1>
-                <p class="auth-brand-tagline">
-                    <span>吃對、練對持續做。</span>
-                    <span>剩下交給時間，進化沒有捷徑，</span>
-                    <span>但每一步都算數，把自己推向人生最好的狀態</span>
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(brand_html, unsafe_allow_html=True)
 
     # 確保 auth_mode 存在
     if "auth_mode" not in st.session_state:
@@ -423,10 +434,11 @@ def page_login() -> None:
 
     if st.session_state.auth_mode == "login":
         # ==================== 登入表單 ====================
-        with st.form("login_form"):
-            username = st.text_input("帳號", key="login_user")
-            password = st.text_input("密碼", type="password", key="login_pwd")
-            submit = st.form_submit_button("登入", width="stretch")
+        with st.container(key="login_panel"):
+            with st.form("login_form"):
+                username = st.text_input("帳號", key="login_user")
+                password = st.text_input("密碼", type="password", key="login_pwd")
+                submit = st.form_submit_button("登入", width="stretch")
 
         if submit:
             try:
@@ -454,9 +466,10 @@ def page_login() -> None:
             st.rerun()
 
         # 切換到註冊
-        if st.button("還沒有帳號？立即註冊", key="nav_to_register"):
-            st.session_state.auth_mode = "register"
-            st.rerun()
+        with st.container(key="login_secondary_action"):
+            if st.button("註冊新學員", key="nav_to_register"):
+                st.session_state.auth_mode = "register"
+                st.rerun()
 
     else:
         # ==================== 註冊表單 ====================
@@ -551,7 +564,6 @@ def page_personal() -> None:
     # ============================================================
     # 👋 1. 個人化頭像歡迎區 (單行無縮排安全版)
     # ============================================================
-    import base64
     import os
 
     user_name = st.session_state.get('username', '學員')
