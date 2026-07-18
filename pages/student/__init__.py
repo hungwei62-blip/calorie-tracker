@@ -991,26 +991,6 @@ def _render_training_records() -> None:
             st.success("訓練紀錄已儲存")
             st.rerun()
 
-    st.subheader("本週訓練紀錄")
-    week_start, week_end = _week_range()
-    rows = []
-    for training in sheets.get_training_records(uid):
-        timestamp = str(training.get("timestamp", ""))[:10]
-        try:
-            target_date = date.fromisoformat(timestamp)
-        except ValueError:
-            continue
-        if week_start <= target_date <= week_end and training.get("training_types"):
-            rows.append({
-                "日期": target_date.strftime("%m/%d"),
-                "訓練內容": sheets.format_training_record(training),
-            })
-    rows.sort(key=lambda row: row["日期"])
-    if rows:
-        st.dataframe(rows, width="stretch", hide_index=True)
-    else:
-        st.info("本週尚無訓練紀錄")
-
 
 def _render_weight_records() -> None:
     st.subheader("體重")

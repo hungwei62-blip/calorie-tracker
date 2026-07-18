@@ -243,6 +243,10 @@ def test_training_renderer_uses_multi_select_and_no_duplicate_heading():
     assert 'st.subheader("訓練")' not in source
     assert 'st.text_input(' in source
     assert 'training_types=selected_types' in source
+    assert '本週訓練紀錄' not in source
+    assert '本週尚無訓練紀錄' not in source
+    assert 'get_training_records' not in source
+    assert 'st.dataframe' not in source
     for legacy_field in (
         "training_back", "training_chest", "training_legs",
         "training_core", "training_cardio",
