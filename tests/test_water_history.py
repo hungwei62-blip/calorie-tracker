@@ -124,7 +124,7 @@ def test_thirty_day_water_figure_reduces_date_ticks():
 def test_water_renderer_has_independent_controls_and_cached_records():
     source = inspect.getsource(student_pages._render_student_water_history)
 
-    assert 'st.subheader("飲水量")' in source
+    assert 'st.subheader("飲水量")' not in source
     assert 'key="water_history_range"' in source
     assert 'key="student_water_history_card"' in source
     assert 'key="student_water_history_chart"' in source
@@ -140,6 +140,8 @@ def test_water_history_has_scoped_blue_card_styles():
     )
 
     assert ".st-key-student_water_history_card" in stylesheet
+    assert "margin-top: 12px !important;" in stylesheet
+    assert "margin-top: 10px !important;" in stylesheet
     assert ".water-history-summary" in stylesheet
     assert "background: #F6F9FC" in stylesheet
     assert "border: 1px solid #E6EDF3" in stylesheet

@@ -121,6 +121,7 @@ def test_training_period_labels_match_selected_view():
 def test_training_history_renderer_has_independent_controls_and_navigation():
     source = inspect.getsource(student_pages._render_student_training_history)
 
+    assert 'st.subheader("訓練")' not in source
     assert '("週", "月")' in source
     assert 'key="training_history_view"' in source
     assert '"training_history_anchor"' in source
@@ -139,10 +140,13 @@ def test_training_history_styles_keep_seven_columns_on_mobile():
     )
 
     assert ".st-key-student_training_history_card" in stylesheet
+    assert "margin-top: 12px !important;" in stylesheet
+    assert "margin-top: 10px !important;" in stylesheet
     assert "grid-template-columns: repeat(7, minmax(0, 1fr))" in stylesheet
     assert "aspect-ratio: 1 / 1" in stylesheet
     assert "background: #B7A1E6" in stylesheet
     assert "background: #ECE6F3" in stylesheet
+    assert "background: #F5F2F9" in stylesheet
     assert "border: 1px solid #ECE6F3" in stylesheet
     assert "rgba(183, 161, 230, 0.42)" in stylesheet
     assert "padding: 16px 18px 26px !important;" in stylesheet

@@ -1019,7 +1019,7 @@ def apply_global_styles() -> None:
 
             /* ===== 學員歷史：週／月訓練日曆 ===== */
             .st-key-student_training_history {
-                margin-top: 20px !important;
+                margin-top: 12px !important;
             }
 
             .st-key-student_training_history_card {
@@ -1149,7 +1149,7 @@ def apply_global_styles() -> None:
                 width: min(42px, 100%) !important;
                 aspect-ratio: 1 / 1 !important;
                 color: #746B80 !important;
-                background: #ECE6F3 !important;
+                background: #F5F2F9 !important;
                 border-radius: 50% !important;
                 font-size: 13px !important;
                 font-variant-numeric: tabular-nums !important;
@@ -1170,7 +1170,7 @@ def apply_global_styles() -> None:
 
             @media (max-width: 480px) {
                 .st-key-student_training_history {
-                    margin-top: 16px !important;
+                    margin-top: 10px !important;
                 }
 
                 .st-key-student_training_history_card {
@@ -1214,7 +1214,7 @@ def apply_global_styles() -> None:
 
             /* ===== 學員歷史：熱量與蛋白質雙軸趨勢 ===== */
             .st-key-student_nutrition_history {
-                margin-top: 20px !important;
+                margin-top: 12px !important;
             }
 
             .st-key-student_nutrition_history_card {
@@ -1324,7 +1324,7 @@ def apply_global_styles() -> None:
 
             @media (max-width: 480px) {
                 .st-key-student_nutrition_history {
-                    margin-top: 16px !important;
+                    margin-top: 10px !important;
                 }
 
                 .st-key-student_nutrition_history_card {
@@ -1357,7 +1357,7 @@ def apply_global_styles() -> None:
 
             /* ===== 學員歷史：飲水量單軸趨勢 ===== */
             .st-key-student_water_history {
-                margin-top: 20px !important;
+                margin-top: 12px !important;
             }
 
             .st-key-student_water_history_card {
@@ -1443,7 +1443,7 @@ def apply_global_styles() -> None:
 
             @media (max-width: 480px) {
                 .st-key-student_water_history {
-                    margin-top: 16px !important;
+                    margin-top: 10px !important;
                 }
 
                 .st-key-student_water_history_card {

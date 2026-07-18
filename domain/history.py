@@ -18,6 +18,14 @@ class WeightHistoryPoint:
 
 
 @dataclass(frozen=True)
+class WeightMeasurementSummary:
+    latest_weight: float
+    previous_weight: float | None
+    difference: float | None
+    percentage: float | None
+
+
+@dataclass(frozen=True)
 class TrainingCalendarDay:
     day: date | None
     has_training: bool
@@ -82,6 +90,54 @@ def _timestamp_order(value: object) -> float:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.timestamp()
+
+
+def _valid_measurement_timestamp(value: object) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def summarize_weight_measurements(
+    records: list[dict[str, Any]],
+) -> WeightMeasurementSummary | None:
+    """Return the latest and previous valid measurements by timestamp."""
+    measurements: list[tuple[float, int, float]] = []
+    for index, record in enumerate(records):
+        timestamp_order = _valid_measurement_timestamp(record.get("timestamp"))
+        if timestamp_order is None:
+            continue
+        try:
+            weight = float(record.get("weight_kg", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(weight) or weight <= 0:
+            continue
+        measurements.append((timestamp_order, index, weight))
+
+    if not measurements:
+        return None
+    measurements.sort(key=lambda item: (item[0], item[1]))
+    latest_weight = measurements[-1][2]
+    if len(measurements) == 1:
+        return WeightMeasurementSummary(latest_weight, None, None, None)
+
+    previous_weight = measurements[-2][2]
+    difference = latest_weight - previous_weight
+    percentage = difference / previous_weight * 100
+    return WeightMeasurementSummary(
+        latest_weight,
+        previous_weight,
+        difference,
+        percentage,
+    )
 
 
 def build_weight_history_series(

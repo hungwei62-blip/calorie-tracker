@@ -84,6 +84,7 @@ def test_history_page_uses_clean_heading_and_renders_all_history_sections():
         student_pages._render_student_weight_history
     )
 
+    assert 'st.subheader("體重變化")' not in renderer_source
     assert 'key="student_history_page"' in source
     assert 'st.header("歷史紀錄")' in source
     assert "📜" not in source

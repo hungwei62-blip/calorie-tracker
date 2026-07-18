@@ -208,7 +208,7 @@ def test_nutrition_renderer_does_not_depend_on_goals_or_legacy_charts():
     assert "st.dataframe" not in source
     assert "st.bar_chart" not in source
     assert "所選期間尚無飲食紀錄" in source
-    assert 'st.subheader("養分攝取")' in source
+    assert 'st.subheader("養分攝取")' not in source
     assert "攝取趨勢" not in source
 
 
@@ -220,6 +220,8 @@ def test_nutrition_history_has_scoped_dual_axis_card_styles():
     )
 
     assert ".st-key-student_nutrition_history_card" in stylesheet
+    assert "margin-top: 12px !important;" in stylesheet
+    assert "margin-top: 10px !important;" in stylesheet
     assert ".nutrition-history-summary" in stylesheet
     assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in stylesheet
     assert "color: var(--history-primary-dark)" in stylesheet

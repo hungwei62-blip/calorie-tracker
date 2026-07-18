@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 import inspect
 
 import pytest
@@ -48,6 +49,35 @@ def test_negative_goal_is_rejected(monkeypatch, student_row):
     _install_fake_users(monkeypatch, FakeWorksheet(), [student_row])
     with pytest.raises(ValueError, match="不可小於 0"):
         sheets.update_user_goals(student_row["user_id"], {"protein": -1})
+
+
+def test_latest_weight_uses_timestamp_order(monkeypatch):
+    sheets.get_latest_weight.clear()
+    monkeypatch.setattr(
+        sheets,
+        "get_weight_records",
+        lambda _user_id: [
+            {"timestamp": "2026-07-19T08:00:00+08:00", "weight_kg": 60},
+            {"timestamp": "2026-07-17", "weight_kg": 62},
+            {"timestamp": "2026-07-18", "weight_kg": 61},
+        ],
+    )
+
+    assert sheets.get_latest_weight("timestamp-order-student") == 60
+
+
+def test_weight_by_date_returns_latest_same_day_measurement(monkeypatch):
+    monkeypatch.setattr(
+        sheets,
+        "get_weight_records",
+        lambda _user_id: [
+            {"timestamp": "2026-07-19T08:00:00+08:00", "weight_kg": 61},
+            {"timestamp": "2026-07-18T20:00:00+08:00", "weight_kg": 62},
+            {"timestamp": "2026-07-19T21:00:00+08:00", "weight_kg": 60.5},
+        ],
+    )
+
+    assert sheets.get_weight_by_date("student", date(2026, 7, 19)) == 60.5
 
 
 def test_coach_only_sees_owned_students(monkeypatch, student_row):

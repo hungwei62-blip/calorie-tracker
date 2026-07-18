@@ -29,6 +29,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import streamlit as st
 
+from domain.history import summarize_weight_measurements
+
 CACHE_TTL = 60  # 快取 TTL（秒）
 FIXED_PRIMARY_COACH_ID = "u_20260629165506_4b525f9c"
 _VERIFIED_WORKSHEET_SCHEMAS: set[tuple[str, str]] = set()
@@ -586,19 +588,20 @@ def get_weight_records(user_id: str | None = None) -> list[dict[str, Any]]:
 @st.cache_data(ttl=CACHE_TTL)
 def get_latest_weight(user_id: str) -> float | None:
     """取得學員最新一筆體重記錄，回傳 kg 值，無記錄時回傳 None。"""
-    records = get_weight_records(user_id)
-    if not records:
-        return None
-    return records[-1].get("weight_kg")
+    summary = summarize_weight_measurements(get_weight_records(user_id))
+    return summary.latest_weight if summary is not None else None
 
 
 def get_weight_by_date(user_id: str, target_date: date) -> float | None:
     """取得指定日期的體重記錄，無記錄時回傳 None。"""
     date_str = target_date.isoformat()[:10]
-    for r in get_weight_records(user_id):
-        if r.get("timestamp", "")[:10] == date_str:
-            return r.get("weight_kg")
-    return None
+    records = [
+        record
+        for record in get_weight_records(user_id)
+        if str(record.get("timestamp", ""))[:10] == date_str
+    ]
+    summary = summarize_weight_measurements(records)
+    return summary.latest_weight if summary is not None else None
 
 
 # =============================================================================

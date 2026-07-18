@@ -24,6 +24,7 @@ from domain.history import (
     history_date_range,
     nutrition_history_averages,
     shift_training_period,
+    summarize_weight_measurements,
     training_period_bounds,
     water_history_average,
 )
@@ -305,22 +306,16 @@ def build_calorie_figure(actual: object, goal: object) -> go.Figure:
 
 def _weight_summary(weight_records: list[dict[str, object]]) -> tuple[float | None, str]:
     """從 Weight 紀錄取得最新體重與相較前一筆的趨勢文字。"""
-    weights = [
-        value
-        for record in weight_records
-        if (value := _to_float(record.get("weight_kg"))) > 0
-    ]
-    if not weights:
+    summary = summarize_weight_measurements(weight_records)
+    if summary is None:
         return None, ""
 
-    latest_weight = weights[-1]
-    if len(weights) < 2:
+    latest_weight = summary.latest_weight
+    if summary.difference is None or summary.percentage is None:
         return latest_weight, ""
 
-    previous_weight = weights[-2]
-    difference = latest_weight - previous_weight
-    difference_percentage = difference / previous_weight * 100
-
+    difference = summary.difference
+    difference_percentage = summary.percentage
     if difference < 0:
         trend = f"⇩ {abs(difference):.1f} Kg ({difference_percentage:.1f}%)"
     elif difference > 0:
@@ -1102,7 +1097,7 @@ def _render_weight_records() -> None:
     if submitted:
         try:
             sheets.append_weight(
-                timestamp=datetime.now().strftime("%Y-%m-%d"),
+                timestamp=datetime.now().isoformat(),
                 user_id=uid, weight_kg=weight,
             )
         except Exception:
@@ -1286,7 +1281,6 @@ def build_weight_history_figure(
 
 def _render_student_weight_history(user_id: str) -> None:
     with st.container(key="student_weight_history"):
-        st.subheader("體重變化")
         selected_range = st.session_state.get("weight_history_range", "7 天")
         if selected_range not in ("7 天", "30 天"):
             selected_range = "7 天"
@@ -1396,7 +1390,6 @@ def _render_student_training_history(user_id: str) -> None:
         st.session_state["training_history_anchor"] = anchor_date
 
     with st.container(key="student_training_history"):
-        st.subheader("訓練")
         try:
             records = sheets.get_training_records(user_id)
         except Exception:
@@ -1598,7 +1591,6 @@ def build_nutrition_history_figure(
 
 def _render_student_nutrition_history(user_id: str) -> None:
     with st.container(key="student_nutrition_history"):
-        st.subheader("養分攝取")
         selected_range = st.session_state.get(
             "nutrition_history_range", "7 天"
         )
@@ -1738,7 +1730,6 @@ def build_water_history_figure(
 
 def _render_student_water_history(user_id: str) -> None:
     with st.container(key="student_water_history"):
-        st.subheader("飲水量")
         selected_range = st.session_state.get("water_history_range", "7 天")
         if selected_range not in ("7 天", "30 天"):
             selected_range = "7 天"

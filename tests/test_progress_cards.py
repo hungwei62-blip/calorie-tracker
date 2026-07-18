@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import date
 import inspect
 
+import pytest
+
+from domain.history import summarize_weight_measurements
 import pages.student as student_pages
 from pages.student import (
     _goal_status,
@@ -121,8 +124,8 @@ def test_calorie_figure_clamps_invalid_values():
 def test_weight_summary_uses_weight_records_for_latest_value_and_trend():
     latest, trend = _weight_summary(
         [
-            {"weight_kg": 62},
-            {"weight_kg": "61.0"},
+            {"timestamp": "2026-07-18", "weight_kg": 62},
+            {"timestamp": "2026-07-19T08:30:00+08:00", "weight_kg": "61.0"},
         ]
     )
 
@@ -132,11 +135,66 @@ def test_weight_summary_uses_weight_records_for_latest_value_and_trend():
 
 def test_weight_summary_handles_missing_and_unchanged_values():
     assert _weight_summary([]) == (None, "")
-    assert _weight_summary([{"weight_kg": 61}]) == (61, "")
-    assert _weight_summary([{"weight_kg": 61}, {"weight_kg": 61}]) == (
+    assert _weight_summary(
+        [{"timestamp": "2026-07-18", "weight_kg": 61}]
+    ) == (61, "")
+    assert _weight_summary([
+        {"timestamp": "2026-07-18", "weight_kg": 61},
+        {"timestamp": "2026-07-19", "weight_kg": 61},
+    ]) == (
         61,
         "⬌ 體重維持持平",
     )
+
+
+def test_weight_summary_orders_records_by_timestamp_not_sheet_row():
+    records = [
+        {"timestamp": "2026-07-19T08:00:00+08:00", "weight_kg": 60},
+        {"timestamp": "2026-07-17", "weight_kg": 63},
+        {"timestamp": "2026-07-18T20:00:00+08:00", "weight_kg": 61},
+    ]
+
+    summary = summarize_weight_measurements(records)
+
+    assert summary is not None
+    assert summary.latest_weight == 60
+    assert summary.previous_weight == 61
+    assert summary.difference == -1
+    assert summary.percentage == pytest.approx(-100 / 61)
+    assert _weight_summary(records) == (60, "⇩ 1.0 Kg (-1.6%)")
+
+
+def test_weight_summary_uses_later_sheet_row_when_timestamps_match():
+    summary = summarize_weight_measurements([
+        {"timestamp": "2026-07-19", "weight_kg": 62},
+        {"timestamp": "2026-07-19", "weight_kg": 61},
+    ])
+
+    assert summary is not None
+    assert (summary.latest_weight, summary.previous_weight) == (61, 62)
+
+
+def test_weight_summary_ignores_invalid_timestamps_and_weights():
+    summary = summarize_weight_measurements([
+        {"timestamp": "bad-date", "weight_kg": 90},
+        {"timestamp": "2026-07-17", "weight_kg": 0},
+        {"timestamp": "2026-07-18", "weight_kg": "nan"},
+        {"timestamp": "2026-07-19T09:00:00", "weight_kg": 60.5},
+    ])
+
+    assert summary is not None
+    assert summary.latest_weight == 60.5
+    assert summary.previous_weight is None
+
+
+def test_weight_record_form_saves_full_iso_timestamp():
+    module_source = inspect.getsource(student_pages)
+    source = module_source[
+        module_source.index("def _render_weight_records"):
+        module_source.index("def _weight_history_summary")
+    ]
+
+    assert 'timestamp=datetime.now().isoformat()' in source
 
 
 def test_progress_cards_have_scoped_fixed_two_column_styles():
