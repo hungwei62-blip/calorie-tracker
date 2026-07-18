@@ -660,75 +660,334 @@ def apply_global_styles() -> None:
                 }
             }
 
-            /* ===== 學員歷史：體重摘要與折線圖 ===== */
-            .st-key-student_weight_history .weight-history-summary {
-                display: grid !important;
-                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-                margin: 8px 0 12px !important;
-                padding: 14px 10px !important;
-                border: 1px solid rgba(47, 62, 70, 0.08) !important;
-                border-radius: 16px !important;
-                background: #f7f7f7 !important;
-            }
-
-            .st-key-student_weight_history .weight-history-summary > div {
-                min-width: 0 !important;
-                padding: 0 10px !important;
-                text-align: center !important;
-            }
-
-            .st-key-student_weight_history .weight-history-summary > div + div {
-                border-left: 1px solid rgba(47, 62, 70, 0.10) !important;
-            }
-
-            .st-key-student_weight_history .weight-history-summary span,
-            .st-key-student_weight_history .weight-history-summary strong {
-                display: block !important;
+            /* ===== 學員歷史：參考健康儀表板的體重圖卡 ===== */
+            .st-key-student_weight_history_card {
+                box-sizing: border-box !important;
+                width: 100% !important;
+                padding: 18px 18px 6px !important;
                 overflow: hidden !important;
-                text-overflow: ellipsis !important;
+                background: #ffffff !important;
+                border: 1px solid rgba(47, 62, 70, 0.08) !important;
+                border-radius: 20px !important;
+                box-shadow: 0 8px 28px rgba(47, 62, 70, 0.055) !important;
+            }
+
+            .st-key-student_weight_history_card > div[data-testid="stVerticalBlock"] {
+                gap: 4px !important;
+            }
+
+            .st-key-student_weight_history_card div[data-testid="stHorizontalBlock"] {
+                align-items: center !important;
+                flex-wrap: nowrap !important;
+                gap: 12px !important;
+            }
+
+            .st-key-student_weight_history_card div[data-testid="stColumn"] {
+                min-width: 0 !important;
+            }
+
+            .st-key-student_weight_history_card .weight-history-card-heading {
+                display: flex !important;
+                align-items: baseline !important;
+                gap: 9px !important;
+                min-width: 0 !important;
                 white-space: nowrap !important;
             }
 
-            .st-key-student_weight_history .weight-history-summary span {
-                margin-bottom: 5px !important;
-                color: #7a7a7a !important;
-                font-size: 11px !important;
-                font-weight: 400 !important;
+            .st-key-student_weight_history_card .weight-history-card-heading > strong {
+                color: #202522 !important;
+                font-size: 30px !important;
+                font-variant-numeric: tabular-nums !important;
+                font-weight: 650 !important;
+                line-height: 1 !important;
             }
 
-            .st-key-student_weight_history .weight-history-summary strong {
-                color: #2f3e46 !important;
-                font-size: 17px !important;
+            .st-key-student_weight_history_card .weight-history-card-heading > strong span {
+                font-size: 18px !important;
+                font-weight: 550 !important;
+            }
+
+            .st-key-student_weight_history_card .weight-history-change {
+                color: #16a77a !important;
+                font-size: 13px !important;
                 font-variant-numeric: tabular-nums !important;
-                font-weight: 500 !important;
+                font-weight: 550 !important;
+            }
+
+            .st-key-student_weight_history_card .weight-history-change.is-flat {
+                color: #888d89 !important;
+            }
+
+            .st-key-student_weight_history_card [data-testid="stButtonGroup"] {
+                justify-content: flex-end !important;
+            }
+
+            .st-key-student_weight_history_card [data-testid="stButtonGroup"] button,
+            .st-key-student_weight_history_card button[data-testid="stBaseButton-segmented_control"] {
+                min-height: 34px !important;
+                padding: 5px 12px !important;
+                color: #6f7471 !important;
+                background: #f5f6f5 !important;
+                border: none !important;
+                border-radius: 10px !important;
+                box-shadow: none !important;
+                font-size: 12px !important;
+            }
+
+            .st-key-student_weight_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
+            .st-key-student_weight_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
+                color: #252a27 !important;
+                background: #ffffff !important;
+                box-shadow: 0 2px 8px rgba(47, 62, 70, 0.08) !important;
             }
 
             .st-key-student_weight_history_chart div[data-testid="stPlotlyChart"] {
                 overflow: hidden !important;
-                border-radius: 16px !important;
             }
 
             @media (max-width: 480px) {
-                .st-key-student_weight_history .weight-history-summary {
-                    padding: 12px 4px !important;
+                .st-key-student_weight_history_card {
+                    padding: 14px 12px 6px !important;
+                    border-radius: 18px !important;
                 }
 
-                .st-key-student_weight_history .weight-history-summary > div {
-                    padding: 0 5px !important;
+                .st-key-student_weight_history_card div[data-testid="stHorizontalBlock"] {
+                    gap: 8px !important;
                 }
 
-                .st-key-student_weight_history .weight-history-summary span {
-                    font-size: 10px !important;
+                .st-key-student_weight_history_card div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
+                    flex: 1 1 auto !important;
+                    width: auto !important;
                 }
 
-                .st-key-student_weight_history .weight-history-summary strong {
-                    font-size: 14px !important;
+                .st-key-student_weight_history_card div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:last-child {
+                    flex: 0 0 122px !important;
+                    width: 122px !important;
+                }
+
+                .st-key-student_weight_history_card .weight-history-card-heading {
+                    gap: 6px !important;
+                }
+
+                .st-key-student_weight_history_card .weight-history-card-heading > strong {
+                    font-size: 25px !important;
+                }
+
+                .st-key-student_weight_history_card .weight-history-card-heading > strong span {
+                    font-size: 15px !important;
+                }
+
+                .st-key-student_weight_history_card .weight-history-change {
+                    font-size: 11px !important;
+                }
+
+                .st-key-student_weight_history_card [data-testid="stButtonGroup"] button,
+                .st-key-student_weight_history_card button[data-testid="stBaseButton-segmented_control"] {
+                    min-height: 32px !important;
+                    padding: 4px 9px !important;
+                    font-size: 11px !important;
                 }
 
                 .st-key-student_weight_history_chart div[data-testid="stPlotlyChart"],
                 .st-key-student_weight_history_chart .js-plotly-plot,
                 .st-key-student_weight_history_chart .plot-container {
-                    height: 260px !important;
+                    height: 230px !important;
+                }
+
+            }
+
+            /* ===== 學員歷史：週／月訓練日曆 ===== */
+            .st-key-student_training_history {
+                margin-top: 20px !important;
+            }
+
+            .st-key-student_training_history_card {
+                box-sizing: border-box !important;
+                width: 100% !important;
+                padding: 16px 18px 18px !important;
+                overflow: hidden !important;
+                background: #ffffff !important;
+                border: 1px solid rgba(47, 62, 70, 0.08) !important;
+                border-radius: 20px !important;
+                box-shadow: 0 8px 28px rgba(47, 62, 70, 0.055) !important;
+            }
+
+            .st-key-student_training_history_card > div[data-testid="stVerticalBlock"] {
+                gap: 10px !important;
+            }
+
+            .st-key-student_training_history_card [data-testid="stButtonGroup"] {
+                width: min(230px, 100%) !important;
+                margin: 0 auto 2px !important;
+                padding: 3px !important;
+                background: #f3f4f2 !important;
+                border-radius: 999px !important;
+            }
+
+            .st-key-student_training_history_card [data-testid="stButtonGroup"] button,
+            .st-key-student_training_history_card button[data-testid="stBaseButton-segmented_control"] {
+                min-height: 34px !important;
+                color: #777c79 !important;
+                background: transparent !important;
+                border: none !important;
+                border-radius: 999px !important;
+                box-shadow: none !important;
+                font-size: 13px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-student_training_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
+            .st-key-student_training_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
+                color: #ffffff !important;
+                background: #252826 !important;
+            }
+
+            .st-key-student_training_history_card div[data-testid="stHorizontalBlock"] {
+                align-items: center !important;
+                flex-wrap: nowrap !important;
+                gap: 8px !important;
+            }
+
+            .st-key-student_training_history_card div[data-testid="stColumn"] {
+                min-width: 0 !important;
+            }
+
+            .st-key-student_training_history_card .st-key-training_history_previous button,
+            .st-key-student_training_history_card .st-key-training_history_next button {
+                width: 36px !important;
+                min-width: 36px !important;
+                max-width: 36px !important;
+                height: 36px !important;
+                min-height: 36px !important;
+                padding: 0 !important;
+                color: #4d5551 !important;
+                background: #f6f7f6 !important;
+                border: none !important;
+                border-radius: 50% !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-student_training_history_card .st-key-training_history_previous button:hover,
+            .st-key-student_training_history_card .st-key-training_history_next button:hover {
+                background: #ecefec !important;
+            }
+
+            .st-key-student_training_history_card .st-key-training_history_previous button:focus-visible,
+            .st-key-student_training_history_card .st-key-training_history_next button:focus-visible {
+                outline: none !important;
+                box-shadow: 0 0 0 3px rgba(22, 167, 122, 0.18) !important;
+            }
+
+            .st-key-student_training_history_card .st-key-training_history_previous button:disabled,
+            .st-key-student_training_history_card .st-key-training_history_next button:disabled {
+                opacity: 0.35 !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar-period {
+                overflow: hidden !important;
+                color: #272c29 !important;
+                font-size: 15px !important;
+                font-variant-numeric: tabular-nums !important;
+                font-weight: 550 !important;
+                line-height: 36px !important;
+                text-align: center !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar {
+                width: 100% !important;
+                padding-top: 2px !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar-weekdays,
+            .st-key-student_training_history_card .training-calendar-grid {
+                display: grid !important;
+                grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+                width: 100% !important;
+                column-gap: 8px !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar-weekdays {
+                margin-bottom: 9px !important;
+                color: #8a8f8c !important;
+                font-size: 11px !important;
+                font-weight: 500 !important;
+                text-align: center !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar-grid {
+                row-gap: 9px !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar-day {
+                display: grid !important;
+                place-items: center !important;
+                justify-self: center !important;
+                width: min(42px, 100%) !important;
+                aspect-ratio: 1 / 1 !important;
+                color: #505652 !important;
+                background: #f1f2f1 !important;
+                border-radius: 50% !important;
+                font-size: 13px !important;
+                font-variant-numeric: tabular-nums !important;
+                font-weight: 500 !important;
+                line-height: 1 !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar-day.is-complete {
+                color: #ffffff !important;
+                background: #16a77a !important;
+                box-shadow: 0 4px 12px rgba(22, 167, 122, 0.20) !important;
+            }
+
+            .st-key-student_training_history_card .training-calendar-day.is-empty {
+                background: transparent !important;
+                box-shadow: none !important;
+            }
+
+            @media (max-width: 480px) {
+                .st-key-student_training_history {
+                    margin-top: 16px !important;
+                }
+
+                .st-key-student_training_history_card {
+                    padding: 14px 10px 16px !important;
+                    border-radius: 18px !important;
+                }
+
+                .st-key-student_training_history_card [data-testid="stButtonGroup"] {
+                    width: min(200px, 100%) !important;
+                }
+
+                .st-key-student_training_history_card [data-testid="stButtonGroup"] button,
+                .st-key-student_training_history_card button[data-testid="stBaseButton-segmented_control"] {
+                    min-height: 32px !important;
+                    font-size: 12px !important;
+                }
+
+                .st-key-student_training_history_card .training-calendar-period {
+                    font-size: 13px !important;
+                }
+
+                .st-key-student_training_history_card .training-calendar-weekdays,
+                .st-key-student_training_history_card .training-calendar-grid {
+                    column-gap: 4px !important;
+                }
+
+                .st-key-student_training_history_card .training-calendar-weekdays {
+                    margin-bottom: 7px !important;
+                    font-size: 10px !important;
+                }
+
+                .st-key-student_training_history_card .training-calendar-grid {
+                    row-gap: 7px !important;
+                }
+
+                .st-key-student_training_history_card .training-calendar-day {
+                    width: min(38px, 100%) !important;
+                    font-size: 12px !important;
                 }
             }
 

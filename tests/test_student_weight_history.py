@@ -12,7 +12,7 @@ def _points(records, start=date(2026, 7, 12), end=date(2026, 7, 18)):
     return build_weight_history_series(records, start, end)
 
 
-def test_weight_summary_uses_latest_change_and_actual_measurement_count():
+def test_weight_card_header_shows_latest_value_and_change():
     points = _points(
         [
             {"timestamp": "2026-07-10T08:00:00+08:00", "weight_kg": 52},
@@ -21,12 +21,11 @@ def test_weight_summary_uses_latest_change_and_actual_measurement_count():
         ]
     )
 
-    markup = student_pages.build_weight_history_summary_html(points)
-
-    assert "目前體重" in markup
-    assert "51.0 kg" in markup
-    assert "-1.0 kg" in markup
-    assert "2 次" in markup
+    heading = student_pages.build_weight_history_card_header_html(points)
+    assert "51.0" in heading
+    assert "kg" in heading
+    assert "↓ -1.0 kg" in heading
+    assert "weight-history-summary" not in heading
 
 
 def test_flat_weight_figure_has_padding_and_only_measured_markers():
@@ -39,7 +38,14 @@ def test_flat_weight_figure_has_padding_and_only_measured_markers():
     assert list(figure.data[0].y) == [50.0] * 7
     assert list(figure.data[1].x) == []
     assert list(figure.layout.yaxis.range) == [49.0, 51.0]
-    assert len(figure.layout.xaxis.tickvals) == 7
+    assert len(figure.layout.xaxis.tickvals) == 4
+    assert figure.data[0].line.shape == "spline"
+    assert figure.data[0].line.color == "#16a77a"
+    assert figure.data[0].fill == "tozeroy"
+    assert figure.data[0].fillgradient.type == "vertical"
+    assert figure.layout.yaxis.visible is False
+    assert figure.layout.margin.b == 4
+    assert figure.layout.xaxis.automargin is True
 
 
 def test_thirty_day_figure_reduces_tick_density_and_marks_real_records():
@@ -54,9 +60,10 @@ def test_thirty_day_figure_reduces_tick_density_and_marks_real_records():
 
     figure = student_pages.build_weight_history_figure(points, 30)
 
-    assert len(figure.layout.xaxis.tickvals) < 30
+    assert len(figure.layout.xaxis.tickvals) == 5
     assert list(figure.data[1].y) == [52.0, 51.0]
-    assert figure.layout.height == 300
+    assert figure.data[1].marker.color == "#16a77a"
+    assert figure.layout.height == 280
 
 
 def test_history_page_renders_weight_before_legacy_nutrition_content():
@@ -68,20 +75,31 @@ def test_history_page_renders_weight_before_legacy_nutrition_content():
     assert source.index("_render_student_weight_history(uid)") < source.index(
         'st.subheader("每日攝取")'
     )
+    assert source.index("_render_student_training_history(uid)") < source.index(
+        'st.subheader("每日攝取")'
+    )
     assert "st.segmented_control(" in renderer_source
     assert '("7 天", "30 天")' in renderer_source
     assert 'key="weight_history_range"' in renderer_source
+    assert 'key="student_weight_history_card"' in renderer_source
     assert 'key="student_weight_history_chart"' in renderer_source
     assert 'open_daily_record_tab("體重")' in renderer_source
+    assert "build_weight_history_card_footer_html" not in renderer_source
+    assert "本期間實際量測" not in inspect.getsource(student_pages)
 
 
-def test_weight_history_has_scoped_three_column_mobile_styles():
+def test_weight_history_has_scoped_card_and_mobile_styles():
     stylesheet = next(
         value
         for value in styles.apply_global_styles.__code__.co_consts
         if isinstance(value, str) and ".st-key-student_weight_history" in value
     )
 
-    assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in stylesheet
+    assert ".st-key-student_weight_history_card" in stylesheet
+    assert ".weight-history-card-heading" in stylesheet
+    assert "font-size: 30px !important;" in stylesheet
+    assert "flex-wrap: nowrap !important;" in stylesheet
     assert ".st-key-student_weight_history_chart" in stylesheet
-    assert "height: 260px !important;" in stylesheet
+    assert "height: 230px !important;" in stylesheet
+    assert ".weight-history-card-footer" not in stylesheet
+    assert "padding: 18px 18px 6px !important;" in stylesheet

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 import math
@@ -14,6 +15,12 @@ class WeightHistoryPoint:
     weight_kg: float | None
     measured: bool
     source_date: date | None
+
+
+@dataclass(frozen=True)
+class TrainingCalendarDay:
+    day: date | None
+    has_training: bool
 
 
 def parse_record_date(timestamp: Any) -> date:
@@ -109,3 +116,103 @@ def build_weight_history_series(
         )
         current_day += timedelta(days=1)
     return points
+
+
+def _has_training_types(value: object) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return any(str(item or "").strip() for item in value)
+    return False
+
+
+def training_record_dates(
+    records: list[dict[str, Any]], *, today: date
+) -> frozenset[date]:
+    """Return valid, non-future dates that contain a training selection."""
+    completed: set[date] = set()
+    for record in records:
+        record_date = parse_record_date(record.get("timestamp", ""))
+        if record_date == date.min or record_date > today:
+            continue
+        if _has_training_types(record.get("training_types")):
+            completed.add(record_date)
+    return frozenset(completed)
+
+
+def training_period_bounds(
+    anchor_date: date, view: str
+) -> tuple[date, date]:
+    """Return Monday-based week or calendar-month bounds."""
+    if view == "週":
+        start = anchor_date - timedelta(days=anchor_date.weekday())
+        return start, start + timedelta(days=6)
+    if view == "月":
+        start = anchor_date.replace(day=1)
+        last_day = calendar.monthrange(start.year, start.month)[1]
+        return start, start.replace(day=last_day)
+    raise ValueError("view must be '週' or '月'")
+
+
+def build_training_calendar(
+    records: list[dict[str, Any]],
+    *,
+    anchor_date: date,
+    view: str,
+    today: date,
+) -> list[TrainingCalendarDay]:
+    """Build Monday-first week/month cells without adjacent-month dates."""
+    if anchor_date > today:
+        anchor_date = today
+    start, end = training_period_bounds(anchor_date, view)
+    completed = training_record_dates(records, today=today)
+
+    cells: list[TrainingCalendarDay] = []
+    if view == "月":
+        cells.extend(
+            TrainingCalendarDay(day=None, has_training=False)
+            for _ in range(start.weekday())
+        )
+
+    current = start
+    while current <= end:
+        cells.append(
+            TrainingCalendarDay(
+                day=current,
+                has_training=current in completed,
+            )
+        )
+        current += timedelta(days=1)
+
+    if view == "月":
+        cells.extend(
+            TrainingCalendarDay(day=None, has_training=False)
+            for _ in range((-len(cells)) % 7)
+        )
+    return cells
+
+
+def shift_training_period(
+    anchor_date: date,
+    *,
+    view: str,
+    direction: int,
+    today: date,
+) -> date:
+    """Move one visible period and clamp navigation at the current period."""
+    if direction not in (-1, 1):
+        raise ValueError("direction must be -1 or 1")
+    if view == "週":
+        candidate = anchor_date + timedelta(days=direction * 7)
+    elif view == "月":
+        month_index = anchor_date.year * 12 + anchor_date.month - 1 + direction
+        year, zero_based_month = divmod(month_index, 12)
+        month = zero_based_month + 1
+        day = min(anchor_date.day, calendar.monthrange(year, month)[1])
+        candidate = date(year, month, day)
+    else:
+        raise ValueError("view must be '週' or '月'")
+
+    candidate_start, _ = training_period_bounds(candidate, view)
+    current_start, _ = training_period_bounds(today, view)
+    return today if candidate_start >= current_start else candidate

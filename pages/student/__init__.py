@@ -13,9 +13,13 @@ from PIL import Image
 from services import auth, gemini, metrics, sheets
 from domain.daily_completion import DailyCompletion, calculate_daily_completion
 from domain.history import (
+    TrainingCalendarDay,
     WeightHistoryPoint,
+    build_training_calendar,
     build_weight_history_series,
     history_date_range,
+    shift_training_period,
+    training_period_bounds,
 )
 from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, calculate_tdee
 from pages.common import (
@@ -1107,22 +1111,44 @@ def _weight_history_summary(
     return current, change, measured_count
 
 
-def build_weight_history_summary_html(points: list[WeightHistoryPoint]) -> str:
+def build_weight_history_card_header_html(
+    points: list[WeightHistoryPoint],
+) -> str:
     summary = _weight_history_summary(points)
     if summary is None:
         return ""
-    current, change, measured_count = summary
-    change_text = f"{change:+.1f} kg" if abs(change) >= 0.05 else "0.0 kg"
+    current, change, _ = summary
+    if change > 0.05:
+        change_text = f"↑ +{change:.1f} kg"
+        change_class = "is-up"
+    elif change < -0.05:
+        change_text = f"↓ {change:.1f} kg"
+        change_class = "is-down"
+    else:
+        change_text = "0.0 kg"
+        change_class = "is-flat"
     return (
-        '<section class="weight-history-summary" aria-label="體重期間摘要">'
-        '<div><span>目前體重</span>'
-        f'<strong>{current:.1f} kg</strong></div>'
-        '<div><span>期間變化</span>'
-        f'<strong>{change_text}</strong></div>'
-        '<div><span>實際量測</span>'
-        f'<strong>{measured_count} 次</strong></div>'
-        "</section>"
+        '<div class="weight-history-card-heading" aria-label="體重期間摘要">'
+        f'<strong>{current:.1f} <span>kg</span></strong>'
+        f'<span class="weight-history-change {change_class}">'
+        f"{change_text}</span></div>"
     )
+
+
+def _weight_history_tick_values(
+    x_values: list[date], day_count: int
+) -> list[date]:
+    if not x_values:
+        return []
+    desired_count = 4 if day_count <= 7 else 5
+    if len(x_values) <= desired_count:
+        return x_values
+    last_index = len(x_values) - 1
+    indexes = {
+        round(index * last_index / (desired_count - 1))
+        for index in range(desired_count)
+    }
+    return [x_values[index] for index in sorted(indexes)]
 
 
 def build_weight_history_figure(
@@ -1154,7 +1180,20 @@ def build_weight_history_figure(
             x=x_values,
             y=y_values,
             mode="lines",
-            line={"color": "#8f85b7", "width": 3, "shape": "linear"},
+            line={
+                "color": "#16a77a",
+                "width": 3,
+                "shape": "spline",
+                "smoothing": 1.05,
+            },
+            fill="tozeroy",
+            fillgradient={
+                "type": "vertical",
+                "colorscale": [
+                    [0.0, "rgba(22,167,122,0.00)"],
+                    [1.0, "rgba(22,167,122,0.18)"],
+                ],
+            },
             customdata=hover_status,
             connectgaps=False,
             hovertemplate=(
@@ -1169,9 +1208,9 @@ def build_weight_history_figure(
             y=[point.weight_kg for point in measured_points],
             mode="markers",
             marker={
-                "size": 9,
-                "color": "#8f85b7",
-                "line": {"color": "#ffffff", "width": 2},
+                "size": 7,
+                "color": "#16a77a",
+                "line": {"color": "#ffffff", "width": 1.5},
             },
             hovertemplate=(
                 "%{x|%m/%d}<br>%{y:.1f} kg<br>實際紀錄<extra></extra>"
@@ -1187,33 +1226,28 @@ def build_weight_history_figure(
         padding = max((high - low) * 0.2, 1.0 if low == high else 0.5)
         y_range = [low - padding, high + padding]
 
-    tick_values = x_values
-    if day_count > 7 and x_values:
-        tick_values = x_values[::5]
-        if tick_values[-1] != x_values[-1]:
-            tick_values.append(x_values[-1])
+    tick_values = _weight_history_tick_values(x_values, day_count)
 
     figure.update_layout(
-        height=300,
-        margin={"l": 12, "r": 12, "t": 16, "b": 12},
+        height=280,
+        margin={"l": 4, "r": 4, "t": 8, "b": 4},
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#fafafa",
+        plot_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
-        hovermode="x unified",
+        hovermode="closest",
         xaxis={
             "showgrid": False,
             "zeroline": False,
             "tickvals": tick_values,
             "tickformat": "%m/%d",
             "tickfont": {"size": 11, "color": "#7a7a7a"},
+            "automargin": True,
             "fixedrange": True,
         },
         yaxis={
-            "showgrid": True,
-            "gridcolor": "rgba(47,62,70,0.08)",
+            "visible": False,
+            "showgrid": False,
             "zeroline": False,
-            "ticksuffix": " kg",
-            "tickfont": {"size": 11, "color": "#7a7a7a"},
             "range": y_range,
             "fixedrange": True,
         },
@@ -1225,14 +1259,9 @@ def build_weight_history_figure(
 def _render_student_weight_history(user_id: str) -> None:
     with st.container(key="student_weight_history"):
         st.subheader("體重變化")
-        selected_range = st.segmented_control(
-            "期間",
-            ("7 天", "30 天"),
-            default="7 天",
-            key="weight_history_range",
-            required=True,
-            width="stretch",
-        )
+        selected_range = st.session_state.get("weight_history_range", "7 天")
+        if selected_range not in ("7 天", "30 天"):
+            selected_range = "7 天"
         day_count = 30 if selected_range == "30 天" else 7
         start_date, end_date = history_date_range(date.today(), day_count)
 
@@ -1256,26 +1285,163 @@ def _render_student_weight_history(user_id: str) -> None:
                 st.rerun()
             return
 
-        st.markdown(
-            build_weight_history_summary_html(points),
-            unsafe_allow_html=True,
-        )
-        st.plotly_chart(
-            build_weight_history_figure(points, day_count),
-            key="student_weight_history_chart",
-            width="stretch",
-            config={"displayModeBar": False, "responsive": True},
-        )
+        with st.container(key="student_weight_history_card"):
+            heading_column, range_column = st.columns(
+                [1.2, 1], gap="small", vertical_alignment="center"
+            )
+            with heading_column:
+                st.markdown(
+                    build_weight_history_card_header_html(points),
+                    unsafe_allow_html=True,
+                )
+            with range_column:
+                st.segmented_control(
+                    "期間",
+                    ("7 天", "30 天"),
+                    default=selected_range,
+                    key="weight_history_range",
+                    required=True,
+                    label_visibility="collapsed",
+                    width="stretch",
+                )
+            st.plotly_chart(
+                build_weight_history_figure(points, day_count),
+                key="student_weight_history_chart",
+                width="stretch",
+                config={"displayModeBar": False, "responsive": True},
+            )
 
-        today_point = points[-1]
-        if (
-            today_point.weight_kg is not None
-            and not today_point.measured
-            and today_point.source_date is not None
-        ):
-            st.caption(
-                "今天尚未記錄體重，目前數值沿用自 "
-                f"{today_point.source_date:%m/%d} 的最近紀錄。"
+
+def build_training_calendar_html(
+    cells: list[TrainingCalendarDay], *, view: str
+) -> str:
+    weekdays = "".join(
+        f'<span role="columnheader">{day}</span>'
+        for day in ("一", "二", "三", "四", "五", "六", "日")
+    )
+    day_cells: list[str] = []
+    for cell in cells:
+        if cell.day is None:
+            day_cells.append(
+                '<span class="training-calendar-day is-empty" '
+                'aria-hidden="true"></span>'
+            )
+            continue
+        status = "有訓練" if cell.has_training else "未訓練"
+        label = f"{cell.day:%Y年%m月%d日}，{status}"
+        completed_class = " is-complete" if cell.has_training else ""
+        day_cells.append(
+            f'<time class="training-calendar-day{completed_class}" '
+            f'role="listitem" datetime="{cell.day.isoformat()}" '
+            f'aria-label="{html.escape(label)}" title="{html.escape(label)}">'
+            f"{cell.day.day}</time>"
+        )
+    return (
+        f'<section class="training-calendar is-{html.escape(view)}" '
+        'aria-label="訓練紀錄日曆">'
+        f'<div class="training-calendar-weekdays" role="row">{weekdays}</div>'
+        '<div class="training-calendar-grid" role="list">'
+        + "".join(day_cells)
+        + "</div></section>"
+    )
+
+
+def _training_period_label(anchor_date: date, view: str) -> str:
+    start, end = training_period_bounds(anchor_date, view)
+    if view == "月":
+        return f"{start.year} 年 {start.month} 月"
+    if start.year == end.year:
+        return f"{start:%Y/%m/%d} – {end:%m/%d}"
+    return f"{start:%Y/%m/%d} – {end:%Y/%m/%d}"
+
+
+def _render_student_training_history(user_id: str) -> None:
+    today = date.today()
+    selected_view = st.session_state.get("training_history_view", "週")
+    if selected_view not in ("週", "月"):
+        selected_view = "週"
+        st.session_state["training_history_view"] = selected_view
+
+    anchor_date = st.session_state.get("training_history_anchor", today)
+    if not isinstance(anchor_date, date) or anchor_date > today:
+        anchor_date = today
+        st.session_state["training_history_anchor"] = anchor_date
+
+    with st.container(key="student_training_history"):
+        st.subheader("訓練")
+        try:
+            records = sheets.get_training_records(user_id)
+        except Exception:
+            st.error("取得訓練紀錄失敗，請稍後再試。")
+            return
+
+        with st.container(key="student_training_history_card"):
+            selected_view = st.segmented_control(
+                "顯示期間",
+                ("週", "月"),
+                default=selected_view,
+                key="training_history_view",
+                required=True,
+                label_visibility="collapsed",
+                width="stretch",
+            )
+            selected_view = selected_view or "週"
+            period_start, _ = training_period_bounds(anchor_date, selected_view)
+            current_start, _ = training_period_bounds(today, selected_view)
+
+            previous_column, label_column, next_column = st.columns(
+                [0.22, 1, 0.22], gap="small", vertical_alignment="center"
+            )
+            with previous_column:
+                if st.button(
+                    ":material/chevron_left:",
+                    key="training_history_previous",
+                    help="上一個期間",
+                    width="stretch",
+                ):
+                    st.session_state["training_history_anchor"] = (
+                        shift_training_period(
+                            anchor_date,
+                            view=selected_view,
+                            direction=-1,
+                            today=today,
+                        )
+                    )
+                    st.rerun()
+            with label_column:
+                st.markdown(
+                    '<div class="training-calendar-period">'
+                    f"{html.escape(_training_period_label(anchor_date, selected_view))}"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+            with next_column:
+                if st.button(
+                    ":material/chevron_right:",
+                    key="training_history_next",
+                    help="下一個期間",
+                    disabled=period_start >= current_start,
+                    width="stretch",
+                ):
+                    st.session_state["training_history_anchor"] = (
+                        shift_training_period(
+                            anchor_date,
+                            view=selected_view,
+                            direction=1,
+                            today=today,
+                        )
+                    )
+                    st.rerun()
+
+            cells = build_training_calendar(
+                records,
+                anchor_date=anchor_date,
+                view=selected_view,
+                today=today,
+            )
+            st.markdown(
+                build_training_calendar_html(cells, view=selected_view),
+                unsafe_allow_html=True,
             )
 
 
@@ -1326,6 +1492,8 @@ def page_history() -> None:
     uid = st.session_state.user_id
 
     _render_student_weight_history(uid)
+
+    _render_student_training_history(uid)
 
     st.divider()
 
