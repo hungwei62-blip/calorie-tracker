@@ -25,7 +25,8 @@ python tools/audit_and_migrate.py --primary-coach-id u_20260629165506_4b525f9c
 - [ ] 學員可註冊、登入及完成 TDEE 問卷
 - [ ] TDEE 不會改動 `created_at`，五項目標寫入正確欄位
 - [ ] 教練只能看到 `coach_id` 等於自己的學員
-- [ ] 文字與照片皆可取得 Gemini 分析結果
+- [ ] 相機與相簿照片皆可取得 Gemini 分析結果
+- [ ] 手動輸入可只記錄熱量與蛋白質
 - [ ] 儲存飲食後 `Records.image_url` 保持空白
 - [ ] 體重、訓練、歷史與 CSV/PDF 匯出正常
 

@@ -109,8 +109,8 @@ def test_bottom_navigation_uses_compact_circular_button_styles():
 @pytest.mark.parametrize(
     ("legacy_page", "expected_tab"),
     [
-        ("體重記錄", "⚖️ 體重"),
-        ("訓練記錄", "🏋️ 訓練"),
+        ("體重記錄", "體重"),
+        ("訓練記錄", "訓練"),
     ],
 )
 def test_legacy_record_pages_redirect_to_daily_records(legacy_page, expected_tab):
@@ -126,8 +126,8 @@ def test_normal_student_page_is_unchanged():
 @pytest.mark.parametrize(
     ("legacy_page", "expected_tab"),
     [
-        ("體重記錄", "⚖️ 體重"),
-        ("訓練記錄", "🏋️ 訓練"),
+        ("體重記錄", "體重"),
+        ("訓練記錄", "訓練"),
     ],
 )
 def test_main_routes_legacy_record_page_to_integrated_page(monkeypatch, legacy_page, expected_tab):

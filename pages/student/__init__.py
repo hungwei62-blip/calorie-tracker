@@ -1,20 +1,26 @@
 """學員端、登入與註冊頁面。"""
 from __future__ import annotations
 from datetime import date, datetime, timedelta
+import hashlib
 from io import BytesIO
+import math
 import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
 from services import auth, gemini, metrics, sheets
 from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, calculate_tdee
 from pages.common import (
-    DEFAULT_GOALS, MEAL_EMOJI, MEAL_TYPES,
-    TRAINING_EMOJI, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
+    DEFAULT_GOALS, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
     _fetch_records_cached, _today_range, _week_range, do_logout,
 )
 
-DAILY_RECORD_TABS = ("🍴 飲食", "⚖️ 體重", "🏋️ 訓練")
+DAILY_RECORD_TABS = ("飲水", "食物", "訓練", "體重")
 DAILY_RECORD_TAB_TARGET_KEY = "daily_record_tab_target"
+LEGACY_DAILY_RECORD_TABS = {
+    "🍴 飲食": "食物",
+    "⚖️ 體重": "體重",
+    "🏋️ 訓練": "訓練",
+}
 
 
 def _to_float(value: object) -> float:
@@ -287,6 +293,7 @@ def _weight_summary(weight_records: list[dict[str, object]]) -> tuple[float | No
 
 def open_daily_record_tab(tab: str) -> None:
     """將學員導向日常紀錄頁的指定分頁。"""
+    tab = LEGACY_DAILY_RECORD_TABS.get(tab, tab)
     if tab not in DAILY_RECORD_TABS:
         raise ValueError("未知的日常紀錄分頁")
     st.session_state.page = "記錄飲食"
@@ -612,7 +619,7 @@ def page_personal() -> None:
                 help="新增體重",
                 icon=":material/add:",
             ):
-                open_daily_record_tab("⚖️ 體重")
+                open_daily_record_tab("體重")
                 st.rerun()
 
         with calorie_column:
@@ -659,382 +666,305 @@ def page_personal() -> None:
 
 # =============================================================================
 
-def _render_weight_records() -> None:
+def _append_water_record(user_id: str, water_ml: float) -> None:
+    """新增一筆可累加的飲水紀錄。"""
+    water_value = float(water_ml)
+    if not math.isfinite(water_value) or water_value <= 0:
+        raise ValueError("飲水量必須大於 0")
+    sheets.append_record(
+        timestamp=datetime.now().isoformat(), user_id=user_id,
+        meal_type="飲水", food_summary="飲水",
+        calories=0, protein=0, carb=0, fat=0, water_ml=water_value,
+        image_url="", portion=1,
+    )
+    _clear_analysis_cache()
 
-    st.subheader("⚖️ 體重記錄")
 
+def _append_food_record(
+    user_id: str, food_summary: str, calories: float, protein: float
+) -> None:
+    """新增只保存熱量與蛋白質的食物紀錄。"""
+    calorie_value = float(calories)
+    protein_value = float(protein)
+    if any(
+        not math.isfinite(value) or value < 0
+        for value in (calorie_value, protein_value)
+    ):
+        raise ValueError("熱量與蛋白質必須是非負有限數字")
+    if calorie_value == 0 and protein_value == 0:
+        raise ValueError("熱量與蛋白質至少一項必須大於 0")
+    sheets.append_record(
+        timestamp=datetime.now().isoformat(), user_id=user_id,
+        meal_type="食物", food_summary=food_summary.strip() or "手動紀錄",
+        calories=calorie_value, protein=protein_value,
+        carb=0, fat=0, water_ml=0, image_url="", portion=1,
+    )
+    _clear_analysis_cache()
+
+
+def _clear_pending_food_analysis() -> None:
+    st.session_state.pending_analysis = None
+    st.session_state.pop("pending_analysis_image_hash", None)
+
+
+def _render_water_records() -> None:
     uid = st.session_state.user_id
-
-    with st.form("weight_form"):
-
-        col1, col2 = st.columns([2, 1])
-
-        with col1:
-
-            weight = st.number_input("今日體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=300.0)
-
-        with col2:
-
-            st.write("")
-
-            submitted = st.form_submit_button("儲存", width="stretch")
-
-        if submitted:
-
-            try:
-
-                sheets.append_weight(timestamp=datetime.now().strftime("%Y-%m-%d"), user_id=uid, weight_kg=weight)
-
-                st.success("體重已記錄！")
-
-                st.rerun()
-
-            except Exception as exc:
-
-                st.error("儲存失敗: " + str(exc))
-
-    st.divider()
-
-    st.subheader("體重趨勢")
-
-    weight_records = sheets.get_weight_records(uid)
-
-    if weight_records:
-
-        weight_data = {"日期": [], "體重 (kg)": []}
-
-        for r in weight_records[-30:]:
-
-            weight_data["日期"].append(r.get("timestamp", "")[:10])
-
-            weight_data["體重 (kg)"].append(r.get("weight_kg", 0))
-
-        st.line_chart(weight_data, x="日期", y="體重 (kg)")
-
-        if len(weight_data["體重 (kg)"]) >= 2:
-
-            weights = weight_data["體重 (kg)"]
-
-            change = weights[-1] - weights[0]
-
-            st.caption(f"起始：{weights[0]:.1f}kg → 目前：{weights[-1]:.1f}kg（{change:+.1f}kg）")
-
-    else:
-
-        st.info("尚無體重記錄")
-
-# =============================================================================
-
-# 學員端：訓練記錄
-
-# =============================================================================
-
-def _render_training_records() -> None:
-
-    st.subheader("🏋️ 訓練記錄")
-
-    uid = st.session_state.user_id
-
-    today = date.today()
-
-    today_str = today.isoformat()
-
-    today_training = sheets.get_training_by_date(uid, today)
-
-    with st.form("training_form"):
-
-        st.subheader(f"📅 {today.strftime('%Y/%m/%d')} 訓練項目")
-
-        cols = st.columns(len(TRAINING_TYPES))
-
-        training_values = {}
-
-        for idx, t_type in enumerate(TRAINING_TYPES):
-
-            with cols[idx]:
-
-                emoji = TRAINING_EMOJI.get(t_type, "")
-
-                default = today_training.get(t_type.lower(), 0) if today_training else 0
-
-                checked = st.checkbox(f"{emoji} {t_type}", value=bool(default))
-
-                training_values[t_type.lower()] = 1 if checked else 0
-
-        submitted = st.form_submit_button("儲存訓練記錄", width="stretch")
-
+    st.subheader("飲水")
+    st.caption("記錄這次喝下的水量，今日進度會自動累加。")
+    with st.form("water_record_form"):
+        water_ml = st.number_input("飲水量 (ml)", min_value=0, value=250, step=50)
+        submitted = st.form_submit_button("儲存飲水紀錄", width="stretch")
     if submitted:
-
         try:
-
-            sheets.update_training(
-
-                timestamp=today_str, user_id=uid,
-
-                training_back=training_values.get("背", 0),
-
-                training_chest=training_values.get("胸", 0),
-
-                training_legs=training_values.get("腿", 0),
-
-                training_core=training_values.get("核心", 0),
-
-                training_cardio=training_values.get("有氧", 0),
-
-            )
-
-            st.success("訓練記錄已儲存！")
-
+            _append_water_record(uid, water_ml)
+        except ValueError as exc:
+            st.warning(str(exc))
+        except Exception:
+            st.error("飲水紀錄儲存失敗，請稍後再試。")
+        else:
+            st.success("飲水紀錄已儲存")
             st.rerun()
 
-        except Exception as exc:
 
-            st.error("儲存失敗: " + str(exc))
-
-    st.divider()
-
-    st.subheader("本週訓練記錄")
-
-    ws, we = _week_range()
-
-    training_data = []
-
-    for i in range((we - ws).days + 1):
-
-        d = ws + timedelta(days=i)
-
-        training = sheets.get_training_by_date(uid, d)
-
-        if training and any(v == 1 for v in training.values()):
-
-            items = [TRAINING_EMOJI.get(t, "") + t for t, v in training.items() if v == 1]
-
-            training_data.append({"日期": d.strftime("%m/%d"), "訓練項目": " ".join(items)})
-
-    if training_data:
-
-        st.dataframe(training_data, width="stretch", hide_index=True)
-
+def _selected_food_image_bytes(source: str) -> bytes | None:
+    if source == "拍照":
+        image_file = st.camera_input("拍攝食物照片", key="food_camera")
     else:
+        image_file = st.file_uploader(
+            "從相簿選擇食物照片", type=["jpg", "jpeg", "png"],
+            key="food_image_upload",
+        )
+    return image_file.getvalue() if image_file is not None else None
 
-        st.info("本週尚無訓練記錄")
 
-# =============================================================================
-
-# 學員端：記錄飲食
-
-# =============================================================================
-
-def _render_meal_records() -> None:
-
-    st.subheader("🍽️ 記錄飲食")
-
-    uid = st.session_state.user_id
-
-    record_mode = sheets.get_user_record_mode(uid)
-
-    meal_type = st.selectbox("餐點類型", MEAL_TYPES)
-
-    st.subheader("分析方式")
-
-    input_mode = st.radio(
-
-        "輸入模式",
-
-        ["📝 文字輸入", "📷 拍照上傳", "📁 圖片上傳"],
-
-        horizontal=True,
-
-        label_visibility="collapsed",
-
+def _render_photo_food_input(uid: str) -> None:
+    source = st.segmented_control(
+        "照片來源", ("拍照", "相簿"), default="拍照", key="food_photo_source"
     )
+    previous_source = st.session_state.get("food_photo_source_previous")
+    if previous_source is not None and previous_source != source:
+        _clear_pending_food_analysis()
+    st.session_state.food_photo_source_previous = source
+    image_bytes = _selected_food_image_bytes(source or "拍照")
+    image_hash = hashlib.sha256(image_bytes).hexdigest() if image_bytes else None
+    pending_hash = st.session_state.get("pending_analysis_image_hash")
+    if image_hash and pending_hash and image_hash != pending_hash:
+        _clear_pending_food_analysis()
 
-    analysis_result = None
-
-    if input_mode == "📝 文字輸入":
-
-        with st.form("text_input_form"):
-
-            food_text = st.text_area("輸入食物內容", placeholder="例如：雞腿便當 + 滷蛋 + 無糖豆漿", height=100)
-
-            submitted = st.form_submit_button("分析食物", width="stretch")
-
-        if submitted and food_text:
-
-            with st.spinner("AI 分析中..."):
-
-                try:
-
-                    analysis_result = gemini.analyze_text(food_text)
-
-                except Exception as exc:
-
-                    st.error("分析失敗: " + str(exc))
-
-    elif input_mode == "📷 拍照上傳":
-
-        camera_file = st.camera_input("拍攝食物照片")
-
-        if camera_file:
-
-            with st.spinner("AI 分析中..."):
-
-                try:
-
-                    analysis_result = gemini.analyze_image(Image.open(camera_file))
-
-                except Exception as exc:
-
-                    st.error("分析失敗: " + str(exc))
-
-    else:
-
-        uploaded_file = st.file_uploader("上傳食物照片", type=["jpg", "jpeg", "png"])
-
-        if uploaded_file:
-
-            with st.spinner("AI 分析中..."):
-
-                try:
-
-                    analysis_result = gemini.analyze_image(Image.open(uploaded_file))
-
-                except Exception as exc:
-
-                    st.error("分析失敗: " + str(exc))
-
-    # 將 analysis_result 存入 session_state，確保按鈕點擊後還能取用
-    if analysis_result:
-        st.session_state.pending_analysis = analysis_result
-
-    if st.session_state.get("pending_analysis"):
-        analysis_result = st.session_state.pending_analysis
-
-        st.divider()
-
-        st.subheader("分析結果")
-
-        cal = analysis_result.get("calories", 0)
-
-        pro = analysis_result.get("protein", 0)
-
-        carb = analysis_result.get("carb", 0)
-
-        fat = analysis_result.get("fat", 0)
-
-        if record_mode == "full":
-
-            col1, col2, col3, col4 = st.columns(4)
-
-            with col1:
-
-                st.metric("熱量", f"{cal:.0f} kcal")
-
-            with col2:
-
-                st.metric("蛋白質", f"{pro:.0f} g")
-
-            with col3:
-
-                st.metric("碳水", f"{carb:.0f} g")
-
-            with col4:
-
-                st.metric("脂肪", f"{fat:.0f} g")
-
+    if st.button(
+        "分析照片", key="analyze_food_photo", width="stretch",
+        disabled=image_bytes is None,
+    ):
+        try:
+            image = Image.open(BytesIO(image_bytes))
+            image.load()
+            result = gemini.analyze_image(image)
+        except Exception:
+            _clear_pending_food_analysis()
+            st.error("照片分析失敗，請重新拍照或稍後再試。")
         else:
+            if not result["is_food"]:
+                _clear_pending_food_analysis()
+                st.warning("無法可靠辨識食物，請重新拍照或改用手動輸入。")
+            else:
+                st.session_state.pending_analysis = result
+                st.session_state.pending_analysis_image_hash = image_hash
 
-            col1, col2 = st.columns(2)
+    result = st.session_state.get("pending_analysis")
+    if result and (
+        not result.get("is_food")
+        or not {"food_summary", "calories", "protein"}.issubset(result)
+    ):
+        _clear_pending_food_analysis()
+        result = None
+    if not result:
+        return
+    st.subheader("分析結果")
+    st.write(result["food_summary"])
+    calorie_col, protein_col = st.columns(2)
+    calorie_col.metric("熱量", f'{result["calories"]:.0f} kcal')
+    protein_col.metric("蛋白質", f'{result["protein"]:.0f} g')
+    save_col, cancel_col = st.columns(2)
+    if save_col.button("確認儲存", key="save_analyzed_food", width="stretch"):
+        try:
+            _append_food_record(
+                uid, result["food_summary"], result["calories"], result["protein"]
+            )
+        except Exception:
+            st.error("食物紀錄儲存失敗，請稍後再試。")
+        else:
+            _clear_pending_food_analysis()
+            st.success("食物紀錄已儲存")
+            st.rerun()
+    if cancel_col.button("取消", key="cancel_analyzed_food", width="stretch"):
+        _clear_pending_food_analysis()
+        st.rerun()
 
-            with col1:
 
-                st.metric("熱量", f"{cal:.0f} kcal")
+def _render_manual_food_input(uid: str) -> None:
+    with st.form("manual_food_form"):
+        calories = st.number_input(
+            "熱量 (kcal)", min_value=0.0, value=0.0, step=10.0
+        )
+        protein = st.number_input(
+            "蛋白質 (g)", min_value=0.0, value=0.0, step=1.0
+        )
+        submitted = st.form_submit_button("儲存食物紀錄", width="stretch")
+    if submitted:
+        try:
+            _append_food_record(uid, "手動紀錄", calories, protein)
+        except ValueError as exc:
+            st.warning(str(exc))
+        except Exception:
+            st.error("食物紀錄儲存失敗，請稍後再試。")
+        else:
+            st.success("食物紀錄已儲存")
+            st.rerun()
 
-            with col2:
 
-                st.metric("蛋白質", f"{pro:.0f} g")
+def _render_food_records() -> None:
+    uid = st.session_state.user_id
+    st.subheader("食物")
+    input_mode = st.segmented_control(
+        "輸入方式", ("照片辨識", "手動輸入"),
+        default="照片辨識", key="food_input_mode",
+    )
+    if input_mode == "手動輸入":
+        _render_manual_food_input(uid)
+    else:
+        _render_photo_food_input(uid)
 
-        portion = st.slider("份量", 0.5, 3.0, 1.0, 0.1)
 
-        if portion != 1.0:
+def _render_training_records() -> None:
+    st.subheader("訓練")
+    uid = st.session_state.user_id
+    today = date.today()
+    today_training = sheets.get_training_by_date(uid, today)
+    field_keys = {
+        "背": "back", "胸": "chest", "腿": "legs",
+        "核心": "core", "有氧": "cardio",
+    }
+    with st.form("training_form"):
+        st.caption(f'{today.strftime("%Y/%m/%d")} 訓練項目')
+        columns = st.columns(2)
+        training_values: dict[str, int] = {}
+        for index, training_type in enumerate(TRAINING_TYPES):
+            field_key = field_keys[training_type]
+            default = today_training.get(field_key, 0) if today_training else 0
+            with columns[index % 2]:
+                checked = st.checkbox(training_type, value=bool(default))
+            training_values[field_key] = 1 if checked else 0
+        submitted = st.form_submit_button("儲存訓練紀錄", width="stretch")
+    if submitted:
+        try:
+            sheets.update_training(
+                timestamp=today.isoformat(), user_id=uid,
+                training_back=training_values["back"],
+                training_chest=training_values["chest"],
+                training_legs=training_values["legs"],
+                training_core=training_values["core"],
+                training_cardio=training_values["cardio"],
+            )
+        except Exception:
+            st.error("訓練紀錄儲存失敗，請稍後再試。")
+        else:
+            st.success("訓練紀錄已儲存")
+            st.rerun()
 
-            st.caption(f"× {portion} 份")
+    st.subheader("本週訓練紀錄")
+    week_start, week_end = _week_range()
+    rows = []
+    labels_by_key = {value: key for key, value in field_keys.items()}
+    for offset in range((week_end - week_start).days + 1):
+        target_date = week_start + timedelta(days=offset)
+        training = sheets.get_training_by_date(uid, target_date)
+        if training and any(value == 1 for value in training.values()):
+            labels = [
+                labels_by_key[key] for key, value in training.items()
+                if value == 1 and key in labels_by_key
+            ]
+            rows.append({
+                "日期": target_date.strftime("%m/%d"),
+                "訓練項目": "、".join(labels),
+            })
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+    else:
+        st.info("本週尚無訓練紀錄")
 
-        water_ml = st.number_input("飲水量 (ml)", value=0, step=50, min_value=0)
 
-        if st.button("✅ 存入今日記錄", width="stretch"):
+def _render_weight_records() -> None:
+    st.subheader("體重")
+    uid = st.session_state.user_id
+    with st.form("weight_form"):
+        weight = st.number_input(
+            "今日體重 (kg)", value=60.0, step=0.1,
+            min_value=30.0, max_value=300.0,
+        )
+        submitted = st.form_submit_button("儲存體重紀錄", width="stretch")
+    if submitted:
+        try:
+            sheets.append_weight(
+                timestamp=datetime.now().strftime("%Y-%m-%d"),
+                user_id=uid, weight_kg=weight,
+            )
+        except Exception:
+            st.error("體重紀錄儲存失敗，請稍後再試。")
+        else:
+            st.success("體重紀錄已儲存")
+            st.rerun()
 
-
-            try:
-                sheets.append_record(
-
-                    timestamp=datetime.now().isoformat(),
-
-                    user_id=uid,
-
-                    meal_type=meal_type,
-
-                    food_summary=analysis_result.get("food_summary", ""),
-
-                    calories=cal * portion,
-
-                    protein=pro * portion,
-
-                    carb=carb * portion if record_mode == "full" else 0,
-
-                    fat=fat * portion if record_mode == "full" else 0,
-
-                    water_ml=water_ml,
-
-                    image_url="",
-
-                    portion=portion,
-
-                )
-
-                _clear_analysis_cache()
-
-                # 清除 pending_analysis，讓錊單回到初始狀態
-                st.session_state.pending_analysis = None
-
-                # 顯示短暫的成功標記
-                st.success("已存入！")
-
-                st.rerun()
-
-            except Exception as exc:
-
-                st.error("儲存失敗: " + str(exc))
+    st.subheader("體重趨勢")
+    weight_records = sheets.get_weight_records(uid)
+    if not weight_records:
+        st.info("尚無體重紀錄")
+        return
+    weight_data = {"日期": [], "體重 (kg)": []}
+    for record in weight_records[-30:]:
+        weight_data["日期"].append(record.get("timestamp", "")[:10])
+        weight_data["體重 (kg)"].append(record.get("weight_kg", 0))
+    st.line_chart(weight_data, x="日期", y="體重 (kg)")
+    if len(weight_data["體重 (kg)"]) >= 2:
+        weights = weight_data["體重 (kg)"]
+        change = weights[-1] - weights[0]
+        st.caption(
+            f'起始 {weights[0]:.1f} kg；目前 {weights[-1]:.1f} kg；變化 {change:+.1f} kg'
+        )
 
 
 def page_log_meal() -> None:
-    """學員日常紀錄入口，只渲染目前開啟的頁內分頁。"""
+    """學員日常紀錄入口，只渲染目前開啟的分段。"""
     target_tab = st.session_state.pop(DAILY_RECORD_TAB_TARGET_KEY, None)
-    current_tab = target_tab or st.session_state.get("daily_record_tab", DAILY_RECORD_TABS[0])
+    target_tab = LEGACY_DAILY_RECORD_TABS.get(target_tab, target_tab)
+    stored_tab = st.session_state.get("daily_record_tab", DAILY_RECORD_TABS[0])
+    stored_tab = LEGACY_DAILY_RECORD_TABS.get(stored_tab, stored_tab)
+    current_tab = target_tab or stored_tab
     if current_tab not in DAILY_RECORD_TABS:
         current_tab = DAILY_RECORD_TABS[0]
     if target_tab:
         st.session_state.pop("daily_record_tab", None)
 
-    st.header("📝 日常紀錄")
-    meal_tab, weight_tab, training_tab = st.tabs(
-        DAILY_RECORD_TABS,
-        default=current_tab,
-        key="daily_record_tab",
-        on_change="rerun",
-    )
-
-    if meal_tab.open:
-        with meal_tab:
-            _render_meal_records()
-    elif weight_tab.open:
-        with weight_tab:
-            _render_weight_records()
-    elif training_tab.open:
-        with training_tab:
-            _render_training_records()
+    with st.container(key="daily_record_page"):
+        st.header("日常紀錄")
+        water_tab, food_tab, training_tab, weight_tab = st.tabs(
+            DAILY_RECORD_TABS, default=current_tab,
+            key="daily_record_tab", on_change="rerun",
+        )
+        if water_tab.open:
+            with water_tab:
+                _render_water_records()
+        elif food_tab.open:
+            with food_tab:
+                _render_food_records()
+        elif training_tab.open:
+            with training_tab:
+                _render_training_records()
+        elif weight_tab.open:
+            with weight_tab:
+                _render_weight_records()
 
 # =============================================================================
+
 
 # 學員端：歷史記錄
 

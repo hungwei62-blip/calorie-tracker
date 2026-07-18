@@ -25,6 +25,7 @@ def test_excel_precomputed_new_record_is_imported(monkeypatch):
     result = sheets.import_records_from_excel(user_id="u1", precomputed_data=data)
     assert result["imported"] == 1
     assert appended[0]["image_url"] == ""
+    assert appended[0]["meal_type"] == "食物"
 
 
 def test_excel_duplicate_can_be_overwritten(monkeypatch):
@@ -41,3 +42,4 @@ def test_excel_duplicate_can_be_overwritten(monkeypatch):
     assert result["overwritten"] == 1
     assert deleted == [("2026-07-17T12:00:00", "u1")]
     assert appended[0]["food_summary"] == "由 Excel 匯入（覆寫）"
+    assert appended[0]["meal_type"] == "食物"

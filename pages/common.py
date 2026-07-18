@@ -9,16 +9,10 @@
 from __future__ import annotations
 
 from datetime import date
-from io import BytesIO
 import streamlit as st
-from PIL import Image
-from services import gemini, metrics, sheets
+from services import metrics, sheets
 
 # ---------- 常數 ----------
-
-MEAL_TYPES = ["早餐", "午餐", "晚餐", "宵夜", "喝水"]
-
-MEAL_EMOJI = {"早餐": "🌅", "午餐": "☀️", "晚餐": "🌙", "宵夜": "🌛", "喝水": "💧"}
 
 NUTRIENT_KEYS = ("calorie", "protein", "carb", "fat")
 
@@ -29,8 +23,6 @@ DEFAULT_GOALS = {"calorie": 2000.0, "protein": 60.0, "carb": 250.0, "fat": 65.0,
 # 訓練項目
 
 TRAINING_TYPES = ["背", "胸", "腿", "核心", "有氧"]
-
-TRAINING_EMOJI = {"背": "🏋️", "胸": "🏋️", "腿": "🦵", "核心": "🎯", "有氧": "🏃"}
 
 # ---------- Session 初始化 ----------
 
@@ -45,10 +37,6 @@ def init_session() -> None:
         "role": None,
 
         "page": "個人",
-
-        "pending_meal_type": None,
-
-        "input_mode": None,
 
         "pending_analysis": None,
 
@@ -96,20 +84,6 @@ def _clear_analysis_cache() -> None:
         except Exception:
             pass
 
-
-def _run_analysis(image_bytes, content_type, text):
-
-    if image_bytes is not None:
-
-        image = Image.open(BytesIO(image_bytes))
-
-        if image.mode != "RGB":
-
-            image = image.convert("RGB")
-
-        return gemini.analyze_image(image)
-
-    return gemini.analyze_text(text)
 
 def _today_range() -> tuple:
 

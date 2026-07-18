@@ -983,7 +983,7 @@ def import_records_from_excel(
                         append_record(
                             timestamp=record["timestamp"],
                             user_id=user_id,
-                            meal_type="午餐",
+                            meal_type="食物",
                             food_summary="由 Excel 匯入（覆寫）",
                             calories=record["calories"],
                             protein=record["protein"],
@@ -1000,7 +1000,7 @@ def import_records_from_excel(
                     append_record(
                         timestamp=record["timestamp"],
                         user_id=user_id,
-                        meal_type="午餐",
+                        meal_type="食物",
                         food_summary="由 Excel 匯入",
                         calories=record["calories"],
                         protein=record["protein"],
@@ -1027,7 +1027,7 @@ def overwrite_record_by_date(user_id: str, date_str: str, calories: float, prote
     append_record(
         timestamp=timestamp,
         user_id=user_id,
-        meal_type="午餐",
+        meal_type="食物",
         food_summary="從 Excel 匯入（覆寫）",
         calories=calories,
         protein=protein,

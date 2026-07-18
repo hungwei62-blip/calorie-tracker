@@ -1,11 +1,9 @@
-"""Gemini 2.5 Flash 營養辨識服務。
-
-辨識結果包含五個欄位：food_summary / calories / protein / carb / fat
-"""
+"""Gemini 2.5 Flash 食物照片辨識服務。"""
 
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from google import genai
@@ -14,23 +12,22 @@ from PIL import Image
 
 
 MODEL_NAME = "gemini-2.5-flash"
-ENV_VAR = "gemini_api_key"  # Streamlit secrets key (對應降低字尾允許, .lower())
+ENV_VAR = "gemini_api_key"
 
-SYSTEM_PROMPT = """你是一位專業的營養師。請嚴格分析使用者提供的「食物照片」或「文字描述」，估計這一餐 / 造食物的「整體」營養總和，不要先估單味再計算。
-
-請嚴格遵守以下 JSON 格式回傳，不要包含任何 markdown 標記（如 ```json）、不要包含額外的解釋文字或空格：
-{"food_summary": "清晰的食物摘要（例如：一個便當含炒麵、雞肉、三式青菜）", "calories": 650, "protein": 30, "carb": 60, "fat": 20}"""
+SYSTEM_PROMPT = """你是專業的營養分析助手，只分析使用者提供的食物照片。
+請辨識照片中所有可食用內容，估計整張照片所呈現餐點的總熱量與總蛋白質；不要重複計算同一食物，無法判斷份量時採保守估計。
+如果照片不是食物、內容過度模糊、遮擋嚴重或無法可靠辨識，is_food 必須為 false，且 calories 與 protein 回傳 0。
+所有數值必須是非負有限數字。只回傳符合 schema 的 JSON，不要加入 Markdown 或額外說明。"""
 
 RESPONSE_SCHEMA = types.Schema(
     type=types.Type.OBJECT,
     properties={
+        "is_food": types.Schema(type=types.Type.BOOLEAN),
         "food_summary": types.Schema(type=types.Type.STRING),
         "calories": types.Schema(type=types.Type.NUMBER),
         "protein": types.Schema(type=types.Type.NUMBER),
-        "carb": types.Schema(type=types.Type.NUMBER),
-        "fat": types.Schema(type=types.Type.NUMBER),
     },
-    required=["food_summary", "calories", "protein", "carb", "fat"],
+    required=["is_food", "food_summary", "calories", "protein"],
 )
 
 CONFIG = types.GenerateContentConfig(
@@ -42,7 +39,6 @@ CONFIG = types.GenerateContentConfig(
 
 
 def _get_api_key() -> str:
-    # 1) Streamlit secrets (部署上線時)
     try:
         import streamlit as st
 
@@ -50,15 +46,14 @@ def _get_api_key() -> str:
             return str(st.secrets[ENV_VAR])
     except Exception:
         pass
-    # 2) 環境變數（本機開發或 CLI）
+
     import os
 
-    val = os.environ.get("GEMINI_API_KEY")
-    if val:
-        return val
+    value = os.environ.get("GEMINI_API_KEY")
+    if value:
+        return value
     raise EnvironmentError(
-        "找不到 Gemini API Key。請在 .streamlit/secrets.toml 設定 "
-        "GEMINI_API_KEY 或者設定環境變數 GEMINI_API_KEY。"
+        "找不到 Gemini API Key。請在 .streamlit/secrets.toml 或環境變數設定 GEMINI_API_KEY。"
     )
 
 
@@ -67,32 +62,41 @@ def _get_client() -> genai.Client:
 
 
 def _parse_response(response: Any) -> dict[str, Any]:
-    text = (response.text or "").strip()
+    text = (getattr(response, "text", "") or "").strip()
     if not text:
-        raise RuntimeError("Gemini 回傳空內容")
+        raise RuntimeError("Gemini 回傳空白內容")
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Gemini 回傳不是有效 JSON: {text!r}") from exc
-    expected = {"food_summary", "calories", "protein", "carb", "fat"}
-    missing = expected - set(data.keys())
+        raise RuntimeError("Gemini 回傳不是有效 JSON") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("Gemini 回傳格式必須是 JSON 物件")
+
+    expected = {"is_food", "food_summary", "calories", "protein"}
+    missing = expected - set(data)
     if missing:
         raise RuntimeError(f"Gemini 回傳缺少欄位: {sorted(missing)}")
-    # 變型安全：數值變為 float，任何無法譯讀的值以 0 替代
-    for k in ("calories", "protein", "carb", "fat"):
+    if not isinstance(data["is_food"], bool):
+        raise RuntimeError("Gemini 回傳的 is_food 必須是布林值")
+    if not isinstance(data["food_summary"], str) or not data["food_summary"].strip():
+        raise RuntimeError("Gemini 回傳的食物摘要不可為空")
+
+    data["food_summary"] = data["food_summary"].strip()
+    for key in ("calories", "protein"):
+        value = data[key]
+        if isinstance(value, bool):
+            raise RuntimeError(f"Gemini 回傳的 {key} 不是有效數字")
         try:
-            data[k] = float(data[k])
-        except (TypeError, ValueError):
-            data[k] = 0.0
-    # Atwater 公式: 蛋白 4 + 碳水 4 + 脂肪 9 (kcal/g)
-    # 始終計算 Atwater 熱量，確保準確性
-    atwater_calories = data["protein"] * 4 + data["carb"] * 4 + data["fat"] * 9
-    
-    # 如果原始熱量為 0 但巨量營養素有值，使用 Atwater 公式計算的熱量
-    if data["calories"] <= 0 and atwater_calories > 0:
-        data["calories"] = round(atwater_calories, 2)
-    
-    return data
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError(f"Gemini 回傳的 {key} 不是有效數字") from exc
+        if not math.isfinite(number) or number < 0:
+            raise RuntimeError(f"Gemini 回傳的 {key} 必須是非負有限數字")
+        data[key] = number
+
+    if data["is_food"] and data["calories"] == 0 and data["protein"] == 0:
+        raise RuntimeError("Gemini 未提供可用的營養數值")
+    return {key: data[key] for key in ("is_food", "food_summary", "calories", "protein")}
 
 
 def _generate(parts: list[Any]) -> dict[str, Any]:
@@ -104,19 +108,14 @@ def _generate(parts: list[Any]) -> dict[str, Any]:
             config=CONFIG,
         )
     except errors.APIError as exc:
-        raise RuntimeError(f"Gemini API 呼叫失敗: {exc}") from exc
+        raise RuntimeError("Gemini 服務目前無法使用，請稍後再試") from exc
+    except Exception as exc:
+        raise RuntimeError("Gemini 服務連線失敗，請稍後再試") from exc
     return _parse_response(response)
 
 
 def analyze_image(image: Image.Image) -> dict[str, Any]:
-    """接受 Pillow Image 並返回結構化營養資訊。"""
-    parts: list[Any] = [image, "請分析這張食物照片。"]
-    return _generate(parts)
-
-
-def analyze_text(description: str) -> dict[str, Any]:
-    """接受純文字並返回結構化營養資訊。"""
-    if not description or not description.strip():
-        raise ValueError("描述不可以是空字串")
-    parts: list[Any] = [description.strip()]
-    return _generate(parts)
+    """分析 Pillow Image 並回傳嚴格驗證的食物營養資料。"""
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    return _generate([image, "請分析這張照片，並依照指定 JSON schema 回傳結果。"])

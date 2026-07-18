@@ -277,6 +277,77 @@ def apply_global_styles() -> None:
                 }
             }
 
+            /* ===== 學員日常紀錄：首頁一致的無圖示卡片風格 ===== */
+            .st-key-daily_record_page {
+                padding-bottom: 48px !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+            }
+
+            .st-key-daily_record_page [data-baseweb="tab-list"] {
+                gap: 4px !important;
+                padding: 5px !important;
+                background: #f7f7f7 !important;
+                border: 1px solid rgba(120, 120, 115, 0.12) !important;
+                border-radius: 999px !important;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04) !important;
+            }
+
+            .st-key-daily_record_page button[data-baseweb="tab"] {
+                min-height: 42px !important;
+                padding: 8px 16px !important;
+                color: #545451 !important;
+                background: transparent !important;
+                border-radius: 999px !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-daily_record_page button[data-baseweb="tab"][aria-selected="true"] {
+                color: #1a1a1a !important;
+                background: #ffffff !important;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+            }
+
+            .st-key-daily_record_page [data-baseweb="tab-highlight"] {
+                display: none !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stForm"],
+            .st-key-daily_record_page [data-testid="stFileUploader"],
+            .st-key-daily_record_page [data-testid="stCameraInput"] {
+                padding: 22px !important;
+                background: #f8f8f8 !important;
+                border: 1px solid rgba(120, 120, 115, 0.08) !important;
+                border-radius: 24px !important;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stMetric"] {
+                padding: 18px !important;
+                background: #f8f8f8 !important;
+                border-radius: 18px !important;
+            }
+
+            @media (max-width: 768px) {
+                .st-key-daily_record_page [data-baseweb="tab-list"] {
+                    width: 100% !important;
+                }
+
+                .st-key-daily_record_page button[data-baseweb="tab"] {
+                    flex: 1 1 25% !important;
+                    min-width: 0 !important;
+                    padding: 8px 5px !important;
+                    font-size: 13px !important;
+                }
+
+                .st-key-daily_record_page [data-testid="stForm"],
+                .st-key-daily_record_page [data-testid="stFileUploader"],
+                .st-key-daily_record_page [data-testid="stCameraInput"] {
+                    padding: 16px !important;
+                    border-radius: 18px !important;
+                }
+            }
+
             /* ===== 學員每日進度卡：所有尺寸固定雙欄 ===== */
             .st-key-daily_progress_cards [data-testid="stHorizontalBlock"] {
                 display: flex !important;
