@@ -31,6 +31,13 @@ class NutritionHistoryPoint:
     recorded: bool
 
 
+@dataclass(frozen=True)
+class WaterHistoryPoint:
+    day: date
+    water_ml: float | None
+    recorded: bool
+
+
 def parse_record_date(timestamp: Any) -> date:
     try:
         return date.fromisoformat(str(timestamp)[:10])
@@ -200,6 +207,63 @@ def nutrition_history_averages(
         sum(float(point.protein or 0) for point in recorded) / count,
         count,
     )
+
+
+def build_water_history_series(
+    records: list[dict[str, Any]],
+    start_date: date,
+    end_date: date,
+    *,
+    today: date,
+) -> list[WaterHistoryPoint]:
+    """Aggregate water records by day while leaving unrecorded days empty."""
+    if end_date < start_date:
+        raise ValueError("end_date must not be earlier than start_date")
+
+    totals: dict[date, float] = {}
+    for record in records:
+        if str(record.get("meal_type", "") or "").strip() not in {"飲水", "喝水"}:
+            continue
+        record_date = parse_record_date(record.get("timestamp", ""))
+        if (
+            record_date == date.min
+            or record_date < start_date
+            or record_date > end_date
+            or record_date > today
+        ):
+            continue
+
+        water_ml = _nonnegative_finite(
+            record.get("water_ml", record.get("water", 0))
+        )
+        if water_ml is None or water_ml <= 0:
+            continue
+        totals[record_date] = totals.get(record_date, 0.0) + water_ml
+
+    points: list[WaterHistoryPoint] = []
+    current = start_date
+    while current <= end_date:
+        water_ml = totals.get(current)
+        points.append(
+            WaterHistoryPoint(
+                day=current,
+                water_ml=water_ml,
+                recorded=water_ml is not None,
+            )
+        )
+        current += timedelta(days=1)
+    return points
+
+
+def water_history_average(
+    points: list[WaterHistoryPoint],
+) -> tuple[float, int] | None:
+    """Return average water intake over recorded water days only."""
+    recorded = [point for point in points if point.recorded]
+    if not recorded:
+        return None
+    count = len(recorded)
+    return sum(float(point.water_ml or 0) for point in recorded) / count, count
 
 
 def _has_training_types(value: object) -> bool:

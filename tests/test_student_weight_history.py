@@ -81,8 +81,10 @@ def test_history_page_uses_clean_heading_and_renders_all_history_sections():
     assert 'st.header("歷史紀錄")' in source
     assert "📜" not in source
     assert source.index("_render_student_weight_history(uid)") < source.index(
+        "_render_student_nutrition_history(uid)"
+    ) < source.index("_render_student_water_history(uid)") < source.index(
         "_render_student_training_history(uid)"
-    ) < source.index("_render_student_nutrition_history(uid)")
+    )
     assert "st.dataframe" not in source
     assert "st.bar_chart" not in source
     assert "營養目標尚未設定" not in source

@@ -15,14 +15,17 @@ from domain.daily_completion import DailyCompletion, calculate_daily_completion
 from domain.history import (
     NutritionHistoryPoint,
     TrainingCalendarDay,
+    WaterHistoryPoint,
     WeightHistoryPoint,
     build_nutrition_history_series,
     build_training_calendar,
+    build_water_history_series,
     build_weight_history_series,
     history_date_range,
     nutrition_history_averages,
     shift_training_period,
     training_period_bounds,
+    water_history_average,
 )
 from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, calculate_tdee
 from pages.common import (
@@ -44,6 +47,8 @@ HISTORY_PRIMARY_DARK = "#5A9C84"
 HISTORY_ACCENT = "#F4B183"
 HISTORY_ACCENT_DARK = "#C87943"
 HISTORY_SECONDARY_TEXT = "#7D8C8A"
+WATER_HISTORY_PRIMARY = "#BFD8FF"
+WATER_HISTORY_SECONDARY = "#7E8FA3"
 
 
 @st.cache_data(show_spinner=False)
@@ -1634,6 +1639,144 @@ def _render_student_nutrition_history(user_id: str) -> None:
             )
 
 
+def build_water_history_summary_html(points: list[WaterHistoryPoint]) -> str:
+    average = water_history_average(points)
+    if average is None:
+        return ""
+    average_ml, _ = average
+    return (
+        '<section class="water-history-summary" '
+        'aria-label="期間每日平均飲水量">'
+        '<span>平均飲水量</span>'
+        f'<div><strong>{average_ml:.0f}</strong><small>ml／日</small></div>'
+        "</section>"
+    )
+
+
+def build_water_history_figure(
+    points: list[WaterHistoryPoint], day_count: int
+) -> go.Figure:
+    x_values = [point.day for point in points]
+    water_values = [point.water_ml for point in points]
+    seven_day_view = day_count <= 7
+    tick_values = (
+        x_values
+        if seven_day_view
+        else _weight_history_tick_values(x_values, day_count)
+    )
+    tick_text = (
+        [("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[day.weekday()]
+         for day in tick_values]
+        if seven_day_view
+        else None
+    )
+
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=water_values,
+            mode="lines+markers",
+            line={
+                "color": WATER_HISTORY_PRIMARY,
+                "width": 3,
+                "shape": "spline",
+                "smoothing": 1.0,
+            },
+            marker={
+                "size": 6,
+                "color": WATER_HISTORY_PRIMARY,
+                "line": {"color": "#ffffff", "width": 1.2},
+            },
+            fill="tozeroy",
+            fillgradient={
+                "type": "vertical",
+                "colorscale": [
+                    [0.0, "rgba(215,230,245,0.00)"],
+                    [1.0, "rgba(215,230,245,0.72)"],
+                ],
+            },
+            connectgaps=False,
+            hovertemplate="飲水量 %{y:.0f} ml<extra></extra>",
+            name="飲水量",
+        )
+    )
+    figure.update_layout(
+        height=250,
+        margin={"l": 28, "r": 28, "t": 10, "b": 30},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        hovermode="x unified",
+        xaxis={
+            "showgrid": False,
+            "zeroline": False,
+            "tickvals": tick_values,
+            "ticktext": tick_text,
+            "tickformat": "%m/%d",
+            "tickfont": {"size": 11, "color": WATER_HISTORY_SECONDARY},
+            "fixedrange": True,
+        },
+        yaxis={
+            "tickfont": {"size": 10, "color": WATER_HISTORY_SECONDARY},
+            "ticklabelposition": "inside",
+            "showgrid": False,
+            "zeroline": False,
+            "rangemode": "tozero",
+            "automargin": False,
+            "fixedrange": True,
+        },
+        font={"family": "system-ui, -apple-system, sans-serif"},
+    )
+    return figure
+
+
+def _render_student_water_history(user_id: str) -> None:
+    with st.container(key="student_water_history"):
+        st.subheader("飲水量")
+        selected_range = st.session_state.get("water_history_range", "7 天")
+        if selected_range not in ("7 天", "30 天"):
+            selected_range = "7 天"
+        day_count = 30 if selected_range == "30 天" else 7
+        start_date, end_date = history_date_range(date.today(), day_count)
+
+        try:
+            records = _fetch_records_cached(user_id)
+        except Exception:
+            st.error("取得飲水紀錄失敗，請稍後再試。")
+            return
+
+        points = build_water_history_series(
+            records,
+            start_date,
+            end_date,
+            today=date.today(),
+        )
+        with st.container(key="student_water_history_card"):
+            st.segmented_control(
+                "期間",
+                ("7 天", "30 天"),
+                default=selected_range,
+                key="water_history_range",
+                required=True,
+                label_visibility="collapsed",
+                width="stretch",
+            )
+            if water_history_average(points) is None:
+                st.info("所選期間尚無飲水紀錄。")
+                return
+            st.markdown(
+                build_water_history_summary_html(points),
+                unsafe_allow_html=True,
+            )
+            st.plotly_chart(
+                build_water_history_figure(points, day_count),
+                key="student_water_history_chart",
+                width="stretch",
+                config={"displayModeBar": False, "responsive": True},
+            )
+
+
 def page_log_meal() -> None:
     """學員日常紀錄入口，只渲染目前開啟的分段。"""
     target_tab = st.session_state.pop(DAILY_RECORD_TAB_TARGET_KEY, None)
@@ -1680,8 +1823,9 @@ def page_history() -> None:
 
         uid = st.session_state.user_id
         _render_student_weight_history(uid)
-        _render_student_training_history(uid)
         _render_student_nutrition_history(uid)
+        _render_student_water_history(uid)
+        _render_student_training_history(uid)
 
 # =============================================================================
 

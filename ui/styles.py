@@ -838,9 +838,9 @@ def apply_global_styles() -> None:
                 padding: 16px 18px 26px !important;
                 overflow: hidden !important;
                 background: var(--history-surface) !important;
-                border: 1px solid var(--history-border) !important;
+                border: 1px solid #ECE6F3 !important;
                 border-radius: 20px !important;
-                box-shadow: 0 8px 28px rgba(125, 140, 138, 0.08) !important;
+                box-shadow: 0 8px 28px rgba(106, 88, 143, 0.08) !important;
             }
 
             .st-key-student_training_history_card > div[data-testid="stVerticalBlock"] {
@@ -851,14 +851,14 @@ def apply_global_styles() -> None:
                 width: min(230px, 100%) !important;
                 margin: 0 auto 2px !important;
                 padding: 3px !important;
-                background: var(--history-background) !important;
+                background: #ECE6F3 !important;
                 border-radius: 999px !important;
             }
 
             .st-key-student_training_history_card [data-testid="stButtonGroup"] button,
             .st-key-student_training_history_card button[data-testid="stBaseButton-segmented_control"] {
                 min-height: 34px !important;
-                color: var(--history-secondary) !important;
+                color: #746B80 !important;
                 background: transparent !important;
                 border: none !important;
                 border-radius: 999px !important;
@@ -869,8 +869,8 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
             .st-key-student_training_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
-                color: #3E7664 !important;
-                background: rgba(168, 213, 194, 0.30) !important;
+                color: #574577 !important;
+                background: rgba(183, 161, 230, 0.48) !important;
             }
 
             .st-key-student_training_history_card div[data-testid="stHorizontalBlock"] {
@@ -891,8 +891,8 @@ def apply_global_styles() -> None:
                 height: 36px !important;
                 min-height: 36px !important;
                 padding: 0 !important;
-                color: var(--history-primary-dark) !important;
-                background: rgba(168, 213, 194, 0.16) !important;
+                color: #6A558F !important;
+                background: rgba(183, 161, 230, 0.20) !important;
                 border: none !important;
                 border-radius: 50% !important;
                 box-shadow: none !important;
@@ -900,13 +900,13 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card .st-key-training_history_previous button:hover,
             .st-key-student_training_history_card .st-key-training_history_next button:hover {
-                background: rgba(168, 213, 194, 0.28) !important;
+                background: rgba(183, 161, 230, 0.34) !important;
             }
 
             .st-key-student_training_history_card .st-key-training_history_previous button:focus-visible,
             .st-key-student_training_history_card .st-key-training_history_next button:focus-visible {
                 outline: none !important;
-                box-shadow: 0 0 0 3px rgba(168, 213, 194, 0.35) !important;
+                box-shadow: 0 0 0 3px rgba(183, 161, 230, 0.42) !important;
             }
 
             .st-key-student_training_history_card .st-key-training_history_previous button:disabled,
@@ -916,7 +916,7 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card .training-calendar-period {
                 overflow: hidden !important;
-                color: #34423E !important;
+                color: #4E435F !important;
                 font-size: 15px !important;
                 font-variant-numeric: tabular-nums !important;
                 font-weight: 550 !important;
@@ -942,7 +942,7 @@ def apply_global_styles() -> None:
 
             .st-key-student_training_history_card .training-calendar-weekdays {
                 margin-bottom: 9px !important;
-                color: var(--history-secondary) !important;
+                color: #7F718F !important;
                 font-size: 11px !important;
                 font-weight: 500 !important;
                 text-align: center !important;
@@ -958,8 +958,8 @@ def apply_global_styles() -> None:
                 justify-self: center !important;
                 width: min(42px, 100%) !important;
                 aspect-ratio: 1 / 1 !important;
-                color: var(--history-secondary) !important;
-                background: var(--history-background) !important;
+                color: #746B80 !important;
+                background: #ECE6F3 !important;
                 border-radius: 50% !important;
                 font-size: 13px !important;
                 font-variant-numeric: tabular-nums !important;
@@ -968,9 +968,9 @@ def apply_global_styles() -> None:
             }
 
             .st-key-student_training_history_card .training-calendar-day.is-complete {
-                color: #345E51 !important;
-                background: var(--history-primary) !important;
-                box-shadow: 0 4px 12px rgba(168, 213, 194, 0.34) !important;
+                color: #FFFFFF !important;
+                background: #B7A1E6 !important;
+                box-shadow: 0 4px 12px rgba(183, 161, 230, 0.38) !important;
             }
 
             .st-key-student_training_history_card .training-calendar-day.is-empty {
@@ -1161,6 +1161,120 @@ def apply_global_styles() -> None:
                 }
 
                 .st-key-student_nutrition_history_card div[data-testid="stAlert"] {
+                    margin-inline: 10px !important;
+                }
+            }
+
+            /* ===== 學員歷史：飲水量單軸趨勢 ===== */
+            .st-key-student_water_history {
+                margin-top: 20px !important;
+            }
+
+            .st-key-student_water_history_card {
+                box-sizing: border-box !important;
+                width: 100% !important;
+                padding: 16px 0 8px !important;
+                overflow: hidden !important;
+                background: #F6F9FC !important;
+                border: 1px solid #E6EDF3 !important;
+                border-radius: 20px !important;
+                box-shadow: 0 8px 28px rgba(126, 143, 163, 0.09) !important;
+            }
+
+            .st-key-student_water_history_card > div[data-testid="stVerticalBlock"] {
+                gap: 8px !important;
+            }
+
+            .st-key-student_water_history_card [data-testid="stButtonGroup"] {
+                width: min(180px, 100%) !important;
+                margin-left: auto !important;
+                margin-right: 18px !important;
+                padding: 3px !important;
+                background: #FFFFFF !important;
+                border-radius: 12px !important;
+            }
+
+            .st-key-student_water_history_card [data-testid="stButtonGroup"] button,
+            .st-key-student_water_history_card button[data-testid="stBaseButton-segmented_control"] {
+                min-height: 32px !important;
+                padding: 4px 10px !important;
+                color: #7E8FA3 !important;
+                background: transparent !important;
+                border: none !important;
+                border-radius: 9px !important;
+                box-shadow: none !important;
+                font-size: 12px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-student_water_history_card [data-testid="stButtonGroup"] button[aria-pressed="true"],
+            .st-key-student_water_history_card [data-testid="stButtonGroup"] button[aria-checked="true"] {
+                color: #5E7FA5 !important;
+                background: #E6F0FA !important;
+                box-shadow: 0 2px 8px rgba(126, 143, 163, 0.10) !important;
+            }
+
+            .st-key-student_water_history_card .water-history-summary {
+                padding: 2px 22px 0 !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+                font-variant-numeric: tabular-nums !important;
+            }
+
+            .st-key-student_water_history_card .water-history-summary > span {
+                display: block !important;
+                margin-bottom: 3px !important;
+                color: #7E8FA3 !important;
+                font-size: 11px !important;
+                font-weight: 500 !important;
+            }
+
+            .st-key-student_water_history_card .water-history-summary strong {
+                margin-right: 5px !important;
+                color: #5E7FA5 !important;
+                font-size: 24px !important;
+                font-weight: 650 !important;
+                line-height: 1 !important;
+            }
+
+            .st-key-student_water_history_card .water-history-summary small {
+                color: #7E8FA3 !important;
+                font-size: 10px !important;
+            }
+
+            .st-key-student_water_history_card div[data-testid="stAlert"] {
+                margin-inline: 18px !important;
+            }
+
+            .st-key-student_water_history_chart,
+            .st-key-student_water_history_chart div[data-testid="stPlotlyChart"] {
+                margin-bottom: 0 !important;
+                overflow: hidden !important;
+            }
+
+            @media (max-width: 480px) {
+                .st-key-student_water_history {
+                    margin-top: 16px !important;
+                }
+
+                .st-key-student_water_history_card {
+                    padding: 14px 0 6px !important;
+                    border-radius: 18px !important;
+                }
+
+                .st-key-student_water_history_card [data-testid="stButtonGroup"] {
+                    width: 150px !important;
+                    margin-right: 10px !important;
+                }
+
+                .st-key-student_water_history_card .water-history-summary {
+                    padding-inline: 12px !important;
+                }
+
+                .st-key-student_water_history_card .water-history-summary strong {
+                    font-size: 20px !important;
+                }
+
+                .st-key-student_water_history_card div[data-testid="stAlert"] {
                     margin-inline: 10px !important;
                 }
             }
