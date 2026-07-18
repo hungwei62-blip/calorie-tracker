@@ -75,10 +75,7 @@ def page_coach_overview() -> None:
         today_records = records_by_student.get(uid, [])
         totals = metrics.sum_totals(today_records).as_dict()
         training_today = training_by_student.get(uid)
-        has_training = bool(training_today) and any(
-            int(training_today.get(field, 0) or 0) == 1
-            for field in ("training_back", "training_chest", "training_legs", "training_core", "training_cardio")
-        )
+        has_training = bool(training_today) and bool(training_today.get("training_types"))
 
         calorie_goal = goals.get("calorie", 0)
         protein_goal = goals.get("protein", 0)
@@ -335,13 +332,7 @@ def _build_history_csv(student, daily, weights, trainings, notes, start_date, en
     for r in trainings:
         d = _parse_record_date(r.get("timestamp", ""))
         if start_date <= d <= end_date:
-            items = []
-            if r.get("training_back"):   items.append("背")
-            if r.get("training_chest"):  items.append("胸")
-            if r.get("training_legs"):   items.append("腿")
-            if r.get("training_core"):   items.append("核心")
-            if r.get("training_cardio"): items.append("有氧")
-            training_by_day[d] = "、".join(items) if items else ""
+            training_by_day[d] = sheets.format_training_record(r)
     for d in sorted(daily.keys()):
         v = daily[d]
         wd = weight_by_day.get(d, "")
@@ -514,13 +505,8 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
         text_lines = ["【訓練記錄】"]
         if trainings:
             for r in sorted(trainings, key=lambda x: x.get("timestamp", ""))[-20:]:
-                items = []
-                if r.get("training_back"):   items.append("背")
-                if r.get("training_chest"):  items.append("胸")
-                if r.get("training_legs"):   items.append("腿")
-                if r.get("training_core"):   items.append("核心")
-                if r.get("training_cardio"): items.append("有氧")
-                text_lines.append("  " + r.get("timestamp", "")[:10] + "  " + ("、".join(items) if items else "-"))
+                detail = sheets.format_training_record(r)
+                text_lines.append("  " + r.get("timestamp", "")[:10] + "  " + (detail or "-"))
         else:
             text_lines.append("  （無）")
         text_lines += ["", "【教練備註】"]
@@ -1033,15 +1019,9 @@ def page_coach_student_history():
     if trainings:
         rows = []
         for r in sorted(trainings, key=lambda x: x.get("timestamp", "")):
-            items = []
-            if r.get("training_back"):   items.append("背")
-            if r.get("training_chest"):  items.append("胸")
-            if r.get("training_legs"):   items.append("腿")
-            if r.get("training_core"):   items.append("核心")
-            if r.get("training_cardio"): items.append("有氧")
             rows.append({
                 "日期": r.get("timestamp", "")[:10],
-                "訓練項目": "、".join(items) if items else "無",
+                "訓練內容": sheets.format_training_record(r) or "無",
             })
         st.dataframe(rows, width="stretch", hide_index=True)
     else:

@@ -142,3 +142,86 @@ def test_registration_uses_validated_fixed_primary_coach():
 
     assert "primary_coach_id = sheets.get_primary_coach_id()" in source
     assert "coach_id=primary_coach_id" in source
+
+
+def test_training_append_uses_new_categorized_schema(monkeypatch):
+    from conftest import FakeWorksheet
+
+    ws = FakeWorksheet()
+    monkeypatch.setattr(sheets, "_get_sheet", lambda: object())
+    monkeypatch.setattr(sheets, "_ensure_worksheet", lambda *_args: ws)
+    monkeypatch.setattr(sheets, "clear_read_caches", lambda: None)
+
+    sheets.append_training(
+        "2026-07-18",
+        "student-1",
+        ["有氧訓練", "重量訓練"],
+        strength_detail="深蹲 4 組",
+        cardio_detail="跑步 20 分鐘",
+    )
+
+    assert sheets.TRAINING_HEADERS == [
+        "timestamp", "user_id", "training_types", "strength_detail",
+        "cardio_detail", "other_detail",
+    ]
+    assert ws.appended_rows == [[
+        "2026-07-18", "student-1", "重量訓練、有氧訓練",
+        "深蹲 4 組", "跑步 20 分鐘", "",
+    ]]
+
+
+@pytest.mark.parametrize(
+    ("training_types", "details", "message"),
+    [
+        ([], {}, "至少選擇"),
+        (["重量訓練"], {}, "重量訓練內容"),
+        (["未知類型"], {"other_detail": "測試"}, "不支援"),
+    ],
+)
+def test_training_validation_rejects_invalid_values(
+    monkeypatch, training_types, details, message
+):
+    monkeypatch.setattr(sheets, "_get_sheet", lambda: object())
+    with pytest.raises(ValueError, match=message):
+        sheets.append_training("2026-07-18", "student-1", training_types, **details)
+
+
+def test_training_records_are_normalized_and_formatted(monkeypatch):
+    from conftest import FakeWorksheet
+
+    ws = FakeWorksheet([
+        sheets.TRAINING_HEADERS,
+        [
+            "2026-07-18", "student-1", "重量訓練、有氧訓練",
+            "深蹲 4 組", "跑步 20 分鐘", "",
+        ],
+    ])
+    monkeypatch.setattr(sheets, "_get_sheet", lambda: object())
+    monkeypatch.setattr(sheets, "_ensure_worksheet", lambda *_args: ws)
+
+    records = sheets.get_training_records.__wrapped__("student-1")
+
+    assert records[0]["training_types"] == ["重量訓練", "有氧訓練"]
+    assert sheets.format_training_record(records[0]) == (
+        "重量訓練：深蹲 4 組；有氧訓練：跑步 20 分鐘"
+    )
+
+
+def test_training_update_overwrites_all_category_fields(monkeypatch):
+    from conftest import FakeWorksheet
+
+    ws = FakeWorksheet([
+        sheets.TRAINING_HEADERS,
+        ["2026-07-18", "student-1", "重量訓練", "深蹲", "", ""],
+    ])
+    monkeypatch.setattr(sheets, "_get_sheet", lambda: object())
+    monkeypatch.setattr(sheets, "_ensure_worksheet", lambda *_args: ws)
+    monkeypatch.setattr(sheets, "clear_read_caches", lambda: None)
+
+    assert sheets.update_training(
+        "2026-07-18", "student-1", ["有氧訓練"], cardio_detail="單車 30 分鐘"
+    ) is True
+    assert ws.updated_cells == [
+        (2, 3, "有氧訓練"), (2, 4, ""),
+        (2, 5, "單車 30 分鐘"), (2, 6, ""),
+    ]

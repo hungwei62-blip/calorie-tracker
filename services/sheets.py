@@ -6,7 +6,7 @@ Google Sheets 存取層。
 - Users        ：教練與學員帳號資訊
 - Records      ：學員每日飲食記錄
 - Weight       ：學員體重記錄
-- Training     ：學員訓練記錄（背/胸/腿/核心/有氧）
+- Training     ：學員訓練記錄（重量訓練/有氧訓練/其他）
 
 這些存取全走 .streamlit/secrets.toml 簡寫，沒有其他設定。
 學員工作表在本系統中由 sheets._ensure_worksheet 自動建立。
@@ -22,6 +22,7 @@ Google Sheets 存取層。
 from __future__ import annotations
 
 from datetime import date
+from collections.abc import Iterable
 from typing import Any
 
 import gspread
@@ -77,12 +78,17 @@ WEIGHT_HEADERS = [
 TRAINING_HEADERS = [
     "timestamp",
     "user_id",
-    "training_back",     # 背：1 或 0
-    "training_chest",   # 胸：1 或 0
-    "training_legs",    # 腿：1 或 0
-    "training_core",    # 核心：1 或 0
-    "training_cardio",  # 有氧：1 或 0
+    "training_types",
+    "strength_detail",
+    "cardio_detail",
+    "other_detail",
 ]
+
+TRAINING_TYPE_FIELDS = {
+    "重量訓練": "strength_detail",
+    "有氧訓練": "cardio_detail",
+    "其他": "other_detail",
+}
 
 # 教練備註工作表
 NOTES_HEADERS = [
@@ -599,26 +605,75 @@ def get_weight_by_date(user_id: str, target_date: date) -> float | None:
 # Training（訓練記錄）
 # =============================================================================
 
+def normalize_training_types(value: str | Iterable[str] | None) -> list[str]:
+    """將工作表或表單中的訓練類型正規化為固定順序的清單。"""
+    if value is None:
+        candidates: list[str] = []
+    elif isinstance(value, str):
+        candidates = [item.strip() for item in value.split("、") if item.strip()]
+    else:
+        candidates = [str(item).strip() for item in value if str(item).strip()]
+
+    unknown = set(candidates) - set(TRAINING_TYPE_FIELDS)
+    if unknown:
+        raise ValueError(f"不支援的訓練類型：{'、'.join(sorted(unknown))}")
+    return [label for label in TRAINING_TYPE_FIELDS if label in candidates]
+
+
+def _validated_training_values(
+    training_types: str | Iterable[str] | None,
+    strength_detail: str = "",
+    cardio_detail: str = "",
+    other_detail: str = "",
+) -> tuple[list[str], dict[str, str]]:
+    selected = normalize_training_types(training_types)
+    if not selected:
+        raise ValueError("請至少選擇一種訓練類型")
+
+    details = {
+        "strength_detail": str(strength_detail or "").strip(),
+        "cardio_detail": str(cardio_detail or "").strip(),
+        "other_detail": str(other_detail or "").strip(),
+    }
+    missing = [label for label in selected if not details[TRAINING_TYPE_FIELDS[label]]]
+    if missing:
+        raise ValueError(f"請填寫{'、'.join(missing)}內容")
+    for label, field in TRAINING_TYPE_FIELDS.items():
+        if label not in selected:
+            details[field] = ""
+    return selected, details
+
+
+def format_training_record(record: dict[str, Any]) -> str:
+    """將一筆訓練紀錄轉成教練頁與匯出共用的人類可讀文字。"""
+    types = normalize_training_types(record.get("training_types"))
+    parts = []
+    for label in types:
+        detail = str(record.get(TRAINING_TYPE_FIELDS[label], "") or "").strip()
+        parts.append(f"{label}：{detail}" if detail else label)
+    return "；".join(parts)
+
 def append_training(
     timestamp: str,
     user_id: str,
-    training_back: int = 0,
-    training_chest: int = 0,
-    training_legs: int = 0,
-    training_core: int = 0,
-    training_cardio: int = 0,
+    training_types: str | Iterable[str],
+    strength_detail: str = "",
+    cardio_detail: str = "",
+    other_detail: str = "",
 ) -> None:
     """新增一筆訓練記錄到 Training 工作表。"""
+    selected, details = _validated_training_values(
+        training_types, strength_detail, cardio_detail, other_detail
+    )
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
     row = [
         timestamp,
         user_id,
-        training_back,
-        training_chest,
-        training_legs,
-        training_core,
-        training_cardio,
+        "、".join(selected),
+        details["strength_detail"],
+        details["cardio_detail"],
+        details["other_detail"],
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
     clear_read_caches()
@@ -634,26 +689,23 @@ def get_training_records(user_id: str | None = None) -> list[dict[str, Any]]:
     for r in raw:
         if user_id is not None and r.get("user_id") != user_id:
             continue
-        r["training_back"] = _to_int(r.get("training_back"), 0)
-        r["training_chest"] = _to_int(r.get("training_chest"), 0)
-        r["training_legs"] = _to_int(r.get("training_legs"), 0)
-        r["training_core"] = _to_int(r.get("training_core"), 0)
-        r["training_cardio"] = _to_int(r.get("training_cardio"), 0)
+        r["training_types"] = normalize_training_types(r.get("training_types"))
+        for field in TRAINING_TYPE_FIELDS.values():
+            r[field] = str(r.get(field, "") or "").strip()
         out.append(r)
     return out
 
 
-def get_training_by_date(user_id: str, target_date: date) -> dict[str, int] | None:
+def get_training_by_date(user_id: str, target_date: date) -> dict[str, Any] | None:
     """取得指定日期的訓練記錄，回傳 dict（無記錄回傳 None）。"""
     date_str = target_date.isoformat()[:10]
     for r in get_training_records(user_id):
         if r.get("timestamp", "")[:10] == date_str:
             return {
-                "back": r.get("training_back", 0),
-                "chest": r.get("training_chest", 0),
-                "legs": r.get("training_legs", 0),
-                "core": r.get("training_core", 0),
-                "cardio": r.get("training_cardio", 0),
+                "training_types": r.get("training_types", []),
+                "strength_detail": r.get("strength_detail", ""),
+                "cardio_detail": r.get("cardio_detail", ""),
+                "other_detail": r.get("other_detail", ""),
             }
     return None
 
@@ -663,19 +715,21 @@ def has_training_today(user_id: str, target_date: date) -> bool:
     record = get_training_by_date(user_id, target_date)
     if record is None:
         return False
-    return any(v == 1 for v in record.values())
+    return bool(record.get("training_types"))
 
 
 def update_training(
     timestamp: str,
     user_id: str,
-    training_back: int = 0,
-    training_chest: int = 0,
-    training_legs: int = 0,
-    training_core: int = 0,
-    training_cardio: int = 0,
+    training_types: str | Iterable[str],
+    strength_detail: str = "",
+    cardio_detail: str = "",
+    other_detail: str = "",
 ) -> bool:
     """更新指定日期的訓練記錄，若該日記錄不存在則新增。成功回傳 True。"""
+    selected, details = _validated_training_values(
+        training_types, strength_detail, cardio_detail, other_detail
+    )
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
     raw_records = ws.get_all_values()
@@ -686,7 +740,12 @@ def update_training(
             cells = [
                 gspread.Cell(row_idx, col, val)
                 for col, val in enumerate(
-                    [training_back, training_chest, training_legs, training_core, training_cardio],
+                    [
+                        "、".join(selected),
+                        details["strength_detail"],
+                        details["cardio_detail"],
+                        details["other_detail"],
+                    ],
                     start=3,
                 )
             ]
@@ -695,7 +754,14 @@ def update_training(
             return True
 
     # 沒找到就新增
-    append_training(timestamp, user_id, training_back, training_chest, training_legs, training_core, training_cardio)
+    append_training(
+        timestamp,
+        user_id,
+        selected,
+        details["strength_detail"],
+        details["cardio_detail"],
+        details["other_detail"],
+    )
     return True
 
 
