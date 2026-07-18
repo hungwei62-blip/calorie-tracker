@@ -237,6 +237,9 @@ def test_training_renderer_uses_multi_select_and_no_duplicate_heading():
     ]
 
     assert 'selection_mode="multi"' in source
+    assert 'default=[]' in source
+    assert 'value=""' in source
+    assert '今日已有訓練紀錄，再次儲存將覆蓋原紀錄。' in source
     assert 'st.subheader("訓練")' not in source
     assert 'st.text_input(' in source
     assert 'training_types=selected_types' in source
@@ -245,3 +248,49 @@ def test_training_renderer_uses_multi_select_and_no_duplicate_heading():
         "training_core", "training_cardio",
     ):
         assert legacy_field not in source
+
+
+def test_entering_training_tab_clears_previous_widget_state(monkeypatch):
+    fake_st = _TabsStreamlit(active_index=2)
+    fake_st.session_state.update({
+        "_last_daily_record_tab": "食物",
+        "training_types": ["重量訓練"],
+        "training_strength_detail": "深蹲 4 組",
+        "training_cardio_detail": "跑步 20 分鐘",
+        "training_other_detail": "伸展",
+    })
+    monkeypatch.setattr(student_pages, "st", fake_st)
+
+    assert student_pages._prepare_daily_record_tab("訓練") is True
+    for key in student_pages.TRAINING_WIDGET_KEYS:
+        assert key not in fake_st.session_state
+    assert fake_st.session_state["_last_daily_record_tab"] == "訓練"
+
+
+def test_training_widget_rerun_keeps_current_inputs(monkeypatch):
+    fake_st = _TabsStreamlit(active_index=2)
+    fake_st.session_state.update({
+        "_last_daily_record_tab": "訓練",
+        "training_types": ["重量訓練"],
+        "training_strength_detail": "深蹲 4 組",
+    })
+    monkeypatch.setattr(student_pages, "st", fake_st)
+
+    assert student_pages._prepare_daily_record_tab("訓練") is False
+    assert fake_st.session_state["training_types"] == ["重量訓練"]
+    assert fake_st.session_state["training_strength_detail"] == "深蹲 4 組"
+
+
+def test_returning_from_another_page_clears_training_even_if_last_tab_matches(monkeypatch):
+    fake_st = _TabsStreamlit(active_index=2)
+    fake_st.session_state.update({
+        "_entered_daily_record_page": True,
+        "_last_daily_record_tab": "訓練",
+        "training_types": ["有氧訓練"],
+        "training_cardio_detail": "單車 30 分鐘",
+    })
+    monkeypatch.setattr(student_pages, "st", fake_st)
+
+    assert student_pages._prepare_daily_record_tab("訓練") is True
+    assert "training_types" not in fake_st.session_state
+    assert "training_cardio_detail" not in fake_st.session_state

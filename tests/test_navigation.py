@@ -123,6 +123,18 @@ def test_normal_student_page_is_unchanged():
     assert app.normalize_student_page("歷史") == ("歷史", None)
 
 
+def test_student_page_entry_tracker_only_marks_real_page_transition(monkeypatch):
+    fake_st = _FakeStreamlit()
+    fake_st.session_state["_last_routed_page"] = "個人"
+    monkeypatch.setattr(app, "st", fake_st)
+
+    app.track_student_page_entry("記錄飲食")
+    assert fake_st.session_state["_entered_daily_record_page"] is True
+
+    app.track_student_page_entry("記錄飲食")
+    assert fake_st.session_state["_entered_daily_record_page"] is False
+
+
 @pytest.mark.parametrize(
     ("legacy_page", "expected_tab"),
     [

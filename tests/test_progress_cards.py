@@ -205,10 +205,12 @@ def test_raw_html_progress_card_renderer_was_removed():
 
 def test_personal_page_is_simplified_and_orders_summary_before_progress():
     source = inspect.getsource(student_pages.page_personal)
+    welcome_source = inspect.getsource(student_pages._build_student_welcome_html)
 
     assert 'key="student_home_header"' in source
-    assert 'class="student-home-welcome"' in source
-    assert 'margin-top: 0;' in source
+    assert '_build_student_welcome_html(user_name, avatar_base64)' in source
+    assert 'class="student-home-welcome"' in welcome_source
+    assert 'margin-top: 0;' in welcome_source
     assert 'st.header("Overview")' in source
     assert '"📊 今日摘要"' not in source
     assert '"今日建議"' not in source

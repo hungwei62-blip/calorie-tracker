@@ -34,6 +34,8 @@ def init_session() -> None:
 
         "username": None,
 
+        "name": None,
+
         "role": None,
 
         "page": "個人",

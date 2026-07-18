@@ -24,6 +24,15 @@ def normalize_student_page(page: str) -> tuple[str, str | None]:
     return ("記錄飲食", tab) if tab else (page, None)
 
 
+def track_student_page_entry(current_page: str) -> None:
+    """標記真正進入日常紀錄頁的頁面切換，不把一般 rerun 視為重進。"""
+    previous_page = st.session_state.get("_last_routed_page")
+    st.session_state["_entered_daily_record_page"] = (
+        current_page == "記錄飲食" and previous_page != current_page
+    )
+    st.session_state["_last_routed_page"] = current_page
+
+
 def main() -> None:
 
     st.set_page_config(page_title="飲食控制管理系統", layout="wide")
@@ -59,6 +68,9 @@ def main() -> None:
 
     if st.session_state.page not in _available_pages:
         st.session_state.page = "學員狀態" if is_coach else "個人"
+
+    if not is_coach:
+        track_student_page_entry(st.session_state.page)
 
     # 先渲染固定導覽，確保頁面警告或提前停止內容時仍可切換頁面。
     render_bottom_navigation(role, st.session_state.page)

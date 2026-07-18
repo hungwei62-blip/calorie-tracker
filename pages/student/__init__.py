@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 from datetime import date, datetime, timedelta
 import hashlib
+import html
 from io import BytesIO
 import math
 from pathlib import Path
@@ -456,6 +457,7 @@ def page_login() -> None:
 
             st.session_state.user_id = user.get("user_id")
             st.session_state.username = user.get("username")
+            st.session_state.name = str(user.get("name") or "").strip() or "學員"
             st.session_state.role = sheets.get_user_role(str(user.get("user_id") or ""))
 
             if st.session_state.role in ("coach", "admin"):
@@ -544,6 +546,7 @@ def page_login() -> None:
 
                 st.session_state.user_id = uid
                 st.session_state.username = new_user
+                st.session_state.name = new_name.strip()
                 st.session_state.role = "student"
                 st.session_state.needs_tdee_setup = True
                 st.success("註冊成功！請先填寫 TDEE 問卷完成設定")
@@ -559,6 +562,39 @@ def page_login() -> None:
 
 
 
+def _resolve_student_name() -> str:
+    """取得正式姓名，並為更新前建立的 session 補上 name。"""
+    session_name = str(st.session_state.get("name") or "").strip()
+    if session_name:
+        return session_name
+
+    user_id = str(st.session_state.get("user_id") or "").strip()
+    if not user_id:
+        return "學員"
+    try:
+        user = next(
+            (
+                row for row in sheets.get_users_rows()
+                if str(row.get("user_id") or "").strip() == user_id
+            ),
+            None,
+        )
+    except Exception:
+        return "學員"
+
+    resolved_name = str((user or {}).get("name") or "").strip()
+    if not resolved_name:
+        return "學員"
+    st.session_state.name = resolved_name
+    return resolved_name
+
+
+def _build_student_welcome_html(display_name: str, avatar_source: str) -> str:
+    safe_name = html.escape(display_name, quote=True)
+    safe_avatar = html.escape(avatar_source, quote=True)
+    return f'<div class="student-home-welcome" style="display: flex; align-items: center; gap: 16px; margin-top: 0; margin-bottom: 25px; width: 100%;"><img src="{safe_avatar}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" alt="avatar"><span style="font-size: 24px; font-weight: 700; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; white-space: nowrap;">Hello, {safe_name}!</span></div>'
+
+
 def page_personal() -> None:
 
     # ============================================================
@@ -566,7 +602,7 @@ def page_personal() -> None:
     # ============================================================
     import os
 
-    user_name = st.session_state.get('username', '學員')
+    user_name = _resolve_student_name()
     avatar_path = './static/avatar.jpg'
 
     avatar_base64 = ""
@@ -577,7 +613,7 @@ def page_personal() -> None:
     else:
         avatar_base64 = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200"
 
-    welcome_html = f'<div class="student-home-welcome" style="display: flex; align-items: center; gap: 16px; margin-top: 0; margin-bottom: 25px; width: 100%;"><img src="{avatar_base64}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" alt="avatar"><span style="font-size: 24px; font-weight: 700; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; white-space: nowrap;">Hello, {user_name}!</span></div>'
+    welcome_html = _build_student_welcome_html(user_name, avatar_base64)
 
     with st.container(key="student_home_header"):
         st.markdown(welcome_html, unsafe_allow_html=True)
@@ -870,6 +906,12 @@ TRAINING_DETAIL_LABELS = {
     "有氧訓練": ("cardio_detail", "有氧訓練內容"),
     "其他": ("other_detail", "其他訓練內容"),
 }
+TRAINING_WIDGET_KEYS = (
+    "training_types",
+    "training_strength_detail",
+    "training_cardio_detail",
+    "training_other_detail",
+)
 
 
 def _training_fields_for_types(selected_types: list[str]) -> list[tuple[str, str, str]]:
@@ -889,16 +931,35 @@ def _training_detail_placeholder(training_type: str) -> str:
     }[training_type]
 
 
+def _clear_training_form_state() -> None:
+    for key in TRAINING_WIDGET_KEYS:
+        st.session_state.pop(key, None)
+
+
+def _prepare_daily_record_tab(current_tab: str) -> bool:
+    """在真正進入訓練分頁時清空一次表單，回傳是否剛進入。"""
+    entered_page = bool(st.session_state.pop("_entered_daily_record_page", False))
+    previous_tab = st.session_state.get("_last_daily_record_tab")
+    entered_training = current_tab == "訓練" and (
+        entered_page or previous_tab != "訓練"
+    )
+    if entered_training:
+        _clear_training_form_state()
+    st.session_state["_last_daily_record_tab"] = current_tab
+    return entered_training
+
+
 def _render_training_records() -> None:
     uid = st.session_state.user_id
     today = date.today()
     today_training = sheets.get_training_by_date(uid, today)
-    default_types = today_training.get("training_types", []) if today_training else []
+    if today_training:
+        st.info("今日已有訓練紀錄，再次儲存將覆蓋原紀錄。")
     selected_types = st.pills(
         "訓練類型",
         TRAINING_TYPES,
         selection_mode="multi",
-        default=default_types,
+        default=[],
         key="training_types",
         width="stretch",
     ) or []
@@ -909,7 +970,7 @@ def _render_training_records() -> None:
         for training_type, field, label in _training_fields_for_types(selected_types):
             details[field] = st.text_input(
                 label,
-                value=(today_training or {}).get(field, ""),
+                value="",
                 key=f"training_{field}",
                 placeholder=_training_detail_placeholder(training_type),
             )
@@ -984,6 +1045,8 @@ def page_log_meal() -> None:
         current_tab = DAILY_RECORD_TABS[0]
     if target_tab:
         st.session_state.pop("daily_record_tab", None)
+
+    _prepare_daily_record_tab(current_tab)
 
     with st.container(key="daily_record_page"):
         st.header("日常紀錄")
