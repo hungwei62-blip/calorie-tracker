@@ -23,7 +23,12 @@ from __future__ import annotations
 
 from datetime import date
 from collections.abc import Iterable
+import hashlib
+import json
+import threading
+import time
 from typing import Any
+import uuid
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -43,6 +48,23 @@ from domain.validation import (
 CACHE_TTL = SETTINGS.cache_ttl_seconds
 FIXED_PRIMARY_COACH_ID = SETTINGS.primary_coach_id
 _VERIFIED_WORKSHEET_SCHEMAS: set[tuple[str, str]] = set()
+_APPLIED_IMPORT_TOKENS: set[str] = set()
+_IMPORT_TOKEN_LOCK = threading.RLock()
+
+
+def _retry_transient(operation, *, attempts: int = 3):
+    """Retry quota/network/server failures; validation errors are never retried."""
+    for attempt in range(attempts):
+        try:
+            return operation()
+        except (ValueError, TypeError):
+            raise
+        except Exception as exc:
+            response = getattr(exc, "response", None)
+            status = getattr(response, "status_code", None) or getattr(exc, "code", None)
+            if status not in {429, 500, 502, 503, 504} or attempt == attempts - 1:
+                raise
+            time.sleep(0.25 * (2**attempt))
 
 # ---------- Headers ----------
 
@@ -109,6 +131,27 @@ NOTES_HEADERS = [
     "note",          # 備註內容
 ]
 
+AUDIT_HEADERS = [
+    "timestamp",
+    "request_id",
+    "actor_id",
+    "actor_role",
+    "action",
+    "target_type",
+    "target_id",
+    "result",
+    "metadata_json",
+]
+
+WORKSHEET_SCHEMAS = {
+    "Users": USERS_HEADERS,
+    "Records": RECORDS_HEADERS,
+    "Weight": WEIGHT_HEADERS,
+    "Training": TRAINING_HEADERS,
+    "Notes": NOTES_HEADERS,
+    "AuditLog": AUDIT_HEADERS,
+}
+
 
 # ---------- 內部工具 ----------
 
@@ -142,29 +185,53 @@ def _get_sheet() -> gspread.Spreadsheet:
 
 
 def _ensure_worksheet(sh: gspread.Spreadsheet, title: str, headers: list[str]) -> gspread.Worksheet:
-    """確保工作表及新增於尾端的欄位存在。"""
+    """Validate a worksheet without mutating production data or schema."""
     try:
         ws = sh.worksheet(title)
-    except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet(title=title, rows=1000, cols=len(headers))
-        ws.append_row(headers)
-        return ws
+    except gspread.WorksheetNotFound as exc:
+        raise RuntimeError(f"缺少 {title} 工作表，請先執行 tools/init_sheets.py") from exc
 
     schema_key = (str(getattr(sh, "id", id(sh))), title)
     if schema_key in _VERIFIED_WORKSHEET_SCHEMAS:
         return ws
     existing_headers = ws.row_values(1)
-    if not existing_headers:
-        ws.append_row(headers)
-        return ws
-    if existing_headers != headers[:len(existing_headers)]:
-        raise RuntimeError(f"{title} 工作表欄位順序與程式定義不一致，請先執行資料檢查工具")
-    if ws.col_count < len(headers):
-        ws.add_cols(len(headers) - ws.col_count)
-    for col, header in enumerate(headers[len(existing_headers):], start=len(existing_headers) + 1):
-        ws.update_cell(1, col, header)
+    if existing_headers != headers:
+        raise RuntimeError(
+            f"{title} 工作表欄位與程式定義不一致，請先執行 tools/init_sheets.py"
+        )
     _VERIFIED_WORKSHEET_SCHEMAS.add(schema_key)
     return ws
+
+
+def initialize_worksheets(*, apply: bool = False) -> list[dict[str, Any]]:
+    """Preview or explicitly create/extend known worksheets."""
+    sh = _get_sheet()
+    report: list[dict[str, Any]] = []
+    for title, headers in WORKSHEET_SCHEMAS.items():
+        try:
+            ws = sh.worksheet(title)
+        except gspread.WorksheetNotFound:
+            report.append({"worksheet": title, "status": "missing"})
+            if apply:
+                ws = sh.add_worksheet(title=title, rows=1000, cols=len(headers))
+                ws.append_row(headers, value_input_option="RAW")
+            continue
+        existing = ws.row_values(1)
+        if existing == headers:
+            report.append({"worksheet": title, "status": "ok"})
+        elif existing == headers[: len(existing)]:
+            missing = headers[len(existing) :]
+            report.append({"worksheet": title, "status": "extend", "headers": missing})
+            if apply:
+                if ws.col_count < len(headers):
+                    ws.add_cols(len(headers) - ws.col_count)
+                for col, header in enumerate(missing, start=len(existing) + 1):
+                    ws.update_cell(1, col, header)
+        else:
+            report.append({"worksheet": title, "status": "mismatch"})
+    if apply:
+        _VERIFIED_WORKSHEET_SCHEMAS.clear()
+    return report
 
 
 def _rows_to_dicts(ws: gspread.Worksheet, headers: list[str]) -> list[dict[str, Any]]:
@@ -218,6 +285,7 @@ def clear_read_caches() -> None:
         "get_latest_weight",
         "get_training_records",
         "get_notes",
+        "get_audit_logs",
     ):
         fn = globals().get(fn_name)
         clear = getattr(fn, "clear", None)
@@ -285,6 +353,77 @@ def append_user(
         coach_id,
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+    clear_read_caches()
+
+
+def _batch_cell(value: Any) -> dict[str, Any]:
+    if isinstance(value, bool):
+        return {"userEnteredValue": {"boolValue": value}}
+    if isinstance(value, (int, float)):
+        return {"userEnteredValue": {"numberValue": value}}
+    return {"userEnteredValue": {"stringValue": str(value or "")}}
+
+
+def append_user_with_initial_weight(
+    user_id: str,
+    username: str,
+    name: str,
+    password_hash: str,
+    created_at: str,
+    goals: dict[str, float],
+    coach_id: str,
+    initial_weight: float,
+    record_mode: str = "simple",
+    weekly_training: int = 4,
+) -> None:
+    """Atomically append Users and initial Weight rows in one Sheets batch request."""
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    username = bounded_text(username, "帳號", limit=TEXT_LIMITS["username"])
+    name = bounded_text(name, "姓名", limit=TEXT_LIMITS["name"])
+    created_at = valid_timestamp(created_at, "created_at")
+    coach_id = bounded_text(coach_id, "coach_id", limit=80)
+    weight = positive_number(initial_weight, "weight_kg")
+    user_row = [
+        user_id,
+        username,
+        name,
+        password_hash,
+        created_at,
+        "",
+        finite_non_negative(goals.get("calorie", 0), "calorie"),
+        finite_non_negative(goals.get("protein", 0), "protein"),
+        finite_non_negative(goals.get("carb", 0), "carb"),
+        finite_non_negative(goals.get("fat", 0), "fat"),
+        finite_non_negative(goals.get("water", 0), "water"),
+        "student",
+        weekly_training,
+        record_mode,
+        coach_id,
+    ]
+    weight_row = [created_at, user_id, round(weight, 1)]
+    sh = _get_sheet()
+    users_ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
+    weight_ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
+    _retry_transient(lambda: sh.batch_update(
+        {
+            "requests": [
+                {
+                    "appendCells": {
+                        "sheetId": users_ws.id,
+                        "rows": [{"values": [_batch_cell(value) for value in user_row]}],
+                        "fields": "userEnteredValue",
+                    }
+                },
+                {
+                    "appendCells": {
+                        "sheetId": weight_ws.id,
+                        "rows": [{"values": [_batch_cell(value) for value in weight_row]}],
+                        "fields": "userEnteredValue",
+                    }
+                },
+            ]
+        }
+    ))
     clear_read_caches()
 
 
@@ -870,11 +1009,68 @@ def delete_note(timestamp: str, user_id: str, coach_id: str) -> bool:
     return False
 
 
+# =============================================================================
+# AuditLog（僅保存操作中繼資料，不保存健康內容或 secrets）
+# =============================================================================
+
+def append_audit_log(
+    *,
+    timestamp: str,
+    request_id: str,
+    actor_id: str,
+    actor_role: str,
+    action: str,
+    target_type: str = "",
+    target_id: str = "",
+    result: str,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    timestamp = valid_timestamp(timestamp)
+    request_id = bounded_text(request_id, "request_id", limit=80)
+    actor_id = bounded_text(actor_id, "actor_id", limit=80, required=False)
+    actor_role = bounded_text(actor_role, "actor_role", limit=20, required=False)
+    action = bounded_text(action, "action", limit=100)
+    target_type = bounded_text(target_type, "target_type", limit=50, required=False)
+    target_id = bounded_text(target_id, "target_id", limit=80, required=False)
+    result = bounded_text(result, "result", limit=30)
+    safe_metadata = {
+        str(key)[:60]: value
+        for key, value in (metadata or {}).items()
+        if str(key).lower() not in {"password", "api_key", "secret", "note", "photo"}
+    }
+    metadata_json = json.dumps(safe_metadata, ensure_ascii=False, default=str)[:2000]
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "AuditLog", AUDIT_HEADERS)
+    ws.append_row(
+        [
+            timestamp,
+            request_id,
+            actor_id,
+            actor_role,
+            action,
+            target_type,
+            target_id,
+            result,
+            metadata_json,
+        ],
+        value_input_option="RAW",
+    )
+
+
+@st.cache_data(ttl=CACHE_TTL)
+def get_audit_logs(limit: int = 100) -> list[dict[str, Any]]:
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "AuditLog", AUDIT_HEADERS)
+    rows = _rows_to_dicts(ws, AUDIT_HEADERS)
+    return rows[-max(1, min(int(limit), 1000)) :]
+
+
 def import_records_from_excel(
     excel_file_bytes: bytes = None,
     user_id: str = None,
     overwrite_duplicates: bool = False,
-    precomputed_data: dict = None
+    precomputed_data: dict = None,
+    operation_token: str | None = None,
 ) -> dict[str, Any]:
     """從 Excel 檔案匯入飲食記錄。
     
@@ -901,9 +1097,6 @@ def import_records_from_excel(
     from datetime import datetime
     import zipfile
     
-    import time
-    from services.sheets import get_records, delete_record, append_record
-    
     result = {
         "imported": 0,
         "overwritten": 0,
@@ -920,6 +1113,14 @@ def import_records_from_excel(
     try:
         # 如果有預計算資料，直接使用
         if precomputed_data is not None:
+            expected_token = str(precomputed_data.get("operation_token") or "")
+            if not operation_token or operation_token != expected_token:
+                raise ValueError("匯入操作已失效，請重新分析檔案")
+            if str(precomputed_data.get("user_id") or "") != str(user_id or ""):
+                raise ValueError("匯入目標學員不一致")
+            with _IMPORT_TOKEN_LOCK:
+                if operation_token in _APPLIED_IMPORT_TOKENS:
+                    raise ValueError("此匯入操作已執行")
             parsed_records = precomputed_data["records"]
             existing_dates = precomputed_data["existing_dates"]
         else:
@@ -1104,47 +1305,77 @@ def import_records_from_excel(
             # 附加預計算資料供第二次使用
             result["parsed_data"] = {
                 "records": parsed_records,
-                "existing_dates": existing_dates.copy()
+                "existing_dates": existing_dates.copy(),
+                "user_id": user_id,
+                "file_hash": hashlib.sha256(excel_file_bytes).hexdigest(),
+                "operation_token": uuid.uuid4().hex,
             }
         else:
-            # 第二次執行：實際進行寫入
+            # 第二次執行：以單一 spreadsheet batch request 套用
+            sh = _get_sheet()
+            ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+            raw_rows = ws.get_all_values()
+            food_rows_by_date: dict[str, int] = {}
+            for row_index, raw_row in enumerate(raw_rows[1:], start=2):
+                if len(raw_row) < 3 or raw_row[1] != user_id:
+                    continue
+                if raw_row[2] == "食物" and raw_row[0]:
+                    food_rows_by_date.setdefault(raw_row[0][:10], row_index)
+
+            requests: list[dict[str, Any]] = []
             for record in parsed_records:
+                record_row = [
+                    record["timestamp"], user_id, "食物", "由 Excel 匯入",
+                    finite_non_negative(record["calories"], "calories"),
+                    finite_non_negative(record["protein"], "protein"),
+                    0, 0,
+                    finite_non_negative(record["water"], "water"),
+                    "", 1.0,
+                ]
                 if record["date"] in existing_dates:
                     if overwrite_duplicates:
-                        delete_record(record["timestamp"], user_id)
-                        time.sleep(0.5)  # 避免 API 配額限制
-                        append_record(
-                            timestamp=record["timestamp"],
-                            user_id=user_id,
-                            meal_type="食物",
-                            food_summary="由 Excel 匯入（覆寫）",
-                            calories=record["calories"],
-                            protein=record["protein"],
-                            carb=0,
-                            fat=0,
-                            water_ml=record["water"],
-                            image_url="",
-                            portion=1.0,
+                        row_index = food_rows_by_date.get(record["date"])
+                        if row_index is None:
+                            result["errors"].append(
+                                f"{record['date']} 找不到可安全覆寫的食物列"
+                            )
+                            continue
+                        record_row[3] = "由 Excel 匯入（覆寫）"
+                        requests.append(
+                            {
+                                "updateCells": {
+                                    "range": {
+                                        "sheetId": ws.id,
+                                        "startRowIndex": row_index - 1,
+                                        "endRowIndex": row_index,
+                                        "startColumnIndex": 0,
+                                        "endColumnIndex": len(RECORDS_HEADERS),
+                                    },
+                                    "rows": [{"values": [_batch_cell(value) for value in record_row]}],
+                                    "fields": "userEnteredValue",
+                                }
+                            }
                         )
                         result["overwritten"] += 1
                     else:
                         result["skipped"] += 1
                 else:
-                    append_record(
-                        timestamp=record["timestamp"],
-                        user_id=user_id,
-                        meal_type="食物",
-                        food_summary="由 Excel 匯入",
-                        calories=record["calories"],
-                        protein=record["protein"],
-                        carb=0,
-                        fat=0,
-                        water_ml=record["water"],
-                        image_url="",
-                        portion=1.0,
+                    requests.append(
+                        {
+                            "appendCells": {
+                                "sheetId": ws.id,
+                                "rows": [{"values": [_batch_cell(value) for value in record_row]}],
+                                "fields": "userEnteredValue",
+                            }
+                        }
                     )
                     existing_dates[record["date"]] = True
                     result["imported"] += 1
+            if requests:
+                _retry_transient(lambda: sh.batch_update({"requests": requests}))
+                clear_read_caches()
+            with _IMPORT_TOKEN_LOCK:
+                _APPLIED_IMPORT_TOKENS.add(operation_token)
     
     except Exception as e:
         result["errors"].append(f"讀取 Excel 檔案失敗：{str(e)}")

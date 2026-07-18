@@ -45,8 +45,8 @@ def test_registration_reuses_one_timestamp_and_personal_page_shows_warning():
     session_source = inspect.getsource(common.init_session)
 
     assert "registration_timestamp = auth.now_iso()" in login_source
-    assert "pwd_hash, registration_timestamp" in login_source
-    assert "registration_timestamp, uid, initial_weight" in login_source
+    assert "sheets.append_user_with_initial_weight(" in login_source
+    assert "initial_weight=initial_weight" in login_source
     assert '"initial_weight_save_warning": None' in session_source
     assert '"initial_weight_save_warning", None' in personal_source
     assert "st.warning(initial_weight_warning)" in personal_source

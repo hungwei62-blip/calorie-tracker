@@ -301,6 +301,7 @@ def page_coach_student_detail() -> None:
                         final_result = application.import_student_records(
                             current_auth_context(), uid,
                             precomputed_data=analysis_result['parsed_data'],
+                            operation_token=analysis_result['parsed_data']['operation_token'],
                             overwrite_duplicates=do_overwrite
                         )
                         _clear_analysis_cache()
@@ -732,6 +733,7 @@ def page_coach_student_history():
                             final_result = application.import_student_records(
                                 current_auth_context(), uid,
                                 precomputed_data=analysis_result['parsed_data'],
+                                operation_token=analysis_result['parsed_data']['operation_token'],
                                 overwrite_duplicates=do_overwrite
                             )
                             _clear_analysis_cache()

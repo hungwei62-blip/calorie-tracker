@@ -98,7 +98,7 @@ Streamlit 頁面
 
 ## Google Sheets 資料結構
 
-程式會檢查並建立下列工作表。營養目標直接存放在 `Users`，沒有 `Goals` 工作表。
+程式只會驗證下列工作表，不會在一般請求中自動建表或補欄。營養目標直接存放在 `Users`，沒有 `Goals` 工作表。
 
 ### Users
 
@@ -150,6 +150,15 @@ cardio_detail, other_detail
 ```text
 timestamp, user_id, coach_id, note
 ```
+
+### AuditLog
+
+```text
+timestamp, request_id, actor_id, actor_role, action,
+target_type, target_id, result, metadata_json
+```
+
+AuditLog 只保存敏感操作的中繼資料，不保存密碼、金鑰、照片、備註全文或健康紀錄內容。
 
 ## 本機啟動
 
@@ -205,6 +214,15 @@ git diff --check
 
 所有工具預設只預覽，只有明確傳入 `--apply` 才可修改線上 Sheet。執行前請確認使用的是正確試算表與 Service Account。
 
+### 初始化／驗證工作表
+
+```powershell
+python tools/init_sheets.py
+python tools/init_sheets.py --apply
+```
+
+第一次部署安全版本時，先在私人 Google Drive 建立完整備份，再以預覽確認只有 `AuditLog` 為 `missing`，最後才使用 `--apply`。
+
 ### Users 稽核與欄位修復
 
 ```powershell
@@ -231,6 +249,10 @@ python tools/migrate_training_schema.py --apply
 ```
 
 `--apply` 會先備份，再刪除全部舊 Training 資料並建立新版表頭；它不會轉換舊的背、胸、腿、核心或有氧欄位。這是破壞性操作，未確認備份前禁止執行。
+
+### 每週 Google Drive 備份
+
+由試算表擁有者安裝 `ops/apps_script/weekly_backup.gs`。腳本每週建立完整副本、保留最近 12 週，並提供大量匯入或遷移前的「立即備份」選單。安裝與還原演練見 [docs/BACKUP_AND_RESTORE.md](docs/BACKUP_AND_RESTORE.md)。
 
 ## 部署與 Git 流程
 
@@ -301,3 +323,4 @@ git push origin main
 
 - [Google Cloud、Sheets 與 Gemini 設定](docs/SETUP_GCP.md)
 - [部署檢查清單](docs/DEPLOY_CHECKLIST.md)
+- [Google Drive 備份與還原](docs/BACKUP_AND_RESTORE.md)

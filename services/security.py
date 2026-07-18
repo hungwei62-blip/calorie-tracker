@@ -103,7 +103,10 @@ def log_event(
     result: str,
     request_id: str | None = None,
     actor_id: str = "",
+    actor_role: str = "",
+    target_type: str = "",
     target_id: str = "",
+    metadata: dict[str, object] | None = None,
     exc: BaseException | None = None,
 ) -> str:
     request_id = request_id or new_request_id()
@@ -112,6 +115,8 @@ def log_event(
         "request_id": request_id,
         "action": action,
         "actor_id": actor_id,
+        "actor_role": actor_role,
+        "target_type": target_type,
         "target_id": target_id,
         "result": result,
     }
@@ -119,6 +124,26 @@ def log_event(
         LOGGER.info("security_event %s", payload)
     else:
         LOGGER.exception("security_event %s exception_type=%s", payload, type(exc).__name__)
+    try:
+        from services import sheets
+
+        sheets.append_audit_log(
+            timestamp=payload["timestamp"],
+            request_id=request_id,
+            actor_id=actor_id,
+            actor_role=actor_role,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            result=result,
+            metadata=metadata,
+        )
+    except Exception as audit_exc:
+        LOGGER.warning(
+            "audit_log_unavailable request_id=%s exception_type=%s",
+            request_id,
+            type(audit_exc).__name__,
+        )
     return request_id
 
 
@@ -150,4 +175,3 @@ def clear_auth_session(session_state: MutableMapping[str, object]) -> None:
     session_state["role"] = None
     session_state["page"] = "個人"
     session_state["auth_mode"] = "login"
-

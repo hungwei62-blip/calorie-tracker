@@ -626,18 +626,19 @@ def page_login() -> None:
 
                 primary_coach_id = sheets.get_primary_coach_id()
                 registration_timestamp = auth.now_iso()
-                sheets.append_user(
-                    uid, new_user, new_name, pwd_hash, registration_timestamp,
+                sheets.append_user_with_initial_weight(
+                    uid,
+                    new_user,
+                    new_name,
+                    pwd_hash,
+                    registration_timestamp,
                     goals=goals,
                     coach_id=primary_coach_id,
+                    initial_weight=initial_weight,
                     record_mode="simple" if "簡易" in record_mode else "full",
                     weekly_training=4,
                 )
-                st.session_state.initial_weight_save_warning = (
-                    _save_initial_registration_weight(
-                        registration_timestamp, uid, initial_weight
-                    )
-                )
+                st.session_state.initial_weight_save_warning = None
 
                 st.session_state.user_id = uid
                 st.session_state.username = new_user

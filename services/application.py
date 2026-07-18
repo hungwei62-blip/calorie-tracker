@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from services import sheets
-from services.security import AuthContext
+from services.security import AuthContext, log_event
 
 
 class PermissionDenied(PermissionError):
@@ -22,6 +22,14 @@ def require_managed_student(context: AuthContext, user_id: str) -> dict[str, Any
         raise PermissionDenied("只有教練或管理員可以操作學員資料")
     student = sheets.get_student_for_manager(user_id, context.user_id)
     if student is None:
+        log_event(
+            "authorization.denied",
+            result="denied",
+            actor_id=context.user_id,
+            actor_role=context.role,
+            target_type="student",
+            target_id=user_id,
+        )
         raise PermissionDenied("沒有權限操作此學員資料")
     return student
 
@@ -46,7 +54,17 @@ def update_student_goals(
         require_self(context, user_id)
     else:
         require_managed_student(context, user_id)
-    return sheets.update_user_goals(user_id, goals)
+    updated = sheets.update_user_goals(user_id, goals)
+    log_event(
+        "student.goals.update",
+        result="success" if updated else "not_found",
+        actor_id=context.user_id,
+        actor_role=context.role,
+        target_type="student",
+        target_id=user_id,
+        metadata={"fields": sorted(goals)},
+    )
+    return updated
 
 
 def update_student_bmr(context: AuthContext, user_id: str, bmr: float) -> bool:
@@ -75,5 +93,19 @@ def import_student_records(
     context: AuthContext, user_id: str, **payload: Any
 ) -> dict[str, Any]:
     require_managed_student(context, user_id)
-    return sheets.import_records_from_excel(user_id=user_id, **payload)
-
+    result = sheets.import_records_from_excel(user_id=user_id, **payload)
+    log_event(
+        "student.records.import",
+        result="success" if not result.get("errors") else "partial",
+        actor_id=context.user_id,
+        actor_role=context.role,
+        target_type="student",
+        target_id=user_id,
+        metadata={
+            "overwrite": bool(payload.get("overwrite_duplicates")),
+            "imported": result.get("imported", 0),
+            "overwritten": result.get("overwritten", 0),
+            "skipped": result.get("skipped", 0),
+        },
+    )
+    return result

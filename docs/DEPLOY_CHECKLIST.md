@@ -7,12 +7,14 @@
 - [ ] `SPREADSHEET_ID` 不包含 `/d/` 或 `/edit`
 - [ ] `Users` 中的 `u_20260629165506_4b525f9c` 存在且 `role=coach`
 - [ ] Google Sheet 已分享給 Service Account
+- [ ] 已安裝每週 Drive 備份並成功執行一次 `backupNow()`
 
 ## 部署前
 
 ```bash
 python -m py_compile app.py pages/common.py pages/coach/__init__.py pages/student/__init__.py
 python -m pytest -q
+python tools/init_sheets.py
 python tools/audit_and_migrate.py --primary-coach-id u_20260629165506_4b525f9c
 ```
 

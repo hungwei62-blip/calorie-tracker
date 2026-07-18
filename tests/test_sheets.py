@@ -122,6 +122,43 @@ def test_append_user_persists_coach_id(monkeypatch):
     )
 
 
+def test_registration_appends_user_and_weight_in_one_batch(monkeypatch):
+    class Worksheet:
+        def __init__(self, sheet_id):
+            self.id = sheet_id
+
+    class Spreadsheet:
+        def __init__(self):
+            self.calls = []
+
+        def batch_update(self, body):
+            self.calls.append(body)
+
+    spreadsheet = Spreadsheet()
+    worksheets = {"Users": Worksheet(1), "Weight": Worksheet(2)}
+    monkeypatch.setattr(sheets, "_get_sheet", lambda: spreadsheet)
+    monkeypatch.setattr(
+        sheets,
+        "_ensure_worksheet",
+        lambda _sh, title, _headers: worksheets[title],
+    )
+    monkeypatch.setattr(sheets, "clear_read_caches", lambda: None)
+
+    sheets.append_user_with_initial_weight(
+        "u1",
+        "account",
+        "name",
+        "hash",
+        "2026-07-19T12:00:00+08:00",
+        {},
+        sheets.FIXED_PRIMARY_COACH_ID,
+        61.5,
+    )
+
+    requests = spreadsheet.calls[0]["requests"]
+    assert [request["appendCells"]["sheetId"] for request in requests] == [1, 2]
+
+
 def test_primary_coach_is_fixed_and_ignores_streamlit_secrets(monkeypatch):
     monkeypatch.setattr(
         sheets.st,
