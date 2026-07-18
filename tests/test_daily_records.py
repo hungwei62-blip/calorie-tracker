@@ -187,6 +187,55 @@ def test_daily_record_page_uses_plain_labels_and_scoped_card_styles():
     assert 'padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px))' in stylesheet
 
 
+def test_daily_record_palette_persists_across_all_tabs_and_ctas():
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-daily_record_page" in value
+    )
+    palette_start = stylesheet.index(
+        "/* ===== 學員日常紀錄：四分頁共用霧藍奶杏色票 ===== */"
+    )
+    palette_end = stylesheet.index("@media (max-width: 768px)", palette_start)
+    palette = stylesheet[palette_start:palette_end]
+
+    assert ".stApp:has(.st-key-daily_record_page)" in palette
+    assert ".st-key-daily_record_page:has(.st-key-food_record_panel)" not in palette
+    assert "--daily-record-primary-text: #27303D;" in palette
+    assert "--daily-record-secondary-text: #7C8798;" in palette
+    assert "--daily-record-tab-background: #EEF3F8;" in palette
+    assert "--daily-record-tab-selected: #F5E7DF;" in palette
+    assert "--daily-record-tab-selected-text: #B97C64;" in palette
+    assert "--daily-record-border: #E7EDF3;" in palette
+    assert "--daily-record-cta-background: #F6E8DE;" in palette
+    assert "--daily-record-cta-text: #B88470;" in palette
+    assert ".st-key-food_input_mode" in palette
+    assert ".st-key-food_photo_source" in palette
+    assert ".st-key-training_types" in palette
+    assert ".st-key-analyze_food_photo" in palette
+    assert ".st-key-save_analyzed_food" in palette
+    assert ".st-key-cancel_analyzed_food" in palette
+    cta_selector = (
+        '.st-key-daily_record_page div[data-testid="stFormSubmitButton"] '
+        'button[data-testid^="stBaseButton"]'
+    )
+    assert cta_selector in palette
+    assert "background: #F6E8DE !important;" in palette
+    assert "background-color: #F6E8DE !important;" in palette
+    assert "background-image: none !important;" in palette
+    assert ":hover" in palette
+    assert ":active" in palette
+    assert ":focus-visible" in palette
+    assert ":disabled" in palette
+    original_cta_selector = (
+        '.st-key-daily_record_page div[data-testid="stFormSubmitButton"] button,'
+    )
+    assert stylesheet.index(cta_selector) > stylesheet.index(original_cta_selector)
+    assert inspect.getsource(student_pages).count(
+        'st.form_submit_button("儲存'
+    ) == 4
+
+
 def test_food_input_defaults_to_manual_mode():
     source = inspect.getsource(student_pages)
     food_renderer = source[source.index("def _render_food_records"):]

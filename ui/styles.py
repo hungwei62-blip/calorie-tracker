@@ -444,6 +444,196 @@ def apply_global_styles() -> None:
                 background: transparent !important;
             }
 
+            /* ===== 學員日常紀錄：四分頁共用霧藍奶杏色票 ===== */
+            .stApp:has(.st-key-daily_record_page),
+            .stApp:has(.st-key-daily_record_page) .main,
+            .stApp:has(.st-key-daily_record_page) [data-testid="stAppViewContainer"],
+            .stApp:has(.st-key-daily_record_page) [data-testid="stMain"] {
+                background: #FAFBFC !important;
+            }
+
+            .st-key-daily_record_page {
+                --daily-record-primary-text: #27303D;
+                --daily-record-secondary-text: #7C8798;
+                --daily-record-tab-background: #EEF3F8;
+                --daily-record-tab-selected: #F5E7DF;
+                --daily-record-tab-selected-text: #B97C64;
+                --daily-record-border: #E7EDF3;
+                --daily-record-cta-background: #F6E8DE;
+                --daily-record-cta-text: #B88470;
+            }
+
+            .st-key-daily_record_page h1,
+            .st-key-daily_record_page h2,
+            .st-key-daily_record_page h3,
+            .st-key-daily_record_page [data-testid="stWidgetLabel"] p {
+                color: var(--daily-record-primary-text) !important;
+            }
+
+            .st-key-daily_record_page [data-baseweb="tab-list"] {
+                background: var(--daily-record-tab-background) !important;
+                border-color: var(--daily-record-border) !important;
+                box-shadow: 0 8px 22px rgba(124, 135, 152, 0.08) !important;
+            }
+
+            .st-key-daily_record_page button[data-baseweb="tab"] {
+                color: var(--daily-record-secondary-text) !important;
+            }
+
+            .st-key-daily_record_page button[data-baseweb="tab"][aria-selected="true"] {
+                color: var(--daily-record-tab-selected-text) !important;
+                background: var(--daily-record-tab-selected) !important;
+                box-shadow: 0 3px 10px rgba(185, 124, 100, 0.10) !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stForm"],
+            .st-key-daily_record_page [data-testid="stFileUploader"],
+            .st-key-daily_record_page [data-testid="stCameraInput"] {
+                color: var(--daily-record-primary-text) !important;
+                background: #FFFFFF !important;
+                border-color: var(--daily-record-border) !important;
+                box-shadow: 0 10px 28px rgba(124, 135, 152, 0.08) !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stCaptionContainer"] p {
+                color: var(--daily-record-secondary-text) !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stMetric"] {
+                background: #FFFFFF !important;
+                border: 1px solid var(--daily-record-border) !important;
+            }
+
+            .st-key-food_input_mode [data-testid="stButtonGroup"],
+            .st-key-food_photo_source [data-testid="stButtonGroup"] {
+                gap: 10px !important;
+                padding: 0 !important;
+                background: transparent !important;
+            }
+
+            .st-key-food_input_mode button[data-testid="stBaseButton-segmented_control"],
+            .st-key-food_photo_source button[data-testid="stBaseButton-segmented_control"] {
+                min-height: 46px !important;
+                padding: 9px 16px !important;
+                color: var(--daily-record-secondary-text) !important;
+                background: #FFFFFF !important;
+                border: 1px solid var(--daily-record-border) !important;
+                border-radius: 10px !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-food_input_mode button[data-testid="stBaseButton-segmented_control"][aria-pressed="true"],
+            .st-key-food_input_mode button[data-testid="stBaseButton-segmented_control"][aria-checked="true"],
+            .st-key-food_photo_source button[data-testid="stBaseButton-segmented_control"][aria-pressed="true"],
+            .st-key-food_photo_source button[data-testid="stBaseButton-segmented_control"][aria-checked="true"] {
+                color: var(--daily-record-tab-selected-text) !important;
+                background: #FFFFFF !important;
+                border-color: #E8CFC3 !important;
+                box-shadow: 0 0 0 1px rgba(245, 231, 223, 0.80) !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stNumberInput"] div[data-baseweb="input"],
+            .st-key-daily_record_page [data-testid="stTextInput"] div[data-baseweb="input"] {
+                overflow: hidden !important;
+                background: #FFFFFF !important;
+                border-color: var(--daily-record-border) !important;
+                border-radius: 10px !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stNumberInput"] input,
+            .st-key-daily_record_page [data-testid="stNumberInput"] button,
+            .st-key-daily_record_page [data-testid="stTextInput"] input {
+                color: var(--daily-record-primary-text) !important;
+                background: transparent !important;
+            }
+
+            .st-key-daily_record_page .st-key-training_types [data-testid="stButtonGroup"] {
+                gap: 8px !important;
+                padding: 0 !important;
+                background: transparent !important;
+            }
+
+            .st-key-daily_record_page .st-key-training_types button {
+                color: var(--daily-record-secondary-text) !important;
+                background: #FFFFFF !important;
+                border: 1px solid var(--daily-record-border) !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"],
+            .st-key-daily_record_page .st-key-analyze_food_photo button,
+            .st-key-daily_record_page .st-key-save_analyzed_food button {
+                color: #B88470 !important;
+                -webkit-text-fill-color: #B88470 !important;
+                background: #F6E8DE !important;
+                background-color: #F6E8DE !important;
+                background-image: none !important;
+                border-color: #EBCFC0 !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"]:hover,
+            .st-key-daily_record_page .st-key-analyze_food_photo button:hover,
+            .st-key-daily_record_page .st-key-save_analyzed_food button:hover {
+                color: #A86E59 !important;
+                -webkit-text-fill-color: #A86E59 !important;
+                background: #F2DED2 !important;
+                background-color: #F2DED2 !important;
+                background-image: none !important;
+                border-color: #E2BDAA !important;
+            }
+
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"]:active,
+            .st-key-daily_record_page .st-key-analyze_food_photo button:active,
+            .st-key-daily_record_page .st-key-save_analyzed_food button:active {
+                background: #EDD4C6 !important;
+                background-color: #EDD4C6 !important;
+                background-image: none !important;
+            }
+
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"]:focus-visible,
+            .st-key-daily_record_page .st-key-analyze_food_photo button:focus-visible,
+            .st-key-daily_record_page .st-key-save_analyzed_food button:focus-visible {
+                outline: 2px solid rgba(185, 124, 100, 0.34) !important;
+                outline-offset: 2px !important;
+            }
+
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"]:disabled,
+            .st-key-daily_record_page .st-key-analyze_food_photo button:disabled,
+            .st-key-daily_record_page .st-key-save_analyzed_food button:disabled {
+                color: rgba(184, 132, 112, 0.58) !important;
+                -webkit-text-fill-color: rgba(184, 132, 112, 0.58) !important;
+                background: rgba(246, 232, 222, 0.62) !important;
+                background-color: rgba(246, 232, 222, 0.62) !important;
+                background-image: none !important;
+                border-color: rgba(235, 207, 192, 0.72) !important;
+                opacity: 1 !important;
+            }
+
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"] [data-testid="stMarkdownContainer"],
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"] p,
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"] span {
+                color: inherit !important;
+                -webkit-text-fill-color: inherit !important;
+                background: transparent !important;
+                background-color: transparent !important;
+            }
+
+            .st-key-daily_record_page button[aria-pressed="true"],
+            .st-key-daily_record_page button[aria-checked="true"],
+            .st-key-daily_record_page button[data-active="true"] {
+                color: var(--daily-record-tab-selected-text) !important;
+                background: var(--daily-record-tab-selected) !important;
+                border-color: #E8CFC3 !important;
+            }
+
+            .st-key-daily_record_page .st-key-cancel_analyzed_food button {
+                color: var(--daily-record-secondary-text) !important;
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
+                border-color: var(--daily-record-border) !important;
+            }
+
             @media (max-width: 768px) {
                 .st-key-daily_record_page [data-baseweb="tab-list"] {
                     width: 100% !important;
