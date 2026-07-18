@@ -14,7 +14,7 @@ from pages.common import (
     _fetch_records_cached, _today_range, _week_range, do_logout,
 )
 
-DAILY_RECORD_TABS = ("飲水", "食物", "訓練", "體重")
+DAILY_RECORD_TABS = ("食物", "飲水", "訓練", "體重")
 DAILY_RECORD_TAB_TARGET_KEY = "daily_record_tab_target"
 LEGACY_DAILY_RECORD_TABS = {
     "🍴 飲食": "食物",
@@ -827,7 +827,7 @@ def _render_food_records() -> None:
     st.subheader("食物")
     input_mode = st.segmented_control(
         "輸入方式", ("照片辨識", "手動輸入"),
-        default="照片辨識", key="food_input_mode",
+        default="手動輸入", key="food_input_mode",
     )
     if input_mode == "手動輸入":
         _render_manual_food_input(uid)
@@ -946,16 +946,16 @@ def page_log_meal() -> None:
 
     with st.container(key="daily_record_page"):
         st.header("日常紀錄")
-        water_tab, food_tab, training_tab, weight_tab = st.tabs(
+        food_tab, water_tab, training_tab, weight_tab = st.tabs(
             DAILY_RECORD_TABS, default=current_tab,
             key="daily_record_tab", on_change="rerun",
         )
-        if water_tab.open:
-            with water_tab:
-                _render_water_records()
-        elif food_tab.open:
+        if food_tab.open:
             with food_tab:
                 _render_food_records()
+        elif water_tab.open:
+            with water_tab:
+                _render_water_records()
         elif training_tab.open:
             with training_tab:
                 _render_training_records()

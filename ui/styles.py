@@ -285,7 +285,10 @@ def apply_global_styles() -> None:
 
             .st-key-daily_record_page [data-baseweb="tab-list"] {
                 gap: 4px !important;
-                padding: 5px !important;
+                min-height: 58px !important;
+                padding: 6px !important;
+                align-items: center !important;
+                overflow: visible !important;
                 background: #f7f7f7 !important;
                 border: 1px solid rgba(120, 120, 115, 0.12) !important;
                 border-radius: 999px !important;
@@ -294,12 +297,14 @@ def apply_global_styles() -> None:
 
             .st-key-daily_record_page button[data-baseweb="tab"] {
                 min-height: 42px !important;
-                padding: 8px 16px !important;
+                padding: 10px 16px !important;
                 color: #545451 !important;
                 background: transparent !important;
                 border-radius: 999px !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
+                line-height: 1.35 !important;
+                overflow: visible !important;
             }
 
             .st-key-daily_record_page button[data-baseweb="tab"][aria-selected="true"] {
@@ -310,6 +315,15 @@ def apply_global_styles() -> None:
 
             .st-key-daily_record_page [data-baseweb="tab-highlight"] {
                 display: none !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stTabs"],
+            .st-key-daily_record_page [data-testid="stTabsContent"] {
+                overflow: visible !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stTabContent"] {
+                padding-top: 18px !important;
             }
 
             .st-key-daily_record_page [data-testid="stForm"],
@@ -328,15 +342,72 @@ def apply_global_styles() -> None:
                 border-radius: 18px !important;
             }
 
+            .st-key-daily_record_page div.stButton > button,
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button,
+            .st-key-daily_record_page button[data-testid^="stBaseButton"]:not([data-baseweb="tab"]) {
+                min-height: 46px !important;
+                padding: 10px 16px !important;
+                color: #343431 !important;
+                background: #ffffff !important;
+                border: 1px solid rgba(112, 112, 106, 0.24) !important;
+                border-radius: 10px !important;
+                outline: none !important;
+                box-shadow: none !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                line-height: 1.35 !important;
+            }
+
+            .st-key-daily_record_page div.stButton > button:hover,
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button:hover,
+            .st-key-daily_record_page button[data-testid^="stBaseButton"]:not([data-baseweb="tab"]):hover {
+                color: #242421 !important;
+                background: #f5f5f2 !important;
+                border-color: rgba(96, 96, 90, 0.34) !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-daily_record_page div.stButton > button:active,
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button:active,
+            .st-key-daily_record_page button[data-testid^="stBaseButton"]:not([data-baseweb="tab"]):active {
+                background: #ecece8 !important;
+                transform: scale(0.99) !important;
+            }
+
+            .st-key-daily_record_page div.stButton > button:focus-visible,
+            .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button:focus-visible,
+            .st-key-daily_record_page button[data-testid^="stBaseButton"]:not([data-baseweb="tab"]):focus-visible {
+                outline: 2px solid rgba(112, 112, 106, 0.30) !important;
+                outline-offset: 2px !important;
+            }
+
+            .st-key-daily_record_page button[aria-pressed="true"],
+            .st-key-daily_record_page button[data-active="true"] {
+                color: #1f1f1c !important;
+                background: #eeeeea !important;
+                border-color: rgba(96, 96, 90, 0.30) !important;
+            }
+
+            .st-key-daily_record_page button > div,
+            .st-key-daily_record_page button [data-testid="stMarkdownContainer"],
+            .st-key-daily_record_page button p,
+            .st-key-daily_record_page button span {
+                color: inherit !important;
+                background: transparent !important;
+            }
+
             @media (max-width: 768px) {
                 .st-key-daily_record_page [data-baseweb="tab-list"] {
                     width: 100% !important;
+                    min-height: 58px !important;
                 }
 
                 .st-key-daily_record_page button[data-baseweb="tab"] {
                     flex: 1 1 25% !important;
                     min-width: 0 !important;
-                    padding: 8px 5px !important;
+                    min-height: 42px !important;
+                    padding: 10px 5px !important;
                     font-size: 13px !important;
                 }
 

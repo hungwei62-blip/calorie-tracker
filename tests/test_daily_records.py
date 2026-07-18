@@ -44,7 +44,7 @@ class _TabsStreamlit:
 
 @pytest.mark.parametrize(
     ("active_index", "expected_renderer"),
-    [(0, "water"), (1, "food"), (2, "training"), (3, "weight")],
+    [(0, "food"), (1, "water"), (2, "training"), (3, "weight")],
 )
 def test_daily_records_only_renders_active_tab(monkeypatch, active_index, expected_renderer):
     fake_st = _TabsStreamlit(active_index)
@@ -61,7 +61,7 @@ def test_daily_records_only_renders_active_tab(monkeypatch, active_index, expect
     labels, kwargs = fake_st.tabs_call
     assert labels == student_pages.DAILY_RECORD_TABS
     assert kwargs == {
-        "default": "飲水",
+        "default": "食物",
         "key": "daily_record_tab",
         "on_change": "rerun",
     }
@@ -151,7 +151,7 @@ def test_empty_daily_records_are_rejected(writer, args):
 
 def test_daily_record_page_uses_plain_labels_and_scoped_card_styles():
     source = inspect.getsource(student_pages.page_log_meal)
-    assert student_pages.DAILY_RECORD_TABS == ("飲水", "食物", "訓練", "體重")
+    assert student_pages.DAILY_RECORD_TABS == ("食物", "飲水", "訓練", "體重")
     assert 'st.header("日常紀錄")' in source
     for emoji in ("🍴", "⚖️", "🏋️", "📝"):
         assert emoji not in source
@@ -165,3 +165,19 @@ def test_daily_record_page_uses_plain_labels_and_scoped_card_styles():
     assert 'background: #f7f7f7 !important;' in stylesheet
     assert 'border-radius: 999px !important;' in stylesheet
     assert '.st-key-daily_record_page [data-testid="stForm"]' in stylesheet
+    assert 'min-height: 58px !important;' in stylesheet
+    assert 'min-height: 42px !important;' in stylesheet
+    assert 'min-height: 46px !important;' in stylesheet
+    assert 'overflow: visible !important;' in stylesheet
+    assert '.st-key-daily_record_page div.stButton > button' in stylesheet
+    assert 'background: #ffffff !important;' in stylesheet
+    assert 'border-radius: 10px !important;' in stylesheet
+    assert '.st-key-daily_record_page button [data-testid="stMarkdownContainer"]' in stylesheet
+    assert 'background: transparent !important;' in stylesheet
+
+
+def test_food_input_defaults_to_manual_mode():
+    source = inspect.getsource(student_pages)
+    food_renderer = source[source.index("def _render_food_records"):]
+    assert '("照片辨識", "手動輸入")' in food_renderer
+    assert 'default="手動輸入"' in food_renderer
