@@ -39,12 +39,14 @@ def calculate_daily_completion(
     protein_goal = _non_negative_number(goals.get("protein"))
     calorie_goal = _non_negative_number(goals.get("calorie"))
 
-    nutrition_statuses = (water > 0, protein > 0, calories > 0)
-    completed_count = sum(nutrition_statuses)
+    water_goal = _non_negative_number(goals.get("water"))
+    water_on_goal = water_goal > 0 and water >= water_goal
     protein_on_goal = protein_goal > 0 and protein >= protein_goal
     calorie_in_range = (
         calorie_goal > 0 and 0.9 <= calories / calorie_goal <= 1.1
     )
+    nutrition_statuses = (water_on_goal, protein_on_goal, calorie_in_range)
+    completed_count = sum(nutrition_statuses)
     return DailyCompletion(
         weight_logged=bool(weight_logged),
         water_logged=nutrition_statuses[0],
@@ -52,5 +54,5 @@ def calculate_daily_completion(
         calories_logged=nutrition_statuses[2],
         completed_count=completed_count,
         percentage=round(completed_count / 3 * 100),
-        bonus=protein_on_goal and calorie_in_range,
+        bonus=completed_count == 3,
     )

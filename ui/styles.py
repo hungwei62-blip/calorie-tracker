@@ -374,8 +374,7 @@ def apply_global_styles() -> None:
             }
 
             .st-key-daily_record_page [data-testid="stForm"],
-            .st-key-daily_record_page [data-testid="stFileUploader"],
-            .st-key-daily_record_page [data-testid="stCameraInput"] {
+            .st-key-daily_record_page [data-testid="stFileUploader"] {
                 padding: 22px !important;
                 background: #f8f8f8 !important;
                 border: 1px solid rgba(120, 120, 115, 0.08) !important;
@@ -487,8 +486,7 @@ def apply_global_styles() -> None:
             }
 
             .st-key-daily_record_page [data-testid="stForm"],
-            .st-key-daily_record_page [data-testid="stFileUploader"],
-            .st-key-daily_record_page [data-testid="stCameraInput"] {
+            .st-key-daily_record_page [data-testid="stFileUploader"] {
                 color: var(--daily-record-primary-text) !important;
                 background: #FFFFFF !important;
                 border-color: var(--daily-record-border) !important;
@@ -558,73 +556,6 @@ def apply_global_styles() -> None:
                 background: #FFFFFF !important;
                 border: 1px solid var(--daily-record-border) !important;
                 box-shadow: none !important;
-            }
-
-            /* 相機前後鏡頭切換：移出影像並使用與分析照片相同的色票。 */
-            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] {
-                position: relative !important;
-                top: auto !important;
-                right: auto !important;
-                z-index: auto !important;
-                display: flex !important;
-                justify-content: flex-end !important;
-                margin: 0 0 10px !important;
-                color: #B88470 !important;
-                mix-blend-mode: normal !important;
-                opacity: 1 !important;
-            }
-
-            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button {
-                width: auto !important;
-                min-width: 0 !important;
-                min-height: 40px !important;
-                padding: 8px 12px !important;
-                display: inline-flex !important;
-                flex-direction: row !important;
-                align-items: center !important;
-                gap: 6px !important;
-                color: #B88470 !important;
-                -webkit-text-fill-color: #B88470 !important;
-                background: #F6E8DE !important;
-                background-color: #F6E8DE !important;
-                background-image: none !important;
-                border: 1px solid #EBCFC0 !important;
-                border-radius: 10px !important;
-                box-shadow: none !important;
-            }
-
-            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button::after {
-                content: "切換前後鏡頭";
-                color: inherit !important;
-                -webkit-text-fill-color: inherit !important;
-                font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;
-                font-size: 14px !important;
-                font-weight: 500 !important;
-                line-height: 1.2 !important;
-                white-space: nowrap !important;
-            }
-
-            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button svg {
-                color: currentColor !important;
-                fill: currentColor !important;
-            }
-
-            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button:hover {
-                color: #A86E59 !important;
-                -webkit-text-fill-color: #A86E59 !important;
-                background: #F2DED2 !important;
-                background-color: #F2DED2 !important;
-                border-color: #E2BDAA !important;
-            }
-
-            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button:active {
-                background: #EDD4C6 !important;
-                background-color: #EDD4C6 !important;
-            }
-
-            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button:focus-visible {
-                outline: 2px solid rgba(185, 124, 100, 0.34) !important;
-                outline-offset: 2px !important;
             }
 
             .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"],
@@ -716,8 +647,7 @@ def apply_global_styles() -> None:
                 }
 
                 .st-key-daily_record_page [data-testid="stForm"],
-                .st-key-daily_record_page [data-testid="stFileUploader"],
-                .st-key-daily_record_page [data-testid="stCameraInput"] {
+                .st-key-daily_record_page [data-testid="stFileUploader"] {
                     padding: 16px !important;
                     border-radius: 18px !important;
                 }
@@ -1619,6 +1549,36 @@ def apply_global_styles() -> None:
             /* ===== 學員今日完成度：原四卡下方的緊湊摘要 ===== */
             .st-key-daily_completion_card {
                 margin-top: -4px !important;
+                position: relative !important;
+                overflow: visible !important;
+                z-index: 5 !important;
+            }
+
+            .st-key-daily_completion_card:has(.daily-completion-details[open]) {
+                z-index: 40 !important;
+            }
+
+            .st-key-daily_completion_card [data-testid="stMarkdownContainer"],
+            .st-key-daily_completion_card .daily-completion-details {
+                position: relative !important;
+                overflow: visible !important;
+            }
+
+            .st-key-daily_completion_card .daily-completion-details > summary {
+                display: block !important;
+                list-style: none !important;
+                cursor: pointer !important;
+                -webkit-tap-highlight-color: transparent !important;
+                user-select: none !important;
+            }
+
+            .st-key-daily_completion_card .daily-completion-details > summary::-webkit-details-marker {
+                display: none !important;
+            }
+
+            .st-key-daily_completion_card .daily-completion-details > summary:focus-visible {
+                outline: 3px solid rgba(184, 132, 112, 0.35) !important;
+                outline-offset: 3px !important;
             }
 
             .st-key-daily_completion_card .daily-completion-card {
@@ -1632,6 +1592,62 @@ def apply_global_styles() -> None:
                 border-radius: 22px !important;
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.035) !important;
                 font-family: system-ui, -apple-system, sans-serif !important;
+            }
+
+            .st-key-daily_completion_card .daily-completion-values {
+                position: absolute !important;
+                right: 12px !important;
+                bottom: calc(100% + 12px) !important;
+                left: 12px !important;
+                z-index: 50 !important;
+                box-sizing: border-box !important;
+                padding: 14px 16px !important;
+                color: #353532 !important;
+                background: rgba(250, 250, 250, 0.98) !important;
+                border: 1px solid rgba(120, 120, 115, 0.14) !important;
+                border-radius: 16px !important;
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12) !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+            }
+
+            .st-key-daily_completion_card .daily-completion-values::after {
+                content: "" !important;
+                position: absolute !important;
+                right: 30px !important;
+                bottom: -7px !important;
+                width: 12px !important;
+                height: 12px !important;
+                background: #fafafa !important;
+                border-right: 1px solid rgba(120, 120, 115, 0.14) !important;
+                border-bottom: 1px solid rgba(120, 120, 115, 0.14) !important;
+                transform: rotate(45deg) !important;
+            }
+
+            .daily-completion-values-title {
+                margin-bottom: 8px !important;
+                color: #777773 !important;
+                font-size: 12px !important;
+                font-weight: 600 !important;
+                letter-spacing: 0.04em !important;
+            }
+
+            .daily-completion-value-row {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: 16px !important;
+                min-height: 28px !important;
+                font-size: 14px !important;
+            }
+
+            .daily-completion-value-row + .daily-completion-value-row {
+                border-top: 1px solid rgba(120, 120, 115, 0.08) !important;
+            }
+
+            .daily-completion-value-row strong {
+                color: #252525 !important;
+                font-size: 15px !important;
+                font-variant-numeric: tabular-nums !important;
             }
 
             .daily-completion-heading,
@@ -2169,6 +2185,56 @@ def apply_global_styles() -> None:
             .stApp:has(.st-key-auth_brand) input:-webkit-autofill {
                 -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
                 -webkit-text-fill-color: #2F3E46 !important;
+            }
+
+            /* 登入模式固定於單一視窗，不允許頁面上下捲動。 */
+            html:has(.st-key-login_panel),
+            body:has(.st-key-login_panel),
+            .stApp:has(.st-key-login_panel),
+            .stApp:has(.st-key-login_panel) [data-testid="stAppViewContainer"],
+            .stApp:has(.st-key-login_panel) [data-testid="stMain"] {
+                height: 100% !important;
+                max-height: 100dvh !important;
+                overflow: hidden !important;
+                overscroll-behavior: none !important;
+            }
+
+            .main .block-container:has(.st-key-login_panel),
+            [data-testid="stMainBlockContainer"]:has(.st-key-login_panel) {
+                height: 100dvh !important;
+                max-height: 100dvh !important;
+                padding-top: 3.75rem !important;
+                padding-bottom: 0.75rem !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+            }
+
+            .st-key-login_panel [data-testid="stForm"] {
+                margin-top: 20px !important;
+                margin-bottom: 20px !important;
+            }
+
+            .st-key-login_secondary_action > div[data-testid="stVerticalBlock"] {
+                gap: 8px !important;
+            }
+
+            @media (max-height: 700px) {
+                .main .block-container:has(.st-key-login_panel),
+                [data-testid="stMainBlockContainer"]:has(.st-key-login_panel) {
+                    padding-top: 3.25rem !important;
+                    padding-bottom: 0.5rem !important;
+                }
+
+                .st-key-auth_brand .auth-brand-tagline {
+                    margin-top: 8px !important;
+                    line-height: 1.45 !important;
+                }
+
+                .st-key-login_panel [data-testid="stForm"] {
+                    margin-top: 12px !important;
+                    margin-bottom: 12px !important;
+                    padding: 22px !important;
+                }
             }
 
             .st-key-login_panel div[data-testid="stFormSubmitButton"] button,

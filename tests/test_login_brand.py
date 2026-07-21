@@ -133,3 +133,21 @@ def test_login_actions_use_scoped_muji_button_styles():
     assert "box-shadow: none !important;" in stylesheet
     assert "width: fit-content !important;" in stylesheet
     assert "background: transparent !important;" in stylesheet
+
+
+def test_login_page_is_locked_to_viewport_without_vertical_scroll():
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-login_panel" in value
+    )
+
+    assert "html:has(.st-key-login_panel)" in stylesheet
+    assert "body:has(.st-key-login_panel)" in stylesheet
+    assert '.stApp:has(.st-key-login_panel) [data-testid="stMain"]' in stylesheet
+    assert '.block-container:has(.st-key-login_panel)' in stylesheet
+    assert "max-height: 100dvh !important;" in stylesheet
+    assert "overflow: hidden !important;" in stylesheet
+    assert "overscroll-behavior: none !important;" in stylesheet
+    assert "@media (max-height: 700px)" in stylesheet
+    assert ".st-key-login_panel [data-testid=\"stForm\"]" in stylesheet

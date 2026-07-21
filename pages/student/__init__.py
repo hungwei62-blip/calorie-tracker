@@ -38,6 +38,7 @@ from pages.common import (
     _fetch_records_cached, _today_range, do_logout,
     current_auth_context, get_default_avatar_source,
 )
+from ui.camera import camera_capture
 
 DAILY_RECORD_TABS = ("食物", "飲水", "訓練", "體重")
 DAILY_RECORD_TAB_TARGET_KEY = "daily_record_tab_target"
@@ -351,8 +352,19 @@ def _completion_badge_svg(completed: bool) -> str:
     return f'<svg viewBox="0 0 16 16" aria-hidden="true">{path}</svg>'
 
 
-def build_daily_completion_html(completion: DailyCompletion) -> str:
-    """Render the compact accessible completion card shown below the four cards."""
+def _format_daily_total(value: object) -> str:
+    """Format a daily total as a safe, non-negative whole number."""
+    number = _to_float(value)
+    if not math.isfinite(number) or number < 0:
+        number = 0.0
+    return f"{number:,.0f}"
+
+
+def build_daily_completion_html(
+    completion: DailyCompletion,
+    totals: dict[str, object],
+) -> str:
+    """Render the interactive completion card and its upward value popover."""
     statuses = (
         ("體重", completion.weight_logged),
         ("水量", completion.water_logged),
@@ -371,17 +383,35 @@ def build_daily_completion_html(completion: DailyCompletion) -> str:
             '</div>'
         )
     bonus_class = " has-bonus" if completion.bonus else ""
+    daily_values = (
+        ("熱量", _format_daily_total(totals.get("calories")), "kcal"),
+        ("蛋白質", _format_daily_total(totals.get("protein")), "g"),
+        ("飲水", _format_daily_total(totals.get("water")), "ml"),
+    )
+    value_rows = "".join(
+        '<div class="daily-completion-value-row">'
+        f'<span>{label}</span><strong>{value} {unit}</strong>'
+        "</div>"
+        for label, value, unit in daily_values
+    )
     return (
-        f'<section class="daily-completion-card{bonus_class}" aria-label="今日記錄完成度">'
+        '<details class="daily-completion-details">'
+        f'<summary class="daily-completion-card{bonus_class}" '
+        'aria-label="今日記錄完成度，點擊查看今日輸入數值">'
         '<div class="daily-completion-heading"><span>今日記錄完成度</span>'
         f'<strong>{completion.percentage}%</strong></div>'
         '<div class="daily-completion-track" role="progressbar" aria-valuemin="0" '
         f'aria-valuemax="100" aria-valuenow="{completion.percentage}">'
         f'<span style="width: {completion.percentage}%"></span></div>'
         '<div class="daily-completion-footer">'
-        f'<div class="daily-completion-meta">飲食完成 {completion.completed_count} / 3 項</div>'
+        f'<div class="daily-completion-meta">目標達成 {completion.completed_count} / 3 項</div>'
         f'<div class="daily-completion-items" role="list">{"".join(items)}</div></div>'
-        '</section>'
+        '</summary>'
+        '<div class="daily-completion-values" role="region" '
+        'aria-label="今日輸入數值">'
+        '<div class="daily-completion-values-title">今日輸入</div>'
+        f'{value_rows}</div>'
+        '</details>'
     )
 
 
@@ -881,7 +911,7 @@ def page_personal() -> None:
     )
     with st.container(key="daily_completion_card"):
         st.markdown(
-            build_daily_completion_html(completion),
+            build_daily_completion_html(completion, totals),
             unsafe_allow_html=True,
         )
 
@@ -954,29 +984,42 @@ def _render_water_records() -> None:
     uid = st.session_state.user_id
     _render_record_success("飲水")
     st.caption("記錄這次喝下的水量，今日進度會自動累加。")
-    with st.form("water_record_form"):
-        water_ml = st.number_input("飲水量 (ml)", min_value=0, value=200, step=100)
+    form_version = int(st.session_state.get("water_form_version", 0))
+    with st.form(f"water_record_form_{form_version}"):
+        water_ml = st.number_input(
+            "飲水量 (ml)",
+            min_value=0,
+            value=None,
+            step=100,
+            key=f"water_ml_{form_version}",
+        )
         submitted = st.form_submit_button("儲存飲水紀錄", width="stretch")
     if submitted:
         try:
-            _append_water_record(uid, water_ml)
+            _append_water_record(uid, water_ml or 0)
         except ValueError as exc:
             st.warning(str(exc))
         except Exception:
             st.error("飲水紀錄儲存失敗，請稍後再試。")
         else:
+            st.session_state.water_form_version = form_version + 1
             _set_record_success("飲水")
             st.rerun()
 
 
+def _reset_food_camera() -> None:
+    version = int(st.session_state.get("food_camera_version", 0))
+    st.session_state.food_camera_version = version + 1
+
+
 def _selected_food_image_bytes(source: str) -> bytes | None:
     if source == "拍照":
-        image_file = st.camera_input("拍攝食物照片", key="food_camera")
-    else:
-        image_file = st.file_uploader(
-            "從相簿選擇食物照片", type=["jpg", "jpeg", "png"],
-            key="food_image_upload",
-        )
+        camera_version = int(st.session_state.get("food_camera_version", 0))
+        return camera_capture(key=f"food_camera_{camera_version}")
+    image_file = st.file_uploader(
+        "從相簿選擇食物照片", type=["jpg", "jpeg", "png"],
+        key="food_image_upload",
+    )
     return image_file.getvalue() if image_file is not None else None
 
 
@@ -987,6 +1030,7 @@ def _render_photo_food_input(uid: str) -> None:
     previous_source = st.session_state.get("food_photo_source_previous")
     if previous_source is not None and previous_source != source:
         _clear_pending_food_analysis()
+        _reset_food_camera()
     st.session_state.food_photo_source_previous = source
     image_bytes = _selected_food_image_bytes(source or "拍照")
     image_hash = hashlib.sha256(image_bytes).hexdigest() if image_bytes else None
@@ -1037,10 +1081,12 @@ def _render_photo_food_input(uid: str) -> None:
             st.error("食物紀錄儲存失敗，請稍後再試。")
         else:
             _clear_pending_food_analysis()
+            _reset_food_camera()
             _set_record_success("食物")
             st.rerun()
     if cancel_col.button("取消", key="cancel_analyzed_food", width="stretch"):
         _clear_pending_food_analysis()
+        _reset_food_camera()
         st.rerun()
 
 

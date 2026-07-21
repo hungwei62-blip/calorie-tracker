@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 
 from pages import student as student_pages
 
@@ -13,6 +14,22 @@ def test_manual_nutrition_inputs_are_blank_integer_widgets():
     assert "calories or 0" in source
     assert "protein or 0" in source
     assert "manual_food_form_version" in source
+    assert "manual_food_form_version = form_version + 1" in source
+
+
+def test_water_input_is_blank_and_rebuilt_only_after_success():
+    module_source = Path(student_pages.__file__).read_text(encoding="utf-8")
+    source = module_source.split("def _render_water_records()", maxsplit=1)[1].split(
+        "def _reset_food_camera()", maxsplit=1
+    )[0]
+
+    assert "water_form_version" in source
+    assert "value=None" in source
+    assert "water_ml or 0" in source
+    assert "water_form_version = form_version + 1" in source
+    assert source.index("water_form_version = form_version + 1") > source.index(
+        "except Exception"
+    )
 
 
 def test_training_inputs_keep_fields_without_example_placeholders():

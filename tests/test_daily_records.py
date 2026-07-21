@@ -6,6 +6,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from pages import student as student_pages
+from ui import camera as camera_ui
 from ui import styles
 
 
@@ -241,24 +242,17 @@ def test_daily_record_palette_persists_across_all_tabs_and_ctas():
     ) == 4
 
 
-def test_camera_switch_is_visible_outside_preview_and_matches_photo_cta():
-    stylesheet = next(
-        value
-        for value in styles.apply_global_styles.__code__.co_consts
-        if isinstance(value, str) and ".st-key-daily_record_page" in value
-    )
-    selector = '[data-testid="stCameraInputSwitchButton"]'
+def test_camera_component_replaces_mobile_only_native_switch():
+    source = inspect.getsource(student_pages._selected_food_image_bytes)
 
-    assert selector in stylesheet
-    switch_styles = stylesheet[stylesheet.index(selector):]
-    assert "position: relative !important;" in switch_styles
-    assert 'content: "切換前後鏡頭";' in switch_styles
-    assert "background: #F6E8DE !important;" in switch_styles
-    assert "color: #B88470 !important;" in switch_styles
-    assert "border: 1px solid #EBCFC0 !important;" in switch_styles
-    assert f'{selector} button:hover' in switch_styles
-    assert f'{selector} button:active' in switch_styles
-    assert f'{selector} button:focus-visible' in switch_styles
+    assert "camera_capture(" in source
+    assert "st.camera_input" not in source
+    assert "切換前後鏡頭" in camera_ui._CAMERA_HTML
+    assert "navigator.mediaDevices.enumerateDevices()" in camera_ui._CAMERA_JS
+    assert 'device.kind === "videoinput"' in camera_ui._CAMERA_JS
+    assert "state.devices.length < 2" in camera_ui._CAMERA_JS
+    assert "getTracks().forEach(track => track.stop())" in camera_ui._CAMERA_JS
+    assert "background: #f6e8de" in camera_ui._CAMERA_CSS.lower()
 
 
 def test_food_input_defaults_to_manual_mode():
@@ -279,7 +273,9 @@ def test_daily_record_sections_remove_duplicate_headings_and_simplify_weight():
     ]
 
     assert 'st.subheader("飲水")' not in water_renderer
-    assert 'value=200, step=100' in water_renderer
+    assert "water_form_version" in water_renderer
+    assert "value=None" in water_renderer
+    assert "water_ml or 0" in water_renderer
     assert 'st.subheader("食物")' not in food_renderer
     assert '體重趨勢' not in weight_renderer
     assert 'get_weight_records' not in weight_renderer

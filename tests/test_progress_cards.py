@@ -354,6 +354,13 @@ def test_daily_completion_card_has_scoped_compact_and_bonus_styles():
 
     assert ".st-key-daily_completion_card .daily-completion-card" in stylesheet
     assert "min-height: 104px !important;" in stylesheet
+    assert ".daily-completion-details > summary" in stylesheet
+    assert "summary::-webkit-details-marker" in stylesheet
+    assert ".daily-completion-details > summary:focus-visible" in stylesheet
+    assert ".daily-completion-values" in stylesheet
+    assert "position: absolute !important;" in stylesheet
+    assert "bottom: calc(100% + 12px) !important;" in stylesheet
+    assert "z-index: 50 !important;" in stylesheet
     assert ".daily-completion-card.has-bonus .daily-completion-track > span" in stylesheet
     assert "linear-gradient(90deg" in stylesheet
     assert "@media (max-width: 768px) and (max-height: 700px)" in stylesheet
