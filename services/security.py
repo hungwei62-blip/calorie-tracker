@@ -91,6 +91,11 @@ class LoginRateLimiter:
 
 
 LOGIN_RATE_LIMITER = LoginRateLimiter()
+PASSWORD_RESET_RATE_LIMITER = LoginRateLimiter(
+    max_failures=1,
+    window_seconds=300,
+    lock_seconds=300,
+)
 
 
 def new_request_id() -> str:

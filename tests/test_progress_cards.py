@@ -8,6 +8,7 @@ import pytest
 from domain.history import summarize_weight_measurements
 import pages.student as student_pages
 from pages.student import (
+    _goal_tooltip_html,
     _goal_status,
     _progress_percentage,
     _weight_summary,
@@ -34,6 +35,15 @@ def test_goal_status_handles_thresholds_and_invalid_goals():
     assert _goal_status(1, None) is None
     assert _goal_status(100, 100, over_only=True) is None
     assert _goal_status(101, 100, over_only=True) == ("超過", "#b85c5c")
+
+
+def test_goal_tooltip_formats_goals_and_handles_invalid_values():
+    assert "熱量目標 2,000 kcal" in _goal_tooltip_html("熱量", 2000, "kcal")
+    assert "飲水目標 2,400 ml" in _goal_tooltip_html("飲水", 2400, "ml")
+    assert "蛋白質目標 120 g" in _goal_tooltip_html("蛋白質", 120, "g")
+    assert "尚未設定目標" in _goal_tooltip_html("蛋白質", 0, "g")
+    assert "尚未設定目標" in _goal_tooltip_html("蛋白質", float("inf"), "g")
+    assert 'role="tooltip"' in _goal_tooltip_html("蛋白質", 120, "g")
 
 
 def test_progress_figure_contains_expected_values_labels_and_units():
@@ -238,6 +248,39 @@ def test_daily_summary_cards_have_scoped_equal_height_two_column_styles():
     assert 'background-color: rgba(255, 255, 255, 0.76) !important;' in stylesheet
     assert '.st-key-weight_add_btn [data-testid="stMarkdownContainer"]' in stylesheet
     assert '.st-key-weight_add_btn [data-testid="stIconMaterial"]' in stylesheet
+
+
+def test_three_nutrition_cards_have_scoped_hover_and_press_goal_tooltips():
+    source = inspect.getsource(student_pages.page_personal)
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-calorie_goal_card" in value
+    )
+
+    for key in ("calorie_goal_card", "water_goal_card", "protein_goal_card"):
+        assert f'key="{key}"' in source or 'key=f"{key}_goal_card"' in source
+        assert f".st-key-{key}" in stylesheet
+    assert source.count("_goal_tooltip_html(") == 2
+    assert 'st.html(_goal_tooltip_html("熱量", calorie_goal, "kcal"))' in source
+    assert '[data-testid="stHtml"]:has(.goal-card-tooltip)' in stylesheet
+    assert "pointer-events: none !important;" in stylesheet
+    assert "@media (hover: hover) and (pointer: fine)" in stylesheet
+    assert ".st-key-calorie_goal_card:hover .goal-card-tooltip" in stylesheet
+    assert "@media (hover: none) and (pointer: coarse)" in stylesheet
+    assert ".st-key-calorie_goal_card:active .goal-card-tooltip" in stylesheet
+    assert ".st-key-daily_summary_cards .weight-card:hover .goal-card-tooltip" not in stylesheet
+
+
+def test_tdee_questionnaire_always_saves_simple_mode_and_zeroes_unused_goals():
+    source = inspect.getsource(student_pages.page_tdee_questionnaire)
+
+    assert "飲食記錄模式" not in source
+    assert "選擇飲食記錄模式" not in source
+    assert 'goals["carb"] = 0.0' in source
+    assert 'goals["fat"] = 0.0' in source
+    assert 'sheets.set_user_record_mode(uid, "simple")' in source
+    assert 'application.update_student_goals(\n                    current_auth_context(), uid, {"carb": 0.0, "fat": 0.0}' not in source
 
 
 def test_student_home_has_scoped_desktop_and_mobile_top_spacing():

@@ -1,17 +1,20 @@
 """學員端、登入與註冊頁面。"""
 from __future__ import annotations
-import base64
 from datetime import date, datetime, timedelta
 import hashlib
 import html
 from io import BytesIO
 import math
-from pathlib import Path
 import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
 from services import application, auth, gemini, metrics, sheets
-from services.security import LOGIN_RATE_LIMITER, log_event, safe_failure_message
+from services.security import (
+    LOGIN_RATE_LIMITER,
+    PASSWORD_RESET_RATE_LIMITER,
+    log_event,
+    safe_failure_message,
+)
 from domain.daily_completion import DailyCompletion, calculate_daily_completion
 from domain.history import (
     NutritionHistoryPoint,
@@ -43,7 +46,6 @@ LEGACY_DAILY_RECORD_TABS = {
     "⚖️ 體重": "體重",
     "🏋️ 訓練": "訓練",
 }
-BRAND_MARK_PATH = Path(__file__).resolve().parents[2] / "static" / "peak_plan_logo.png"
 HISTORY_PRIMARY = "#A8D5C2"
 HISTORY_PRIMARY_DARK = "#5A9C84"
 HISTORY_ACCENT = "#F4B183"
@@ -51,13 +53,6 @@ HISTORY_ACCENT_DARK = "#C87943"
 HISTORY_SECONDARY_TEXT = "#7D8C8A"
 WATER_HISTORY_PRIMARY = "#BFD8FF"
 WATER_HISTORY_SECONDARY = "#7E8FA3"
-
-
-@st.cache_data(show_spinner=False)
-def _load_brand_mark_data_uri() -> str:
-    """Load the bundled Peak Plan mark as an embeddable PNG data URI."""
-    encoded_mark = base64.b64encode(BRAND_MARK_PATH.read_bytes()).decode("ascii")
-    return f"data:image/png;base64,{encoded_mark}"
 
 
 def _to_float(value: object) -> float:
@@ -91,6 +86,23 @@ def _goal_status(
     if actual_value >= goal_value:
         return "達成", "#3f7d5a"
     return "不足", "#b85c5c"
+
+
+def _goal_tooltip_html(label: str, goal: object, unit: str) -> str:
+    """Build the non-interactive goal tooltip rendered over a progress card."""
+    goal_value = _to_float(goal)
+    if not math.isfinite(goal_value) or goal_value <= 0:
+        message = "尚未設定目標"
+    else:
+        message = (
+            f"{html.escape(label)}目標 {goal_value:,.0f} "
+            f"{html.escape(unit)}"
+        )
+    return (
+        '<div class="goal-card-tooltip" role="tooltip">'
+        f"{message}"
+        "</div>"
+    )
 
 
 def build_daily_progress_figure(
@@ -425,20 +437,6 @@ def page_tdee_questionnaire() -> None:
 
         goal_type = st.radio("你的目標是？", ["減脂", "維持", "增肌"], horizontal=True, index=1)
 
-        st.subheader("飲食記錄模式")
-
-        record_mode = st.radio(
-
-            "選擇飲食記錄模式",
-
-            ["簡易模式（蛋白質/熱量/水量）", "完整模式（蛋白質/碳水/脂肪/熱量/水量）"],
-
-            horizontal=False,
-
-        )
-
-        mode = "simple" if "簡易" in record_mode else "full"
-
         submitted = st.form_submit_button("計算並儲存目標", width="stretch")
 
     if submitted:
@@ -451,6 +449,10 @@ def page_tdee_questionnaire() -> None:
 
         goals["bmr"] = bmr
 
+        goals["carb"] = 0.0
+
+        goals["fat"] = 0.0
+
         try:
 
             uid = st.session_state.user_id
@@ -459,13 +461,7 @@ def page_tdee_questionnaire() -> None:
 
             application.update_student_goals(current_auth_context(), uid, goals)
 
-            sheets.set_user_record_mode(uid, mode)
-
-            if mode == "simple":
-
-                application.update_student_goals(
-                    current_auth_context(), uid, {"carb": 0.0, "fat": 0.0}
-                )
+            sheets.set_user_record_mode(uid, "simple")
 
             _clear_analysis_cache()
 
@@ -489,15 +485,16 @@ def page_tdee_questionnaire() -> None:
 
 
 def page_login() -> None:
-    brand_mark_uri = _load_brand_mark_data_uri()
+    # Ensure the route marker exists before deciding whether to render the brand.
+    if "auth_mode" not in st.session_state:
+        st.session_state.auth_mode = "login"
+
     brand_html = (
         '<div class="auth-brand-lockup">'
         '<div role="heading" aria-level="1" class="auth-brand-title">'
         '<span class="auth-brand-english">Project Prime</span>'
         '<span class="auth-brand-divider">|</span>'
-        '<span class="auth-brand-logo-frame">'
-        f'<img class="auth-brand-logo" src="{brand_mark_uri}" alt="巔峰計畫">'
-        "</span>"
+        '<span class="auth-brand-chinese">巔峰計畫</span>'
         "</div>"
         '<p class="auth-brand-tagline">'
         "<span>練對、吃對</span>"
@@ -506,12 +503,9 @@ def page_login() -> None:
         "</p>"
         "</div>"
     )
-    with st.container(key="auth_brand"):
-        st.markdown(brand_html, unsafe_allow_html=True)
-
-    # 確保 auth_mode 存在
-    if "auth_mode" not in st.session_state:
-        st.session_state.auth_mode = "login"
+    if st.session_state.auth_mode != "register":
+        with st.container(key="auth_brand"):
+            st.markdown(brand_html, unsafe_allow_html=True)
 
     if st.session_state.auth_mode == "login":
         # ==================== 登入表單 ====================
@@ -561,25 +555,27 @@ def page_login() -> None:
             if st.button("註冊新學員", key="nav_to_register"):
                 st.session_state.auth_mode = "register"
                 st.rerun()
+            if st.button("忘記密碼", key="nav_to_forgot_password"):
+                st.session_state.auth_mode = "forgot"
+                st.rerun()
 
-    else:
+    elif st.session_state.auth_mode == "register":
         # ==================== 註冊表單 ====================
-        st.subheader("建立學員帳號")
-        st.info("填寫以下資料即可建立帳號")
+        with st.container(key="registration_page", gap="small"):
+            st.subheader("註冊學員帳號", text_alignment="center")
 
-        with st.form("signup_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                new_user = st.text_input("帳號", placeholder="輸入帳號")
-                new_name = st.text_input("姓名", placeholder="輸入真實姓名")
-                new_pwd = st.text_input("密碼", type="password")
-                new_pwd2 = st.text_input("確認密碼", type="password")
-            with col2:
-                initial_weight = st.number_input("目前體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=200.0)
-                goal_type = st.selectbox("目標", ["減脂", "維持", "增肌"], index=1)
-                record_mode = st.radio("記錄模式", ["簡易模式", "完整模式"], horizontal=True, index=0)
+            with st.form("signup_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_user = st.text_input("帳號", placeholder="輸入帳號")
+                    new_name = st.text_input("姓名", placeholder="輸入真實姓名")
+                    new_pwd = st.text_input("密碼", type="password")
+                    new_pwd2 = st.text_input("確認密碼", type="password")
+                with col2:
+                    initial_weight = st.number_input("目前體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=200.0)
+                    goal_type = st.selectbox("目標", ["減脂", "維持", "增肌"], index=1)
 
-            submitted = st.form_submit_button("註冊並登入", width="stretch")
+                submitted = st.form_submit_button("註冊並登入", width="stretch")
 
         if submitted:
             if not new_user or not new_name or not new_pwd:
@@ -635,7 +631,7 @@ def page_login() -> None:
                     goals=goals,
                     coach_id=primary_coach_id,
                     initial_weight=initial_weight,
-                    record_mode="simple" if "簡易" in record_mode else "full",
+                    record_mode="simple",
                     weekly_training=4,
                 )
                 st.session_state.initial_weight_save_warning = None
@@ -652,9 +648,58 @@ def page_login() -> None:
                 st.error(safe_failure_message("registration.create", exc))
 
         # 切換回登入
-        if st.button("已經有帳號了？立即登入", key="nav_to_login"):
+        if st.button("← 返回登入頁", key="nav_to_login"):
             st.session_state.auth_mode = "login"
             st.rerun()
+
+    else:
+        st.subheader("忘記密碼")
+        st.info("送出申請後，請聯絡教練協助核對身分。")
+        with st.form("forgot_password_form"):
+            reset_username = st.text_input("帳號", key="reset_username")
+            reset_submitted = st.form_submit_button(
+                "送出重設申請", width="stretch"
+            )
+        if reset_submitted:
+            if not PASSWORD_RESET_RATE_LIMITER.is_blocked(reset_username):
+                PASSWORD_RESET_RATE_LIMITER.register_failure(reset_username)
+                try:
+                    application.request_password_reset(reset_username)
+                except Exception as exc:
+                    safe_failure_message("password_reset.request", exc)
+            st.success("若帳號資料正確，教練將收到密碼重設申請。")
+        if st.button("← 返回登入頁", key="forgot_back_to_login"):
+            st.session_state.auth_mode = "login"
+            st.rerun()
+
+
+def page_force_password_change() -> None:
+    """Block normal navigation until a temporary password is replaced."""
+    st.header("設定新密碼")
+    st.info("你目前使用臨時密碼，請先設定新密碼才能繼續。")
+    with st.form("force_password_change_form"):
+        new_password = st.text_input("新密碼", type="password")
+        confirm_password = st.text_input("確認新密碼", type="password")
+        submitted = st.form_submit_button("更新密碼", width="stretch")
+    if not submitted:
+        return
+    if new_password != confirm_password:
+        st.error("兩次輸入的密碼不一致")
+        return
+    try:
+        updated = application.change_own_password(
+            current_auth_context(), new_password
+        )
+    except ValueError as exc:
+        st.warning(str(exc))
+    except Exception as exc:
+        st.error(safe_failure_message("password.change", exc))
+    else:
+        if not updated:
+            st.error("找不到目前帳號，請重新登入。")
+            return
+        st.session_state.password_changed_notice = "密碼已更新"
+        st.rerun()
 
 
 
@@ -692,6 +737,10 @@ def _build_student_welcome_html(display_name: str, avatar_source: str) -> str:
 
 
 def page_personal() -> None:
+
+    password_notice = st.session_state.pop("password_changed_notice", None)
+    if password_notice:
+        st.success(password_notice)
 
     # ============================================================
     # 👋 1. 個人化頭像歡迎區 (單行無縮排安全版)
@@ -787,12 +836,14 @@ def page_personal() -> None:
                 st.rerun()
 
         with calorie_column:
-            st.plotly_chart(
-                build_calorie_figure(totals.get("calories", 0), calorie_goal),
-                key="daily_summary_calories",
-                width="stretch",
-                config={"displayModeBar": False, "responsive": True},
-            )
+            with st.container(key="calorie_goal_card", gap=None):
+                st.html(_goal_tooltip_html("熱量", calorie_goal, "kcal"))
+                st.plotly_chart(
+                    build_calorie_figure(totals.get("calories", 0), calorie_goal),
+                    key="daily_summary_calories",
+                    width="stretch",
+                    config={"displayModeBar": False, "responsive": True},
+                )
 
     progress_cards = (
         (
@@ -814,12 +865,14 @@ def page_personal() -> None:
         columns = st.columns(2, gap="small")
         for column, (key, label, actual, goal, unit) in zip(columns, progress_cards):
             with column:
-                st.plotly_chart(
-                    build_daily_progress_figure(label, actual, goal, unit),
-                    key=f"daily_progress_{key}",
-                    width="stretch",
-                    config={"displayModeBar": False, "responsive": True},
-                )
+                with st.container(key=f"{key}_goal_card", gap=None):
+                    st.html(_goal_tooltip_html(label, goal, unit))
+                    st.plotly_chart(
+                        build_daily_progress_figure(label, actual, goal, unit),
+                        key=f"daily_progress_{key}",
+                        width="stretch",
+                        config={"displayModeBar": False, "responsive": True},
+                    )
 
     completion = calculate_daily_completion(
         totals,
@@ -882,8 +935,24 @@ def _clear_pending_food_analysis() -> None:
     st.session_state.pop("pending_analysis_image_hash", None)
 
 
+def _set_record_success(record_tab: str) -> None:
+    st.session_state.daily_record_flash = {
+        "tab": record_tab,
+        "message": "紀錄完成",
+    }
+
+
+def _render_record_success(record_tab: str) -> None:
+    flash = st.session_state.get("daily_record_flash")
+    if not isinstance(flash, dict) or flash.get("tab") != record_tab:
+        return
+    st.session_state.pop("daily_record_flash", None)
+    st.success(str(flash.get("message") or "紀錄完成"))
+
+
 def _render_water_records() -> None:
     uid = st.session_state.user_id
+    _render_record_success("飲水")
     st.caption("記錄這次喝下的水量，今日進度會自動累加。")
     with st.form("water_record_form"):
         water_ml = st.number_input("飲水量 (ml)", min_value=0, value=200, step=100)
@@ -896,7 +965,7 @@ def _render_water_records() -> None:
         except Exception:
             st.error("飲水紀錄儲存失敗，請稍後再試。")
         else:
-            st.success("飲水紀錄已儲存")
+            _set_record_success("飲水")
             st.rerun()
 
 
@@ -968,7 +1037,7 @@ def _render_photo_food_input(uid: str) -> None:
             st.error("食物紀錄儲存失敗，請稍後再試。")
         else:
             _clear_pending_food_analysis()
-            st.success("食物紀錄已儲存")
+            _set_record_success("食物")
             st.rerun()
     if cancel_col.button("取消", key="cancel_analyzed_food", width="stretch"):
         _clear_pending_food_analysis()
@@ -976,29 +1045,36 @@ def _render_photo_food_input(uid: str) -> None:
 
 
 def _render_manual_food_input(uid: str) -> None:
-    with st.form("manual_food_form"):
+    form_version = int(st.session_state.get("manual_food_form_version", 0))
+    with st.form(f"manual_food_form_{form_version}"):
         calories = st.number_input(
-            "熱量 (kcal)", min_value=0.0, value=0.0, step=10.0
+            "熱量 (kcal)", min_value=0, value=None, step=10,
+            key=f"manual_calories_{form_version}",
         )
         protein = st.number_input(
-            "蛋白質 (g)", min_value=0.0, value=0.0, step=1.0
+            "蛋白質 (g)", min_value=0, value=None, step=1,
+            key=f"manual_protein_{form_version}",
         )
         submitted = st.form_submit_button("儲存食物紀錄", width="stretch")
     if submitted:
         try:
-            _append_food_record(uid, "手動紀錄", calories, protein)
+            _append_food_record(
+                uid, "手動紀錄", calories or 0, protein or 0
+            )
         except ValueError as exc:
             st.warning(str(exc))
         except Exception:
             st.error("食物紀錄儲存失敗，請稍後再試。")
         else:
-            st.success("食物紀錄已儲存")
+            st.session_state.manual_food_form_version = form_version + 1
+            _set_record_success("食物")
             st.rerun()
 
 
 def _render_food_records() -> None:
     uid = st.session_state.user_id
     with st.container(key="food_record_panel"):
+        _render_record_success("食物")
         input_mode = st.segmented_control(
             "輸入方式", ("照片辨識", "手動輸入"),
             default="手動輸入", key="food_input_mode",
@@ -1031,14 +1107,6 @@ def _training_fields_for_types(selected_types: list[str]) -> list[tuple[str, str
     ]
 
 
-def _training_detail_placeholder(training_type: str) -> str:
-    return {
-        "重量訓練": "例如：深蹲 4 組、臥推 3 組",
-        "有氧訓練": "例如：跑步機 20 分鐘",
-        "其他": "請輸入訓練內容",
-    }[training_type]
-
-
 def _clear_training_form_state() -> None:
     for key in TRAINING_WIDGET_KEYS:
         st.session_state.pop(key, None)
@@ -1059,12 +1127,13 @@ def _prepare_daily_record_tab(current_tab: str) -> bool:
 
 def _render_training_records() -> None:
     uid = st.session_state.user_id
+    _render_record_success("訓練")
     today = date.today()
     today_training = sheets.get_training_by_date(uid, today)
     if today_training:
         st.info("今日已有訓練紀錄，再次儲存將覆蓋原紀錄。")
     selected_types = st.pills(
-        "訓練類型",
+        "訓練類型 (可複選)",
         TRAINING_TYPES,
         selection_mode="multi",
         default=[],
@@ -1080,7 +1149,6 @@ def _render_training_records() -> None:
                 label,
                 value="",
                 key=f"training_{field}",
-                placeholder=_training_detail_placeholder(training_type),
             )
         submitted = st.form_submit_button("儲存訓練紀錄", width="stretch")
     if submitted:
@@ -1097,7 +1165,7 @@ def _render_training_records() -> None:
         except Exception:
             st.error("訓練紀錄儲存失敗，請稍後再試。")
         else:
-            st.success("訓練紀錄已儲存")
+            _set_record_success("訓練")
             st.rerun()
 
 

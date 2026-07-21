@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import inspect
 
 from pages import student as student_pages
@@ -11,12 +10,12 @@ def test_login_page_uses_project_prime_brand_copy():
     source = inspect.getsource(student_pages.page_login)
 
     assert 'key="auth_brand"' in source
+    assert 'st.session_state.auth_mode != "register"' in source
     assert 'role="heading" aria-level="1"' in source
     assert "<h1" not in source
     assert '<span class="auth-brand-english">Project Prime</span>' in source
-    assert 'class="auth-brand-logo"' in source
-    assert 'alt="巔峰計畫"' in source
-    assert 'class="auth-brand-chinese"' not in source
+    assert '<span class="auth-brand-chinese">巔峰計畫</span>' in source
+    assert 'class="auth-brand-logo"' not in source
     assert "巔峰計畫" in source
     assert "練對、吃對" in source
     assert "剩下交給時間" in source
@@ -30,15 +29,41 @@ def test_login_page_uses_project_prime_brand_copy():
     assert "輕鬆記錄飲食，追蹤你的營養目標" not in source
 
 
-def test_brand_mark_asset_is_bundled_as_png_data_uri():
-    assert student_pages.BRAND_MARK_PATH.is_file()
-    assert not (student_pages.BRAND_MARK_PATH.parent / "project_prime_logo.png").exists()
+def test_registration_page_hides_brand_and_uses_compact_centered_layout():
+    source = inspect.getsource(student_pages.page_login)
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-registration_page" in value
+    )
 
-    data_uri = student_pages._load_brand_mark_data_uri()
-    prefix, payload = data_uri.split(",", maxsplit=1)
+    assert 'st.container(key="registration_page", gap="small")' in source
+    assert 'st.subheader("註冊學員帳號", text_alignment="center")' in source
+    assert 'st.subheader("建立學員帳號")' not in source
+    assert 'st.info("填寫以下資料即可建立帳號")' not in source
+    assert 'with st.form("signup_form")' in source
+    registration_source = source[
+        source.index('st.session_state.auth_mode == "register"'):
+        source.index('st.subheader("忘記密碼")')
+    ]
+    assert 'st.radio("記錄模式"' not in registration_source
+    assert 'record_mode="simple"' in registration_source
+    assert 'st.button("← 返回登入頁", key="nav_to_login")' in source
+    assert ".stApp:has(.st-key-registration_page)" in stylesheet
+    assert '.st-key-registration_page [data-testid="stForm"]' in stylesheet
+    assert "max-width: 760px !important;" in stylesheet
+    assert "margin: 6px auto !important;" in stylesheet
+    assert "padding: 18px 22px !important;" in stylesheet
+    assert '.block-container:has(.st-key-registration_page)' in stylesheet
+    assert "padding-top: 4.25rem !important;" in stylesheet
 
-    assert prefix == "data:image/png;base64"
-    assert base64.b64decode(payload) == student_pages.BRAND_MARK_PATH.read_bytes()
+
+def test_brand_mark_is_text_only():
+    source = inspect.getsource(student_pages)
+
+    assert "BRAND_MARK_PATH" not in source
+    assert "_load_brand_mark_data_uri" not in source
+    assert "peak_plan_logo.png" not in source
 
 
 def test_login_brand_has_scoped_responsive_typography():
@@ -52,8 +77,7 @@ def test_login_brand_has_scoped_responsive_typography():
     assert ".st-key-auth_brand .auth-brand-english" in stylesheet
     assert ".st-key-auth_brand .auth-brand-tagline" in stylesheet
     assert "display: grid !important;" in stylesheet
-    assert "grid-template-columns: max-content max-content 105px !important;" in stylesheet
-    assert "grid-template-columns: max-content max-content 80px !important;" in stylesheet
+    assert "grid-template-columns: repeat(3, max-content) !important;" in stylesheet
     assert "width: max-content !important;" in stylesheet
     assert "max-width: 100% !important;" in stylesheet
     brand_title_block = stylesheet.split(
@@ -70,17 +94,26 @@ def test_login_brand_has_scoped_responsive_typography():
     assert "line-height: 1.8 !important;" in stylesheet
     assert ".st-key-auth_brand .auth-brand-tagline span" in stylesheet
     assert "display: block !important;" in stylesheet
-    assert ".st-key-auth_brand .auth-brand-logo-frame" in stylesheet
-    assert ".st-key-auth_brand .auth-brand-logo" in stylesheet
-    assert "display: inline-flex !important;" not in stylesheet
+    assert ".st-key-auth_brand .auth-brand-chinese" in stylesheet
+    assert 'font-family: "Noto Sans TC"' in stylesheet
+    assert "display: inline-flex !important;" not in brand_title_block
     assert "flex-wrap" not in brand_title_block
     assert "flex:" not in brand_title_block
     assert "min-width: 0 !important;" in stylesheet
     assert "width: 100% !important;" in stylesheet
-    assert "height: 31px !important;" in stylesheet
-    assert "height: 24px !important;" in stylesheet
-    assert "object-fit: cover !important;" in stylesheet
-    assert "object-position: center !important;" in stylesheet
+
+
+def test_auth_page_opts_out_of_normal_dark_mode():
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-auth_brand" in value
+    )
+
+    assert ".stApp:has(.st-key-auth_brand)" in stylesheet
+    assert "color-scheme: light !important;" in stylesheet
+    assert "-webkit-text-fill-color: #2F3E46 !important;" in stylesheet
+    assert ".stApp:has(.st-key-auth_brand) input:-webkit-autofill" in stylesheet
 
 
 def test_login_actions_use_scoped_muji_button_styles():

@@ -61,4 +61,5 @@ def student_row():
         "weekly_training_goal": "4",
         "record_mode": "full",
         "coach_id": "coach_1",
+        "must_change_password": "FALSE",
     }

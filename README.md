@@ -106,13 +106,14 @@ Streamlit 頁面
 user_id, username, name, password_hash, created_at, bmr,
 daily_calorie_goal, daily_protein_goal, daily_carb_goal,
 daily_fat_goal, daily_water_goal, role, weekly_training_goal,
-record_mode, coach_id
+record_mode, coach_id, must_change_password
 ```
 
 - `role`：`admin`、`coach` 或 `student`。
 - `password_hash`：bcrypt 雜湊，不儲存明碼。
 - `record_mode`：保留 `simple`／`full` 相容欄位；學員首頁目前使用統一版面。
 - `coach_id`：學員所屬教練；教練帳號本身保持空白。
+- `must_change_password`：臨時密碼登入時為 `TRUE`；舊資料空白視為 `FALSE`。
 
 ### Records
 
@@ -159,6 +160,15 @@ target_type, target_id, result, metadata_json
 ```
 
 AuditLog 只保存敏感操作的中繼資料，不保存密碼、金鑰、照片、備註全文或健康紀錄內容。
+
+### PasswordResetRequests
+
+```text
+request_id, user_id, requested_at, status, resolved_at, resolved_by
+```
+
+- `status` 使用 `pending`、`approved` 或 `rejected`。
+- 臨時密碼不會寫入此工作表；`Users` 只保存 bcrypt 雜湊。
 
 ## 本機啟動
 
@@ -221,7 +231,7 @@ python tools/init_sheets.py
 python tools/init_sheets.py --apply
 ```
 
-第一次部署安全版本時，先在私人 Google Drive 建立完整備份，再以預覽確認只有 `AuditLog` 為 `missing`，最後才使用 `--apply`。
+部署密碼重設版本前，先在私人 Google Drive 建立完整備份，再以預覽確認 `Users` 只追加 `must_change_password`，且 `PasswordResetRequests` 為 `missing`；確認無其他異動後才使用 `--apply`。
 
 ### Users 稽核與欄位修復
 

@@ -85,6 +85,7 @@ USERS_HEADERS = [
     "weekly_training_goal",
     "record_mode",          # "simple" 或 "full"，學員的飲食記錄模式
     "coach_id",            # 所屬教練 ID；教練帳號與未分配學員留空
+    "must_change_password", # 臨時密碼登入後必須先更改密碼
 ]
 
 RECORDS_HEADERS = [
@@ -144,6 +145,15 @@ AUDIT_HEADERS = [
     "metadata_json",
 ]
 
+PASSWORD_RESET_HEADERS = [
+    "request_id",
+    "user_id",
+    "requested_at",
+    "status",
+    "resolved_at",
+    "resolved_by",
+]
+
 WORKSHEET_SCHEMAS = {
     "Users": USERS_HEADERS,
     "Records": RECORDS_HEADERS,
@@ -151,6 +161,7 @@ WORKSHEET_SCHEMAS = {
     "Training": TRAINING_HEADERS,
     "Notes": NOTES_HEADERS,
     "AuditLog": AUDIT_HEADERS,
+    "PasswordResetRequests": PASSWORD_RESET_HEADERS,
 }
 
 
@@ -276,6 +287,17 @@ def _to_int(val: Any, default: int) -> int:
         return default
 
 
+def _to_bool(val: Any, default: bool = False) -> bool:
+    if isinstance(val, bool):
+        return val
+    normalized = str(val or "").strip().casefold()
+    if normalized in {"true", "1", "yes", "y"}:
+        return True
+    if normalized in {"false", "0", "no", "n", ""}:
+        return False
+    return default
+
+
 def _validated_non_negative(value: Any, field_name: str) -> float:
     """將營養數值轉成非負浮點數；無效值直接拒絕，避免污染試算表。"""
     return round(finite_non_negative(value, field_name), 2)
@@ -291,6 +313,7 @@ def clear_read_caches() -> None:
         "get_training_records",
         "get_notes",
         "get_audit_logs",
+        "get_password_reset_requests",
     ):
         fn = globals().get(fn_name)
         clear = getattr(fn, "clear", None)
@@ -356,6 +379,7 @@ def append_user(
         weekly_training,
         record_mode,
         coach_id,
+        False,
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
     clear_read_caches()
@@ -404,6 +428,7 @@ def append_user_with_initial_weight(
         weekly_training,
         record_mode,
         coach_id,
+        False,
     ]
     weight_row = [created_at, user_id, round(weight, 1)]
     sh = _get_sheet()
@@ -596,6 +621,230 @@ def get_student_for_manager(user_id: str, manager_id: str) -> dict[str, Any] | N
         if row.get("user_id") == user_id:
             return row
     return None
+
+
+def user_must_change_password(user_id: str) -> bool:
+    """Return whether a user must replace a temporary password."""
+    target = str(user_id or "").strip()
+    for row in get_users_rows():
+        if str(row.get("user_id") or "").strip() == target:
+            return _to_bool(row.get("must_change_password"))
+    return False
+
+
+def update_user_password(
+    user_id: str, password_hash: str, *, must_change_password: bool
+) -> bool:
+    """Update only password-related fields for one user."""
+    target = bounded_text(user_id, "user_id", limit=80)
+    password_hash = bounded_text(password_hash, "password_hash", limit=200)
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
+    for row_idx, row in enumerate(get_users_rows(), start=2):
+        if str(row.get("user_id") or "").strip() != target:
+            continue
+        cells = [
+            gspread.Cell(
+                row_idx,
+                USERS_HEADERS.index("password_hash") + 1,
+                password_hash,
+            ),
+            gspread.Cell(
+                row_idx,
+                USERS_HEADERS.index("must_change_password") + 1,
+                bool(must_change_password),
+            ),
+        ]
+        ws.update_cells(cells, value_input_option="RAW")
+        clear_read_caches()
+        return True
+    return False
+
+
+# =============================================================================
+# PasswordResetRequests（忘記密碼申請）
+# =============================================================================
+
+@st.cache_data(ttl=CACHE_TTL)
+def get_password_reset_requests(status: str | None = None) -> list[dict[str, Any]]:
+    sh = _get_sheet()
+    ws = _ensure_worksheet(
+        sh, "PasswordResetRequests", PASSWORD_RESET_HEADERS
+    )
+    rows = _rows_to_dicts(ws, PASSWORD_RESET_HEADERS)
+    if status is None:
+        return rows
+    target = str(status).strip().casefold()
+    return [
+        row
+        for row in rows
+        if str(row.get("status") or "").strip().casefold() == target
+    ]
+
+
+def create_password_reset_request(
+    request_id: str, user_id: str, requested_at: str
+) -> bool:
+    """Create one pending request unless the student already has one."""
+    request_id = bounded_text(request_id, "request_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    requested_at = valid_timestamp(requested_at, "requested_at")
+    if any(
+        str(row.get("user_id") or "").strip() == user_id
+        for row in get_password_reset_requests("pending")
+    ):
+        return False
+    sh = _get_sheet()
+    ws = _ensure_worksheet(
+        sh, "PasswordResetRequests", PASSWORD_RESET_HEADERS
+    )
+    ws.append_row(
+        [request_id, user_id, requested_at, "pending", "", ""],
+        value_input_option="RAW",
+    )
+    clear_read_caches()
+    return True
+
+
+def resolve_password_reset_request(
+    request_id: str,
+    *,
+    status: str,
+    resolved_at: str,
+    resolved_by: str,
+) -> bool:
+    """Mark a pending password request approved or rejected."""
+    request_id = bounded_text(request_id, "request_id", limit=80)
+    status = str(status or "").strip().casefold()
+    if status not in {"approved", "rejected"}:
+        raise ValueError("status 必須是 approved 或 rejected")
+    resolved_at = valid_timestamp(resolved_at, "resolved_at")
+    resolved_by = bounded_text(resolved_by, "resolved_by", limit=80)
+    sh = _get_sheet()
+    ws = _ensure_worksheet(
+        sh, "PasswordResetRequests", PASSWORD_RESET_HEADERS
+    )
+    rows = _rows_to_dicts(ws, PASSWORD_RESET_HEADERS)
+    for row_idx, row in enumerate(rows, start=2):
+        if str(row.get("request_id") or "").strip() != request_id:
+            continue
+        if str(row.get("status") or "").strip().casefold() != "pending":
+            return False
+        cells = [
+            gspread.Cell(
+                row_idx, PASSWORD_RESET_HEADERS.index("status") + 1, status
+            ),
+            gspread.Cell(
+                row_idx,
+                PASSWORD_RESET_HEADERS.index("resolved_at") + 1,
+                resolved_at,
+            ),
+            gspread.Cell(
+                row_idx,
+                PASSWORD_RESET_HEADERS.index("resolved_by") + 1,
+                resolved_by,
+            ),
+        ]
+        ws.update_cells(cells, value_input_option="RAW")
+        clear_read_caches()
+        return True
+    return False
+
+
+def approve_password_reset_request(
+    request_id: str,
+    user_id: str,
+    password_hash: str,
+    *,
+    resolved_at: str,
+    resolved_by: str,
+) -> bool:
+    """Atomically install a temporary password and approve its pending request."""
+    request_id = bounded_text(request_id, "request_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    password_hash = bounded_text(password_hash, "password_hash", limit=200)
+    resolved_at = valid_timestamp(resolved_at, "resolved_at")
+    resolved_by = bounded_text(resolved_by, "resolved_by", limit=80)
+    sh = _get_sheet()
+    users_ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
+    reset_ws = _ensure_worksheet(
+        sh, "PasswordResetRequests", PASSWORD_RESET_HEADERS
+    )
+    user_row_idx = next(
+        (
+            index
+            for index, row in enumerate(get_users_rows(), start=2)
+            if str(row.get("user_id") or "").strip() == user_id
+        ),
+        None,
+    )
+    request_row_idx = next(
+        (
+            index
+            for index, row in enumerate(
+                _rows_to_dicts(reset_ws, PASSWORD_RESET_HEADERS), start=2
+            )
+            if str(row.get("request_id") or "").strip() == request_id
+            and str(row.get("user_id") or "").strip() == user_id
+            and str(row.get("status") or "").strip().casefold() == "pending"
+        ),
+        None,
+    )
+    if user_row_idx is None or request_row_idx is None:
+        return False
+
+    def update_cell_request(
+        sheet_id: int, row_idx: int, col_idx: int, value: Any
+    ) -> dict[str, Any]:
+        return {
+            "updateCells": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": row_idx - 1,
+                    "endRowIndex": row_idx,
+                    "startColumnIndex": col_idx - 1,
+                    "endColumnIndex": col_idx,
+                },
+                "rows": [{"values": [_batch_cell(value)]}],
+                "fields": "userEnteredValue",
+            }
+        }
+
+    requests = [
+        update_cell_request(
+            users_ws.id,
+            user_row_idx,
+            USERS_HEADERS.index("password_hash") + 1,
+            password_hash,
+        ),
+        update_cell_request(
+            users_ws.id,
+            user_row_idx,
+            USERS_HEADERS.index("must_change_password") + 1,
+            True,
+        ),
+        update_cell_request(
+            reset_ws.id,
+            request_row_idx,
+            PASSWORD_RESET_HEADERS.index("status") + 1,
+            "approved",
+        ),
+        update_cell_request(
+            reset_ws.id,
+            request_row_idx,
+            PASSWORD_RESET_HEADERS.index("resolved_at") + 1,
+            resolved_at,
+        ),
+        update_cell_request(
+            reset_ws.id,
+            request_row_idx,
+            PASSWORD_RESET_HEADERS.index("resolved_by") + 1,
+            resolved_by,
+        ),
+    ]
+    _retry_transient(lambda: sh.batch_update({"requests": requests}))
+    clear_read_caches()
+    return True
 
 
 # =============================================================================

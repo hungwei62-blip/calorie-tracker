@@ -560,6 +560,73 @@ def apply_global_styles() -> None:
                 box-shadow: none !important;
             }
 
+            /* 相機前後鏡頭切換：移出影像並使用與分析照片相同的色票。 */
+            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] {
+                position: relative !important;
+                top: auto !important;
+                right: auto !important;
+                z-index: auto !important;
+                display: flex !important;
+                justify-content: flex-end !important;
+                margin: 0 0 10px !important;
+                color: #B88470 !important;
+                mix-blend-mode: normal !important;
+                opacity: 1 !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button {
+                width: auto !important;
+                min-width: 0 !important;
+                min-height: 40px !important;
+                padding: 8px 12px !important;
+                display: inline-flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                gap: 6px !important;
+                color: #B88470 !important;
+                -webkit-text-fill-color: #B88470 !important;
+                background: #F6E8DE !important;
+                background-color: #F6E8DE !important;
+                background-image: none !important;
+                border: 1px solid #EBCFC0 !important;
+                border-radius: 10px !important;
+                box-shadow: none !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button::after {
+                content: "切換前後鏡頭";
+                color: inherit !important;
+                -webkit-text-fill-color: inherit !important;
+                font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                line-height: 1.2 !important;
+                white-space: nowrap !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button svg {
+                color: currentColor !important;
+                fill: currentColor !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button:hover {
+                color: #A86E59 !important;
+                -webkit-text-fill-color: #A86E59 !important;
+                background: #F2DED2 !important;
+                background-color: #F2DED2 !important;
+                border-color: #E2BDAA !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button:active {
+                background: #EDD4C6 !important;
+                background-color: #EDD4C6 !important;
+            }
+
+            .st-key-daily_record_page [data-testid="stCameraInputSwitchButton"] button:focus-visible {
+                outline: 2px solid rgba(185, 124, 100, 0.34) !important;
+                outline-offset: 2px !important;
+            }
+
             .st-key-daily_record_page div[data-testid="stFormSubmitButton"] button[data-testid^="stBaseButton"],
             .st-key-daily_record_page .st-key-analyze_food_photo button,
             .st-key-daily_record_page .st-key-save_analyzed_food button {
@@ -684,6 +751,86 @@ def apply_global_styles() -> None:
             @media (max-width: 768px) {
                 .st-key-daily_progress_cards div[data-testid="stPlotlyChart"] {
                     border-radius: 18px !important;
+                }
+            }
+
+            /* ===== 首頁三張營養卡：桌面滑入、手機按住顯示目標 ===== */
+            .st-key-calorie_goal_card,
+            .st-key-water_goal_card,
+            .st-key-protein_goal_card,
+            .st-key-calorie_goal_card > div[data-testid="stVerticalBlock"],
+            .st-key-water_goal_card > div[data-testid="stVerticalBlock"],
+            .st-key-protein_goal_card > div[data-testid="stVerticalBlock"] {
+                position: relative !important;
+                min-width: 0 !important;
+            }
+
+            .st-key-calorie_goal_card > div[data-testid="stVerticalBlock"],
+            .st-key-water_goal_card > div[data-testid="stVerticalBlock"],
+            .st-key-protein_goal_card > div[data-testid="stVerticalBlock"] {
+                gap: 0 !important;
+            }
+
+            .st-key-calorie_goal_card [data-testid="stHtml"]:has(.goal-card-tooltip),
+            .st-key-water_goal_card [data-testid="stHtml"]:has(.goal-card-tooltip),
+            .st-key-protein_goal_card [data-testid="stHtml"]:has(.goal-card-tooltip) {
+                position: absolute !important;
+                inset: 0 !important;
+                z-index: 12 !important;
+                width: 100% !important;
+                height: 100% !important;
+                pointer-events: none !important;
+            }
+
+            .goal-card-tooltip {
+                position: absolute !important;
+                top: 14px !important;
+                left: 50% !important;
+                max-width: calc(100% - 20px) !important;
+                padding: 8px 12px !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                color: #FFFFFF !important;
+                background: rgba(39, 48, 61, 0.94) !important;
+                border: 1px solid rgba(255, 255, 255, 0.24) !important;
+                border-radius: 10px !important;
+                box-shadow: 0 8px 22px rgba(39, 48, 61, 0.22) !important;
+                font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;
+                font-size: 13px !important;
+                font-weight: 600 !important;
+                line-height: 1.3 !important;
+                text-align: center !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+                opacity: 0 !important;
+                transform: translate(-50%, -6px) !important;
+                transition: opacity 140ms ease, transform 140ms ease !important;
+                pointer-events: none !important;
+            }
+
+            @media (hover: hover) and (pointer: fine) {
+                .st-key-calorie_goal_card:hover .goal-card-tooltip,
+                .st-key-water_goal_card:hover .goal-card-tooltip,
+                .st-key-protein_goal_card:hover .goal-card-tooltip {
+                    opacity: 1 !important;
+                    transform: translate(-50%, 0) !important;
+                }
+            }
+
+            @media (hover: none) and (pointer: coarse) {
+                .st-key-calorie_goal_card,
+                .st-key-water_goal_card,
+                .st-key-protein_goal_card {
+                    -webkit-tap-highlight-color: transparent !important;
+                    -webkit-touch-callout: none !important;
+                    user-select: none !important;
+                }
+
+                .st-key-calorie_goal_card:active .goal-card-tooltip,
+                .st-key-water_goal_card:active .goal-card-tooltip,
+                .st-key-protein_goal_card:active .goal-card-tooltip {
+                    opacity: 1 !important;
+                    transform: translate(-50%, 0) !important;
                 }
             }
 
@@ -1931,7 +2078,7 @@ def apply_global_styles() -> None:
 
             .st-key-auth_brand .auth-brand-title {
                 display: grid !important;
-                grid-template-columns: max-content max-content 105px !important;
+                grid-template-columns: repeat(3, max-content) !important;
                 align-items: center !important;
                 justify-content: center !important;
                 gap: 0.22em !important;
@@ -1953,21 +2100,13 @@ def apply_global_styles() -> None:
                 letter-spacing: 0.045em !important;
             }
 
-            .st-key-auth_brand .auth-brand-logo-frame {
-                display: block !important;
+            .st-key-auth_brand .auth-brand-chinese {
                 min-width: 0 !important;
-                width: 100% !important;
-                height: 31px !important;
-                overflow: hidden !important;
-                background: #ffffff !important;
-            }
-
-            .st-key-auth_brand .auth-brand-logo {
-                display: block !important;
-                width: 100% !important;
-                height: 100% !important;
-                object-fit: cover !important;
-                object-position: center !important;
+                white-space: nowrap !important;
+                font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif !important;
+                font-size: 1em !important;
+                font-weight: inherit !important;
+                letter-spacing: 0.04em !important;
             }
 
             .st-key-auth_brand .auth-brand-divider {
@@ -1995,13 +2134,9 @@ def apply_global_styles() -> None:
 
             @media (max-width: 768px) {
                 .st-key-auth_brand .auth-brand-title {
-                    grid-template-columns: max-content max-content 80px !important;
+                    grid-template-columns: repeat(3, max-content) !important;
                     font-size: clamp(14px, 4.4vw, 18px) !important;
                     gap: 0.14em !important;
-                }
-
-                .st-key-auth_brand .auth-brand-logo-frame {
-                    height: 24px !important;
                 }
 
                 .st-key-auth_brand .auth-brand-tagline {
@@ -2011,6 +2146,29 @@ def apply_global_styles() -> None:
                     font-size: 14px !important;
                     line-height: 1.75 !important;
                 }
+            }
+
+            /* 登入與註冊維持既有亮色設計，不跟隨一般系統深色模式。 */
+            .stApp:has(.st-key-auth_brand) {
+                color-scheme: light !important;
+            }
+
+            .stApp:has(.st-key-auth_brand) div[data-baseweb="input"],
+            .stApp:has(.st-key-auth_brand) input {
+                background-color: #ffffff !important;
+                color: #2F3E46 !important;
+                -webkit-text-fill-color: #2F3E46 !important;
+            }
+
+            .stApp:has(.st-key-auth_brand) [data-testid="stWidgetLabel"] p,
+            .stApp:has(.st-key-auth_brand) input::placeholder {
+                color: #2F3E46 !important;
+                opacity: 1 !important;
+            }
+
+            .stApp:has(.st-key-auth_brand) input:-webkit-autofill {
+                -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+                -webkit-text-fill-color: #2F3E46 !important;
             }
 
             .st-key-login_panel div[data-testid="stFormSubmitButton"] button,
@@ -2085,6 +2243,75 @@ def apply_global_styles() -> None:
             div[data-testid="stForm"] > div {
                 width: 100% !important;
                 box-sizing: border-box !important;
+            }
+
+            /* 註冊模式專用的緊湊版面；不改動登入與其他頁面的表單。 */
+            .stApp:has(.st-key-registration_page) {
+                color-scheme: light !important;
+            }
+
+            .stApp:has(.st-key-registration_page) div[data-baseweb="input"],
+            .stApp:has(.st-key-registration_page) input {
+                background-color: #ffffff !important;
+                color: #2F3E46 !important;
+                -webkit-text-fill-color: #2F3E46 !important;
+            }
+
+            .stApp:has(.st-key-registration_page) [data-testid="stWidgetLabel"] p,
+            .stApp:has(.st-key-registration_page) input::placeholder {
+                color: #2F3E46 !important;
+                opacity: 1 !important;
+            }
+
+            .stApp:has(.st-key-registration_page) input:-webkit-autofill {
+                -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+                -webkit-text-fill-color: #2F3E46 !important;
+            }
+
+            .main .block-container:has(.st-key-registration_page),
+            [data-testid="stMainBlockContainer"]:has(.st-key-registration_page) {
+                padding-top: 4.25rem !important;
+                padding-bottom: 1.25rem !important;
+            }
+
+            .st-key-registration_page {
+                width: 100% !important;
+                max-width: 820px !important;
+                margin: 0 auto !important;
+            }
+
+            .st-key-registration_page h3 {
+                margin: 0 0 4px !important;
+                color: #2F3E46 !important;
+            }
+
+            .st-key-registration_page [data-testid="stForm"] {
+                max-width: 760px !important;
+                margin: 6px auto !important;
+                padding: 18px 22px !important;
+                border-radius: 24px !important;
+            }
+
+            .st-key-registration_page [data-testid="stForm"] [data-testid="stVerticalBlock"] {
+                gap: 0.55rem !important;
+            }
+
+            .st-key-registration_page [data-testid="stHorizontalBlock"] {
+                gap: 1rem !important;
+            }
+
+            @media (max-width: 768px) {
+                .main .block-container:has(.st-key-registration_page),
+                [data-testid="stMainBlockContainer"]:has(.st-key-registration_page) {
+                    padding-top: 3.75rem !important;
+                    padding-bottom: 1rem !important;
+                }
+
+                .st-key-registration_page [data-testid="stForm"] {
+                    margin: 4px auto !important;
+                    padding: 12px 14px !important;
+                    border-radius: 18px !important;
+                }
             }
 
 

@@ -10,6 +10,7 @@ import bcrypt
 
 # 台灣時區 (GMT+8)
 TAIPEI_TZ = timezone(timedelta(hours=8))
+TEMPORARY_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
 
 
 def hash_password(plain: str) -> str:
@@ -37,6 +38,13 @@ def make_user_id() -> str:
 def now_iso() -> str:
     """產生台北時區 (GMT+8) 的 ISO 格式時間戳。"""
     return datetime.now(TAIPEI_TZ).isoformat(timespec="seconds")
+
+
+def make_temporary_password(length: int = 12) -> str:
+    """Generate a strong one-time password without ambiguous characters."""
+    if length < 10:
+        raise ValueError("臨時密碼長度至少為 10")
+    return "".join(secrets.choice(TEMPORARY_PASSWORD_ALPHABET) for _ in range(length))
 
 
 def find_user(rows: list[dict[str, Any]], username: str) -> dict[str, Any] | None:

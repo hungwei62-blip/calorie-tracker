@@ -10,7 +10,7 @@ from ui.styles import apply_global_styles
 from pages.coach import page_coach_overview, page_coach_student_detail, page_coach_student_history
 from pages.student import (
     page_history, page_log_meal, page_login, page_personal, page_tdee,
-    page_tdee_questionnaire,
+    page_tdee_questionnaire, page_force_password_change,
 )
 
 
@@ -66,6 +66,10 @@ def main() -> None:
 
     st.session_state.role = auth_context.role
     role = auth_context.role
+
+    if sheets.user_must_change_password(str(st.session_state.user_id or "")):
+        page_force_password_change()
+        return
 
     is_coach = role in ("coach", "admin")
 

@@ -140,6 +140,70 @@ def build_coach_welcome_html(display_name: object, avatar_source: str) -> str:
     )
 
 
+def _render_password_reset_requests() -> None:
+    notice = st.session_state.pop("temporary_password_notice", None)
+    if isinstance(notice, dict):
+        st.success(
+            f"{notice.get('student_name', '學員')} 的臨時密碼已產生，"
+            "請立即記錄並透過既有聯絡方式告知。此密碼不會再次顯示。"
+        )
+        st.code(str(notice.get("temporary_password") or ""), language=None)
+
+    try:
+        requests = application.get_password_reset_requests(
+            current_auth_context()
+        )
+    except Exception as exc:
+        st.warning(safe_failure_message("password_reset.list", exc))
+        return
+
+    with st.expander(f"密碼重設申請（{len(requests)}）", expanded=bool(requests)):
+        if not requests:
+            st.caption("目前沒有待處理申請。")
+            return
+        for request in requests:
+            student = request.get("student") or {}
+            student_name = str(
+                student.get("name") or student.get("username") or "學員"
+            )
+            st.write(
+                f"{student_name}｜申請時間：{request.get('requested_at', '')}"
+            )
+            approve_column, reject_column = st.columns(2)
+            request_id = str(request.get("request_id") or "")
+            if approve_column.button(
+                "核准並產生臨時密碼",
+                key=f"approve_password_reset_{request_id}",
+                width="stretch",
+            ):
+                try:
+                    temporary_password = application.approve_password_reset(
+                        current_auth_context(), request_id
+                    )
+                except Exception as exc:
+                    st.error(safe_failure_message("password_reset.approve", exc))
+                else:
+                    st.session_state.temporary_password_notice = {
+                        "student_name": student_name,
+                        "temporary_password": temporary_password,
+                    }
+                    st.rerun()
+            if reject_column.button(
+                "駁回",
+                key=f"reject_password_reset_{request_id}",
+                width="stretch",
+            ):
+                try:
+                    application.reject_password_reset(
+                        current_auth_context(), request_id
+                    )
+                except Exception as exc:
+                    st.error(safe_failure_message("password_reset.reject", exc))
+                else:
+                    st.rerun()
+            st.divider()
+
+
 def page_coach_overview() -> None:
     st.markdown("""<style>
     .member-card { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 16px; }
@@ -176,6 +240,8 @@ def page_coach_overview() -> None:
             unsafe_allow_html=True,
         )
         st.header("本日學員狀態")
+
+    _render_password_reset_requests()
 
     if st.session_state.get("role") == "admin":
         with st.expander("系統健康狀態"):

@@ -2,7 +2,7 @@
 
 ## 1. 建立 Google Sheet
 
-建立試算表並記下網址 `/d/` 與 `/edit` 間的 `SPREADSHEET_ID`。設定 secrets 後先執行 `python tools/init_sheets.py` 預覽，再以 `--apply` 建立或補齊 `Users`、`Records`、`Weight`、`Training`、`Notes`、`AuditLog`；正式請求不會自動修改 schema。
+建立試算表並記下網址 `/d/` 與 `/edit` 間的 `SPREADSHEET_ID`。設定 secrets 後先執行 `python tools/init_sheets.py` 預覽，再以 `--apply` 建立或補齊 `Users`、`Records`、`Weight`、`Training`、`Notes`、`AuditLog`、`PasswordResetRequests`；正式請求不會自動修改 schema。
 
 ## 2. 建立 Service Account
 

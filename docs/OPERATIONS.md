@@ -23,7 +23,7 @@
 ## 備份與還原
 
 - 每週 Drive 備份保留 12 份，本機 CSV 作為第二層備份。
-- 每季在隔離副本執行一次還原演練，比對 Users、Records、Weight、Training、Notes 與 AuditLog 的表頭及筆數。
+- 每季在隔離副本執行一次還原演練，比對 Users、Records、Weight、Training、Notes、AuditLog 與 PasswordResetRequests 的表頭及筆數。
 - 還原演練不可覆蓋正式試算表；結果需記錄日期、操作者、備份檔及比對結果。
 
 ## 事故處理

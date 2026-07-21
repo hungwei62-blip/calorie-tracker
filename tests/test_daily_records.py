@@ -241,6 +241,26 @@ def test_daily_record_palette_persists_across_all_tabs_and_ctas():
     ) == 4
 
 
+def test_camera_switch_is_visible_outside_preview_and_matches_photo_cta():
+    stylesheet = next(
+        value
+        for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str) and ".st-key-daily_record_page" in value
+    )
+    selector = '[data-testid="stCameraInputSwitchButton"]'
+
+    assert selector in stylesheet
+    switch_styles = stylesheet[stylesheet.index(selector):]
+    assert "position: relative !important;" in switch_styles
+    assert 'content: "切換前後鏡頭";' in switch_styles
+    assert "background: #F6E8DE !important;" in switch_styles
+    assert "color: #B88470 !important;" in switch_styles
+    assert "border: 1px solid #EBCFC0 !important;" in switch_styles
+    assert f'{selector} button:hover' in switch_styles
+    assert f'{selector} button:active' in switch_styles
+    assert f'{selector} button:focus-visible' in switch_styles
+
+
 def test_food_input_defaults_to_manual_mode():
     source = inspect.getsource(student_pages)
     food_renderer = source[source.index("def _render_food_records"):]
@@ -300,6 +320,7 @@ def test_training_renderer_uses_multi_select_and_no_duplicate_heading():
     ]
 
     assert 'selection_mode="multi"' in source
+    assert '"訓練類型 (可複選)"' in source
     assert 'default=[]' in source
     assert 'value=""' in source
     assert '今日已有訓練紀錄，再次儲存將覆蓋原紀錄。' in source

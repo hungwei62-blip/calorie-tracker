@@ -19,8 +19,7 @@
 1. 複製最新備份為測試試算表，不要覆蓋正式檔案。
 2. 將本機 `SPREADSHEET_ID` 暫時指向測試副本。
 3. 執行 `python tools/init_sheets.py`，確認六張工作表皆為 `ok`。
-4. 執行 smoke test，核對 Users、Records、Weight、Training、Notes、AuditLog 筆數。
+4. 執行 smoke test，核對 Users、Records、Weight、Training、Notes、AuditLog、PasswordResetRequests 筆數。
 5. 恢復正式 `SPREADSHEET_ID` 並刪除測試 secrets。
 
 每季至少演練一次，將日期、執行者、來源備份與驗證結果記錄在維運紀錄中。
-
