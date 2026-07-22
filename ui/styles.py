@@ -960,6 +960,7 @@ def apply_global_styles() -> None:
             }
 
             .st-key-student_history_tabs [data-baseweb="tab-list"] {
+                margin-top: -8px !important;
                 padding: 4px !important;
                 background: rgba(168, 213, 194, 0.18) !important;
                 border: 1px solid rgba(168, 213, 194, 0.32) !important;
@@ -986,156 +987,231 @@ def apply_global_styles() -> None:
                 background-color: transparent !important;
             }
 
-            /* ===== 學員歷史：修改紀錄緊湊操作區 ===== */
+            /* ===== 學員歷史：修改紀錄月曆與摘要 ===== */
             .st-key-student_daily_record_manager {
                 --record-action-background: #F6E8DE;
                 --record-action-hover: #F2DED2;
                 --record-action-active: #EDD4C6;
                 --record-action-text: #B88470;
                 --record-action-border: #EBCFC0;
-                padding: 14px !important;
-                background: #FFFFFF !important;
-                border-color: var(--history-border) !important;
-                border-radius: 18px !important;
-                box-shadow: 0 8px 28px rgba(125, 140, 138, 0.08) !important;
+                margin-top: 4px !important;
+                padding: 0 !important;
+                background: transparent !important;
             }
 
             .st-key-student_daily_record_manager > div[data-testid="stVerticalBlock"] {
                 gap: 8px !important;
             }
 
-            .st-key-student_daily_record_manager [data-testid="stMetric"] {
-                padding: 8px 10px !important;
-                background: #F9FBFA !important;
-                border: 1px solid var(--history-border) !important;
+            .st-key-history_daily_summary {
+                box-sizing: border-box !important;
+                min-width: 0 !important;
+                min-height: 112px !important;
+                padding: 18px 16px !important;
+                flex-wrap: nowrap !important;
+                background: #FFFFFF !important;
+                border-color: #ECE6F3 !important;
+                border-radius: 14px !important;
+                box-shadow: 0 6px 20px rgba(106, 88, 143, 0.07) !important;
+            }
+
+            .st-key-history_daily_summary_values {
+                min-width: 0 !important;
+            }
+
+            .st-key-history_daily_summary_values .history-daily-summary-values,
+            .st-key-history_dialog_totals .history-daily-summary-values {
+                display: grid !important;
+                gap: 7px !important;
+                color: #746B80 !important;
+                font-size: 16px !important;
+                line-height: 1.45 !important;
+            }
+
+            .st-key-history_daily_summary_values .history-daily-summary-values > div,
+            .st-key-history_dialog_totals .history-daily-summary-values > div {
+                white-space: nowrap !important;
+            }
+
+            .st-key-history_daily_summary_values .history-daily-summary-values strong,
+            .st-key-history_dialog_totals .history-daily-summary-values strong {
+                color: #4E435F !important;
+                font-size: 16px !important;
+                font-variant-numeric: tabular-nums !important;
+                font-weight: 650 !important;
+            }
+
+            .st-key-history_dialog_totals {
+                padding: 10px 12px !important;
+                background: #F9F7FC !important;
+                border: 1px solid #ECE6F3 !important;
                 border-radius: 12px !important;
             }
 
-            .st-key-history_add_actions,
-            .st-key-history_add_actions > div[data-testid="stHorizontalBlock"],
-            .st-key-student_daily_record_manager [class*="st-key-history_record_actions_"] {
+            .st-key-history_daily_summary_actions,
+            .st-key-history_daily_summary_actions > div[data-testid="stHorizontalBlock"],
+            .st-key-history_dialog_add_actions,
+            .st-key-history_dialog_add_actions > div[data-testid="stHorizontalBlock"] {
                 flex-wrap: nowrap !important;
                 gap: 6px !important;
             }
 
-            .st-key-history_add_actions > div,
-            .st-key-history_add_actions [data-testid="stElementContainer"] {
-                min-width: 0 !important;
+            .st-key-history_daily_summary_actions {
+                flex: 0 0 auto !important;
+                width: auto !important;
+                min-width: max-content !important;
             }
 
-            .st-key-student_daily_record_manager .st-key-history_add_actions button,
-            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button {
+            .st-key-history_day_manage button[data-testid^="stBaseButton"],
+            .st-key-history_day_delete button[data-testid^="stBaseButton"],
+            .st-key-history_daily_summary_actions button,
+            .st-key-history_dialog_add_actions button,
+            [class*="st-key-history_dialog_edit_"] button,
+            [class*="st-key-history_dialog_delete_select_"] button {
                 min-width: 0 !important;
                 min-height: 34px !important;
                 padding: 5px 10px !important;
-                color: var(--record-action-text) !important;
-                -webkit-text-fill-color: var(--record-action-text) !important;
+                color: #B88470 !important;
+                -webkit-text-fill-color: #B88470 !important;
                 white-space: nowrap !important;
-                background: var(--record-action-background) !important;
-                background-color: var(--record-action-background) !important;
+                background: #F6E8DE !important;
+                background-color: #F6E8DE !important;
                 background-image: none !important;
-                border: 1px solid var(--record-action-border) !important;
+                border: 1px solid #EBCFC0 !important;
                 border-radius: 9px !important;
                 box-shadow: none !important;
                 font-size: 12px !important;
             }
 
-            .st-key-student_daily_record_manager .st-key-history_add_actions button:hover,
-            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button:hover {
+            .st-key-history_day_manage button[data-testid^="stBaseButton"]:hover,
+            .st-key-history_day_delete button[data-testid^="stBaseButton"]:hover,
+            .st-key-history_daily_summary_actions button:hover,
+            .st-key-history_dialog_add_actions button:hover,
+            [class*="st-key-history_dialog_edit_"] button:hover,
+            [class*="st-key-history_dialog_delete_select_"] button:hover {
                 color: #A86E59 !important;
                 -webkit-text-fill-color: #A86E59 !important;
-                background: var(--record-action-hover) !important;
+                background: #F2DED2 !important;
                 border-color: #E2BDAA !important;
             }
 
-            .st-key-student_daily_record_manager .st-key-history_add_actions button:active,
-            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button:active {
-                background: var(--record-action-active) !important;
+            .st-key-history_day_manage button[data-testid^="stBaseButton"]:active,
+            .st-key-history_day_delete button[data-testid^="stBaseButton"]:active,
+            .st-key-history_daily_summary_actions button:active,
+            .st-key-history_dialog_add_actions button:active,
+            [class*="st-key-history_dialog_edit_"] button:active,
+            [class*="st-key-history_dialog_delete_select_"] button:active {
+                background: #EDD4C6 !important;
                 transform: scale(0.98) !important;
             }
 
-            .st-key-student_daily_record_manager .st-key-history_add_actions button:focus-visible,
-            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button:focus-visible,
-            .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button:focus-visible {
+            .st-key-history_daily_summary_actions button:focus-visible,
+            .st-key-history_dialog_add_actions button:focus-visible,
+            [class*="st-key-history_dialog_edit_"] button:focus-visible,
+            [class*="st-key-history_dialog_delete_select_"] button:focus-visible {
                 outline: 2px solid rgba(185, 124, 100, 0.34) !important;
                 outline-offset: 2px !important;
             }
 
-            .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button {
-                min-width: 0 !important;
-                min-height: 34px !important;
-                padding: 5px 10px !important;
-                color: var(--history-secondary) !important;
-                -webkit-text-fill-color: var(--history-secondary) !important;
-                white-space: nowrap !important;
-                background: #FFFFFF !important;
-                border: 1px solid var(--history-border) !important;
-                border-radius: 9px !important;
+            .st-key-history_manage_dialog button[data-testid^="stBaseButton"],
+            .st-key-history_delete_dialog button[data-testid^="stBaseButton"] {
+                color: #B88470 !important;
+                -webkit-text-fill-color: #B88470 !important;
+                background: #F6E8DE !important;
+                background-color: #F6E8DE !important;
+                background-image: none !important;
+                border-color: #EBCFC0 !important;
                 box-shadow: none !important;
-                font-size: 12px !important;
             }
 
-            .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button:hover {
+            .st-key-history_manage_dialog button[data-testid^="stBaseButton"]:hover,
+            .st-key-history_delete_dialog button[data-testid^="stBaseButton"]:hover {
                 color: #A86E59 !important;
                 -webkit-text-fill-color: #A86E59 !important;
-                background: #FFF8F5 !important;
-                border-color: #EBCFC0 !important;
+                background: #F2DED2 !important;
+                background-color: #F2DED2 !important;
+                border-color: #E2BDAA !important;
+            }
+
+            .st-key-history_manage_dialog button[data-testid^="stBaseButton"]:active,
+            .st-key-history_delete_dialog button[data-testid^="stBaseButton"]:active {
+                background: #EDD4C6 !important;
+                background-color: #EDD4C6 !important;
+            }
+
+            .st-key-history_manage_dialog button[data-testid^="stBaseButton"]:focus-visible,
+            .st-key-history_delete_dialog button[data-testid^="stBaseButton"]:focus-visible {
+                outline: 2px solid rgba(185, 124, 100, 0.34) !important;
+                outline-offset: 2px !important;
+            }
+
+            .st-key-history_manage_dialog button[data-testid^="stBaseButton"]:disabled,
+            .st-key-history_delete_dialog button[data-testid^="stBaseButton"]:disabled {
+                color: rgba(184, 132, 112, 0.58) !important;
+                -webkit-text-fill-color: rgba(184, 132, 112, 0.58) !important;
+                background: rgba(246, 232, 222, 0.62) !important;
+                border-color: rgba(235, 207, 192, 0.62) !important;
+            }
+
+            .st-key-history_manage_dialog button > div,
+            .st-key-history_manage_dialog button [data-testid="stMarkdownContainer"],
+            .st-key-history_manage_dialog button p,
+            .st-key-history_manage_dialog button span,
+            .st-key-history_delete_dialog button > div,
+            .st-key-history_delete_dialog button [data-testid="stMarkdownContainer"],
+            .st-key-history_delete_dialog button p,
+            .st-key-history_delete_dialog button span {
+                color: inherit !important;
+                -webkit-text-fill-color: inherit !important;
+                background: transparent !important;
+                background-color: transparent !important;
+            }
+
+            .st-key-history_day_manage button > div,
+            .st-key-history_day_manage button p,
+            .st-key-history_day_manage button span,
+            .st-key-history_day_delete button > div,
+            .st-key-history_day_delete button p,
+            .st-key-history_day_delete button span {
+                color: inherit !important;
+                -webkit-text-fill-color: inherit !important;
+                background: transparent !important;
+                background-color: transparent !important;
             }
 
             .st-key-student_daily_record_manager button:disabled {
                 opacity: 0.58 !important;
             }
 
-            .st-key-history_record_list > div[data-testid="stVerticalBlock"] {
-                gap: 6px !important;
-            }
-
-            .st-key-student_daily_record_manager [class*="st-key-history_record_row_"] {
-                box-sizing: border-box !important;
-                min-width: 0 !important;
-                padding: 8px 10px !important;
-                flex-wrap: nowrap !important;
-                background: #FFFFFF !important;
-                border-color: var(--history-border) !important;
-                border-radius: 12px !important;
-            }
-
-            .st-key-student_daily_record_manager [class*="st-key-history_record_content_"] {
-                min-width: 0 !important;
-                overflow: hidden !important;
-            }
-
-            .st-key-student_daily_record_manager [class*="st-key-history_record_content_"] p {
-                margin: 0 !important;
-                overflow-wrap: anywhere !important;
-                color: #34423E !important;
-                font-size: 13px !important;
-                line-height: 1.35 !important;
-            }
-
-            .st-key-student_daily_record_manager [class*="st-key-history_record_actions_"] {
-                flex: 0 0 auto !important;
-                width: auto !important;
-                min-width: max-content !important;
-            }
-
             @media (max-width: 480px) {
-                .st-key-student_daily_record_manager {
-                    padding: 10px !important;
-                    border-radius: 15px !important;
+                .st-key-student_history_tabs [data-baseweb="tab-list"] {
+                    margin-top: -10px !important;
                 }
 
-                .st-key-student_daily_record_manager .st-key-history_add_actions button,
-                .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button,
-                .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button {
+                .st-key-history_daily_summary {
+                    min-height: 108px !important;
+                    padding: 16px 10px !important;
+                    gap: 6px !important;
+                }
+
+                .st-key-history_daily_summary_values .history-daily-summary-values,
+                .st-key-history_dialog_totals .history-daily-summary-values {
+                    gap: 5px !important;
+                    font-size: 16px !important;
+                }
+
+                .st-key-history_daily_summary_values .history-daily-summary-values strong,
+                .st-key-history_dialog_totals .history-daily-summary-values strong {
+                    font-size: 16px !important;
+                }
+
+                .st-key-history_daily_summary_actions button,
+                .st-key-history_dialog_add_actions button,
+                [class*="st-key-history_dialog_edit_"] button,
+                [class*="st-key-history_dialog_delete_select_"] button {
                     min-height: 32px !important;
                     padding: 4px 7px !important;
                     font-size: 11px !important;
-                }
-
-                .st-key-student_daily_record_manager [class*="st-key-history_record_row_"] {
-                    padding: 7px 8px !important;
-                    gap: 5px !important;
                 }
             }
 

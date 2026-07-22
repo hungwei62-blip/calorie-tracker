@@ -101,7 +101,7 @@ def test_history_page_uses_clean_heading_and_renders_all_history_sections():
 
     assert 'st.subheader("體重變化")' not in renderer_source
     assert 'key="student_history_page"' in source
-    assert 'st.header("歷史紀錄")' in source
+    assert 'st.header("歷史紀錄")' not in source
     assert '("歷史紀錄", "修改紀錄")' in source
     assert 'default="歷史紀錄"' in source
     assert 'key="student_history_tabs"' in source
@@ -158,22 +158,33 @@ def test_weight_history_has_scoped_card_and_mobile_styles():
     assert ".stApp:has(.st-key-student_history_page)" in stylesheet
 
 
-def test_history_record_manager_has_scoped_compact_action_styles():
+def test_history_record_manager_has_scoped_calendar_summary_styles():
     stylesheet = next(
         value
         for value in styles.apply_global_styles.__code__.co_consts
         if isinstance(value, str) and ".st-key-student_daily_record_manager" in value
     )
 
-    assert ".st-key-history_add_actions" in stylesheet
-    assert '[class*="st-key-history_record_actions_"]' in stylesheet
-    assert '[class*="st-key-history_edit_"] button' in stylesheet
-    assert '[class*="st-key-history_delete_"] button' in stylesheet
+    assert ".st-key-history_daily_summary" in stylesheet
+    assert ".st-key-history_daily_summary_values" in stylesheet
+    assert ".history-daily-summary-values" in stylesheet
+    assert ".st-key-history_daily_summary_actions" in stylesheet
+    assert ".st-key-history_dialog_add_actions" in stylesheet
+    assert ".st-key-history_manage_dialog" in stylesheet
+    assert ".st-key-history_delete_dialog" in stylesheet
+    assert ".st-key-history_dialog_totals" in stylesheet
     assert "flex-wrap: nowrap !important;" in stylesheet
     assert "white-space: nowrap !important;" in stylesheet
     assert "background: #F6E8DE !important;" in stylesheet
+    assert "color: #B88470 !important;" in stylesheet
+    assert "border-color: #EBCFC0 !important;" in stylesheet
     assert "background: #FFFFFF !important;" in stylesheet
+    assert "font-size: 16px !important;" in stylesheet
+    assert "min-height: 112px !important;" in stylesheet
+    assert ".st-key-history_day_manage button" in stylesheet
+    assert "display: grid !important;" in stylesheet
     assert ".st-key-student_history_tabs" in stylesheet
+    assert "margin-top: -8px !important;" in stylesheet
     assert "background-color: transparent !important;" in stylesheet
 
     all_styles = "\n".join(

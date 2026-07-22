@@ -1964,8 +1964,6 @@ def page_log_meal() -> None:
 
 def page_history() -> None:
     with st.container(key="student_history_page"):
-        st.header("歷史紀錄")
-
         uid = st.session_state.user_id
         history_tab, edit_tab = st.tabs(
             ("歷史紀錄", "修改紀錄"),
