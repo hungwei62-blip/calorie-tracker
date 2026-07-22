@@ -259,6 +259,8 @@ def apply_global_styles() -> None:
             [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header),
             .main .block-container:has(.st-key-coach_overview_header),
             [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header),
+            .main .block-container:has(.st-key-coach_student_history_page),
+            [data-testid="stMainBlockContainer"]:has(.st-key-coach_student_history_page),
             .main .block-container:has(.st-key-student_history_page),
             [data-testid="stMainBlockContainer"]:has(.st-key-student_history_page) {
                 padding-top: 32px !important;
@@ -281,9 +283,60 @@ def apply_global_styles() -> None:
                 [data-testid="stMainBlockContainer"]:has(.st-key-student_home_header),
                 .main .block-container:has(.st-key-coach_overview_header),
                 [data-testid="stMainBlockContainer"]:has(.st-key-coach_overview_header),
+                .main .block-container:has(.st-key-coach_student_history_page),
+                [data-testid="stMainBlockContainer"]:has(.st-key-coach_student_history_page),
                 .main .block-container:has(.st-key-student_history_page),
                 [data-testid="stMainBlockContainer"]:has(.st-key-student_history_page) {
                     padding-top: 32px !important;
+                }
+            }
+
+            /* ===== 教練總覽：卡片展開目標與管理員健康資訊 ===== */
+            [class*="st-key-coach_goal_editor_"] {
+                margin-top: -8px !important;
+                margin-bottom: 16px !important;
+                padding: 14px !important;
+                background: #F8FCFC !important;
+                border-color: rgba(132, 204, 214, 0.52) !important;
+                border-radius: 10px 10px 16px 16px !important;
+                box-shadow: 0 7px 22px rgba(74, 119, 126, 0.08) !important;
+            }
+
+            [class*="st-key-coach_goal_editor_"] div[data-testid="stForm"] {
+                border: 0 !important;
+                padding: 0 !important;
+            }
+
+            [class*="st-key-coach_goal_editor_"] div[data-testid="stFormSubmitButton"] button {
+                color: #315F67 !important;
+                background: #DDF2F4 !important;
+                border-color: #A9D9DF !important;
+            }
+
+            [class*="st-key-coach_goal_editor_"] div[data-testid="stFormSubmitButton"] button:hover {
+                background: #CDEBED !important;
+                border-color: #8ACBD3 !important;
+            }
+
+            .st-key-admin_health_status .admin-health-row {
+                margin: 2px 0 !important;
+                color: #65706F !important;
+                font-size: 12px !important;
+                line-height: 1.45 !important;
+            }
+
+            .st-key-coach_student_history_page > div[data-testid="stVerticalBlock"] {
+                gap: 10px !important;
+            }
+
+            @media (max-width: 640px) {
+                [class*="st-key-coach_goal_editor_"] div[data-testid="stHorizontalBlock"] {
+                    flex-wrap: wrap !important;
+                }
+
+                [class*="st-key-coach_goal_editor_"] div[data-testid="stHorizontalBlock"] > div {
+                    min-width: 100% !important;
+                    flex: 0 0 100% !important;
                 }
             }
 

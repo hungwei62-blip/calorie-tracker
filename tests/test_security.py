@@ -3,7 +3,9 @@ from __future__ import annotations
 from services.security import (
     LoginRateLimiter,
     clear_auth_session,
+    is_rate_limit_error,
     resolve_auth_context,
+    safe_data_read_failure_message,
 )
 
 
@@ -47,3 +49,23 @@ def test_clear_auth_session_removes_sensitive_state():
         "auth_mode": "login",
     }
 
+
+def test_rate_limit_read_message_does_not_write_an_audit_log(monkeypatch):
+    class Response:
+        status_code = 429
+
+    class QuotaError(Exception):
+        response = Response()
+
+    monkeypatch.setattr(
+        "services.security.log_event",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("rate limits must not trigger another Sheets write")
+        ),
+    )
+    error = QuotaError("quota exceeded")
+
+    assert is_rate_limit_error(error) is True
+    assert safe_data_read_failure_message("history.read", error) == (
+        "資料讀取次數過多，請稍後再試。"
+    )

@@ -162,6 +162,27 @@ def safe_failure_message(action: str, exc: BaseException) -> str:
     return f"作業失敗，請稍後再試（錯誤代碼：{request_id}）"
 
 
+def is_rate_limit_error(exc: BaseException) -> bool:
+    """Return whether an exception represents an upstream HTTP 429."""
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code == 429:
+        return True
+    return "[429]" in str(exc) or "quota exceeded" in str(exc).lower()
+
+
+def safe_data_read_failure_message(action: str, exc: BaseException) -> str:
+    """Keep quota errors actionable without triggering another Sheets write."""
+    if is_rate_limit_error(exc):
+        LOGGER.warning(
+            "upstream_rate_limit action=%s exception_type=%s",
+            action,
+            type(exc).__name__,
+        )
+        return "資料讀取次數過多，請稍後再試。"
+    return safe_failure_message(action, exc)
+
+
 def resolve_auth_context(user_id: str, rows: list[dict]) -> AuthContext | None:
     target = str(user_id or "").strip()
     if not target:

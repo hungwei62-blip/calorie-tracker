@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import inspect
 
 from pages.coach import (
     build_coach_welcome_html,
@@ -8,6 +9,8 @@ from pages.coach import (
     build_coach_student_card_html,
     calculate_coach_nutrient_progress,
 )
+from ui import coach_student_card as card_component
+from ui import styles
 
 
 @pytest.mark.parametrize(
@@ -69,13 +72,11 @@ def test_coach_student_card_has_three_ordered_metrics_and_escapes_name():
 
 
 def test_coach_overview_css_keeps_metrics_in_one_row():
-    source = __import__("inspect").getsource(
-        __import__("pages.coach", fromlist=["page_coach_overview"]).page_coach_overview
-    )
+    stylesheet = card_component._CARD_CSS
 
-    assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in source
-    assert "@media (max-width: 480px)" in source
-    assert ".capsule-track" not in source
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in stylesheet
+    assert "@media (max-width: 480px)" in stylesheet
+    assert ".capsule-track" not in stylesheet
 
 
 def test_coach_welcome_uses_avatar_and_escapes_dynamic_values():
@@ -90,16 +91,78 @@ def test_coach_welcome_uses_avatar_and_escapes_dynamic_values():
 
 
 def test_coach_overview_matches_student_header_and_enlarges_values():
-    source = __import__("inspect").getsource(
-        __import__("pages.coach", fromlist=["page_coach_overview"]).page_coach_overview
-    )
+    coach_pages = __import__("pages.coach", fromlist=["page_coach_overview"])
+    source = inspect.getsource(coach_pages.page_coach_overview)
+    stylesheet = card_component._CARD_CSS
 
     assert 'key="coach_overview_header"' in source
     assert 'st.header("本日學員狀態")' in source
     assert "section-title" not in source
-    assert ".coach-nutrient-value { display: block; width: 100%;" in source
-    assert "font-size: 15px" in source
-    assert "text-align: center" in source
-    assert ".coach-nutrient-value { font-size: 13px; }" in source
-    assert "font-variant-numeric: tabular-nums" in source
-    assert ".coach-nutrient-grid { gap: 6px; }" in source
+    assert "coach_student_card(" in source
+    assert "font-size: 14px" in stylesheet
+    assert "font-size: 17px" in stylesheet
+    assert "font-size: 13px" in stylesheet
+    assert "font-size: 15px" in stylesheet
+    assert "font-variant-numeric: tabular-nums" in stylesheet
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in stylesheet
+
+
+def test_coach_card_component_uses_ccv2_toggle_and_accessible_button():
+    assert 'type="button"' in card_component._CARD_HTML
+    assert 'aria-expanded="false"' in card_component._CARD_HTML
+    assert 'setTriggerValue("toggle"' in card_component._CARD_JS
+    assert "Streamlit.setComponentValue" not in card_component._CARD_JS
+    assert "window.Streamlit" not in card_component._CARD_JS
+    assert ':focus-visible' in card_component._CARD_CSS
+
+
+def test_coach_card_wrapper_normalizes_values_and_returns_toggle(monkeypatch):
+    mounted = {}
+
+    def fake_component(**kwargs):
+        mounted.update(kwargs)
+        return {"toggle": "student-1"}
+
+    monkeypatch.setattr(card_component, "_COACH_STUDENT_CARD", fake_component)
+
+    toggled = card_component.coach_student_card(
+        student_id="student-1",
+        name="小明",
+        has_training=True,
+        totals={"calories": 900, "water": -1, "protein": 60},
+        goals={"calorie": 1800, "water": 2400, "protein": 120},
+        expanded=False,
+        key="student-card-1",
+    )
+
+    assert toggled is True
+    assert mounted["data"]["student_id"] == "student-1"
+    assert mounted["data"]["nutrients"][0]["percentage"] == 50
+    assert mounted["data"]["nutrients"][1]["value_text"] == "0 / 2,400 ml"
+    assert mounted["on_toggle_change"] is not None
+
+
+def test_coach_goal_editor_updates_only_three_positive_goals():
+    coach_pages = __import__("pages.coach", fromlist=["_render_student_goal_editor"])
+    source = inspect.getsource(coach_pages._render_student_goal_editor)
+
+    assert source.count("min_value=1.0") == 3
+    assert '{"calorie": calorie, "protein": protein, "water": water}' in source
+    assert '"carb"' not in source
+    assert '"fat"' not in source
+    assert "_clear_analysis_cache()" in source
+
+
+def test_admin_health_rows_and_coach_history_top_spacing_are_scoped():
+    stylesheet = "\n".join(
+        value for value in styles.apply_global_styles.__code__.co_consts
+        if isinstance(value, str)
+    )
+    overview_source = inspect.getsource(
+        __import__("pages.coach", fromlist=["page_coach_overview"]).page_coach_overview
+    )
+
+    assert 'key="admin_health_status"' in overview_source
+    assert ".st-key-admin_health_status .admin-health-row" in stylesheet
+    assert "font-size: 12px !important;" in stylesheet
+    assert ":has(.st-key-coach_student_history_page)" in stylesheet

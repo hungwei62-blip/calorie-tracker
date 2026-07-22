@@ -109,15 +109,16 @@ def test_history_page_uses_clean_heading_and_renders_all_history_sections():
     assert "if history_tab.open:" in source
     assert "elif edit_tab.open:" in source
     assert source.index("if history_tab.open:") < source.index(
-        "_render_student_weight_history(uid)"
+        "render_student_history_charts(uid)"
     ) < source.index("elif edit_tab.open:") < source.index(
         "render_daily_record_manager(uid, _clear_analysis_cache)"
     )
     assert "📜" not in source
-    assert source.index("_render_student_weight_history(uid)") < source.index(
-        "_render_student_nutrition_history(uid)"
-    ) < source.index("_render_student_water_history(uid)") < source.index(
-        "_render_student_training_history(uid)"
+    shared_source = inspect.getsource(student_pages.render_student_history_charts)
+    assert shared_source.index("_render_student_weight_history(") < shared_source.index(
+        "_render_student_nutrition_history("
+    ) < shared_source.index("_render_student_water_history(") < shared_source.index(
+        "_render_student_training_history("
     )
     assert "st.dataframe" not in source
     assert "st.bar_chart" not in source

@@ -49,6 +49,26 @@ def test_manager_target_is_revalidated(monkeypatch):
         application.require_managed_student(coach, "s2")
 
 
+def test_manager_cannot_update_goals_for_unmanaged_student(monkeypatch):
+    monkeypatch.setattr(
+        application.sheets,
+        "get_student_for_manager",
+        lambda _user_id, _manager_id: None,
+    )
+    monkeypatch.setattr(
+        application.sheets,
+        "update_user_goals",
+        lambda *_args, **_kwargs: pytest.fail("repository must not be called"),
+    )
+
+    with pytest.raises(application.PermissionDenied):
+        application.update_student_goals(
+            AuthContext("coach-1", "coach"),
+            "student-2",
+            {"calorie": 1800, "protein": 120, "water": 2400},
+        )
+
+
 def test_common_validators_reject_invalid_values():
     with pytest.raises(ValueError):
         finite_non_negative(float("nan"), "calories")

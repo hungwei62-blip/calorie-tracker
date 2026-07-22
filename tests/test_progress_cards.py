@@ -336,10 +336,23 @@ def test_tdee_questionnaire_always_saves_simple_mode_and_zeroes_unused_goals():
 
     assert "飲食記錄模式" not in source
     assert "選擇飲食記錄模式" not in source
-    assert 'goals["carb"] = 0.0' in source
-    assert 'goals["fat"] = 0.0' in source
+    assert "st.segmented_control" in source
+    assert "CALORIE_DEFICIT_OPTIONS" in source
+    assert "DEFAULT_CALORIE_DEFICIT_LABEL" in source
+    assert "goal_type" not in source
+    assert 'calculate_goals(weight, tdee, bmr, calorie_deficit)' in source
     assert 'sheets.set_user_record_mode(uid, "simple")' in source
     assert 'application.update_student_goals(\n                    current_auth_context(), uid, {"carb": 0.0, "fat": 0.0}' not in source
+
+
+def test_registration_removes_goal_type_and_requires_tdee_questionnaire():
+    source = inspect.getsource(student_pages.page_login)
+
+    assert "goal_type" not in source
+    assert 'st.selectbox("目標"' not in source
+    assert '"calorie": 0' in source
+    assert "initial_weight * 2" in source
+    assert "initial_weight * 40" in source
 
 
 def test_student_home_has_scoped_desktop_and_mobile_top_spacing():

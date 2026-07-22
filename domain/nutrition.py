@@ -12,6 +12,13 @@ TDEE_MULTIPLIERS = {
 }
 EXERCISE_LEVELS = list(TDEE_MULTIPLIERS)
 
+CALORIE_DEFICIT_OPTIONS = {
+    "溫和（-200 大卡）": 200,
+    "標準（-300 大卡）": 300,
+    "積極（-400 大卡）": 400,
+}
+DEFAULT_CALORIE_DEFICIT_LABEL = "標準（-300 大卡）"
+
 
 def calculate_bmr(weight: float, height: float, age: int, gender: str) -> float:
     if gender == "男":
@@ -23,16 +30,21 @@ def calculate_tdee(bmr: float, exercise_level: str) -> float:
     return bmr * TDEE_MULTIPLIERS.get(exercise_level, 1.2)
 
 
-def calculate_goals(weight: float, tdee: float, goal_type: str = "維持") -> dict[str, float]:
+def calculate_goals(
+    weight: float,
+    tdee: float,
+    bmr: float,
+    calorie_deficit: int,
+) -> dict[str, float]:
+    if calorie_deficit not in set(CALORIE_DEFICIT_OPTIONS.values()):
+        raise ValueError("熱量赤字只能選擇 200、300 或 400 大卡")
     protein = weight * 2
-    fat = weight * 0.8
-    carb = ((tdee - 100) - (protein * 4) - (fat * 9)) / 4
-    calorie = tdee - 300 if goal_type == "減脂" else tdee + 300 if goal_type == "增肌" else tdee
+    calorie = max(0, bmr, tdee - calorie_deficit)
     return {
-        "bmr": 0,
-        "calorie": max(0, calorie),
+        "bmr": bmr,
+        "calorie": calorie,
         "protein": protein,
-        "carb": max(0, carb),
-        "fat": fat,
+        "carb": 0,
+        "fat": 0,
         "water": weight * 40,
     }

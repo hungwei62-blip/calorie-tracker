@@ -1,5 +1,6 @@
 """學員端、登入與註冊頁面。"""
 from __future__ import annotations
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 import hashlib
 import html
@@ -13,6 +14,7 @@ from services.security import (
     LOGIN_RATE_LIMITER,
     PASSWORD_RESET_RATE_LIMITER,
     log_event,
+    safe_data_read_failure_message,
     safe_failure_message,
 )
 from domain.daily_completion import DailyCompletion, calculate_daily_completion
@@ -32,7 +34,14 @@ from domain.history import (
     training_period_bounds,
     water_history_average,
 )
-from domain.nutrition import EXERCISE_LEVELS, calculate_bmr, calculate_goals, calculate_tdee
+from domain.nutrition import (
+    CALORIE_DEFICIT_OPTIONS,
+    DEFAULT_CALORIE_DEFICIT_LABEL,
+    EXERCISE_LEVELS,
+    calculate_bmr,
+    calculate_goals,
+    calculate_tdee,
+)
 from pages.common import (
     DEFAULT_GOALS, TRAINING_TYPES, _clear_analysis_cache, _fetch_goals_cached,
     _fetch_records_cached, _today_range, do_logout,
@@ -55,6 +64,24 @@ HISTORY_ACCENT_DARK = "#C87943"
 HISTORY_SECONDARY_TEXT = "#7D8C8A"
 WATER_HISTORY_PRIMARY = "#BFD8FF"
 WATER_HISTORY_SECONDARY = "#7E8FA3"
+
+
+@dataclass
+class StudentHistoryData:
+    """Raw history rows shared by all read-only student charts."""
+
+    records: list[dict[str, object]]
+    weights: list[dict[str, object]]
+    trainings: list[dict[str, object]]
+
+
+def load_student_history_data(user_id: str) -> StudentHistoryData:
+    """Load each history worksheet once for a student page render."""
+    return StudentHistoryData(
+        records=_fetch_records_cached(user_id),
+        weights=sheets.get_weight_records(user_id),
+        trainings=sheets.get_training_records(user_id),
+    )
 
 
 def _to_float(value: object) -> float:
@@ -468,9 +495,15 @@ def page_tdee_questionnaire() -> None:
 
         exercise_level = st.selectbox("每週運動頻率", EXERCISE_LEVELS, index=1)
 
-        st.subheader("健身目標")
+        st.subheader("減脂程度")
 
-        goal_type = st.radio("你的目標是？", ["減脂", "維持", "增肌"], horizontal=True, index=1)
+        deficit_label = st.segmented_control(
+            "每日熱量赤字",
+            options=list(CALORIE_DEFICIT_OPTIONS),
+            default=DEFAULT_CALORIE_DEFICIT_LABEL,
+            required=True,
+            width="stretch",
+        )
 
         submitted = st.form_submit_button("計算並儲存目標", width="stretch")
 
@@ -480,13 +513,9 @@ def page_tdee_questionnaire() -> None:
 
         tdee = calculate_tdee(bmr, exercise_level)
 
-        goals = calculate_goals(weight, tdee, goal_type)
+        calorie_deficit = CALORIE_DEFICIT_OPTIONS[deficit_label]
 
-        goals["bmr"] = bmr
-
-        goals["carb"] = 0.0
-
-        goals["fat"] = 0.0
+        goals = calculate_goals(weight, tdee, bmr, calorie_deficit)
 
         try:
 
@@ -608,7 +637,6 @@ def page_login() -> None:
                     new_pwd2 = st.text_input("確認密碼", type="password")
                 with col2:
                     initial_weight = st.number_input("目前體重 (kg)", value=60.0, step=0.1, min_value=30.0, max_value=200.0)
-                    goal_type = st.selectbox("目標", ["減脂", "維持", "增肌"], index=1)
 
                 submitted = st.form_submit_button("註冊並登入", width="stretch")
 
@@ -636,19 +664,11 @@ def page_login() -> None:
                 uid = auth.make_user_id()
                 pwd_hash = auth.hash_password(new_pwd)
 
-                estimated_tdee = initial_weight * 30
-                if goal_type == "減脂":
-                    calorie = estimated_tdee - 300
-                elif goal_type == "增肌":
-                    calorie = estimated_tdee + 300
-                else:
-                    calorie = estimated_tdee
-
                 protein = initial_weight * 2
                 water = initial_weight * 40
 
                 goals = {
-                    "calorie": calorie,
+                    "calorie": 0,
                     "protein": protein,
                     "carb": 0,
                     "fat": 0,
@@ -1426,7 +1446,12 @@ def build_weight_history_figure(
     return figure
 
 
-def _render_student_weight_history(user_id: str) -> None:
+def _render_student_weight_history(
+    user_id: str,
+    *,
+    allow_record_actions: bool = True,
+    weight_records: list[dict[str, object]] | None = None,
+) -> None:
     with st.container(key="student_weight_history"):
         selected_range = st.session_state.get("weight_history_range", "7 天")
         if selected_range not in ("7 天", "30 天"):
@@ -1434,24 +1459,30 @@ def _render_student_weight_history(user_id: str) -> None:
         day_count = 30 if selected_range == "30 天" else 7
         start_date, end_date = history_date_range(auth.today_date(), day_count)
 
-        try:
-            weight_records = sheets.get_weight_records(user_id)
-        except Exception:
-            st.error("取得體重紀錄失敗，請稍後再試。")
-            return
+        if weight_records is None:
+            try:
+                weight_records = sheets.get_weight_records(user_id)
+            except Exception as exc:
+                st.error(
+                    safe_data_read_failure_message(
+                        "student_history.weight", exc
+                    )
+                )
+                return
 
         points = build_weight_history_series(
             weight_records, start_date, end_date
         )
         if _weight_history_summary(points) is None:
             st.info("目前尚無體重紀錄。")
-            if st.button(
-                "新增體重紀錄",
-                key="history_add_weight",
-                width="stretch",
-            ):
-                open_daily_record_tab("體重")
-                st.rerun()
+            if allow_record_actions:
+                if st.button(
+                    "新增體重紀錄",
+                    key="history_add_weight",
+                    width="stretch",
+                ):
+                    open_daily_record_tab("體重")
+                    st.rerun()
             return
 
         with st.container(key="student_weight_history_card"):
@@ -1524,7 +1555,11 @@ def _training_period_label(anchor_date: date, view: str) -> str:
     return f"{start:%Y/%m/%d} – {end:%Y/%m/%d}"
 
 
-def _render_student_training_history(user_id: str) -> None:
+def _render_student_training_history(
+    user_id: str,
+    *,
+    training_records: list[dict[str, object]] | None = None,
+) -> None:
     today = auth.today_date()
     selected_view = st.session_state.get("training_history_view", "週")
     if selected_view not in ("週", "月"):
@@ -1537,11 +1572,16 @@ def _render_student_training_history(user_id: str) -> None:
         st.session_state["training_history_anchor"] = anchor_date
 
     with st.container(key="student_training_history"):
-        try:
-            records = sheets.get_training_records(user_id)
-        except Exception:
-            st.error("取得訓練紀錄失敗，請稍後再試。")
-            return
+        if training_records is None:
+            try:
+                training_records = sheets.get_training_records(user_id)
+            except Exception as exc:
+                st.error(
+                    safe_data_read_failure_message(
+                        "student_history.training", exc
+                    )
+                )
+                return
 
         with st.container(key="student_training_history_card"):
             selected_view = st.segmented_control(
@@ -1602,7 +1642,7 @@ def _render_student_training_history(user_id: str) -> None:
                     st.rerun()
 
             cells = build_training_calendar(
-                records,
+                training_records,
                 anchor_date=anchor_date,
                 view=selected_view,
                 today=today,
@@ -1736,7 +1776,11 @@ def build_nutrition_history_figure(
     return figure
 
 
-def _render_student_nutrition_history(user_id: str) -> None:
+def _render_student_nutrition_history(
+    user_id: str,
+    *,
+    records: list[dict[str, object]] | None = None,
+) -> None:
     with st.container(key="student_nutrition_history"):
         selected_range = st.session_state.get(
             "nutrition_history_range", "7 天"
@@ -1747,11 +1791,16 @@ def _render_student_nutrition_history(user_id: str) -> None:
         today = auth.today_date()
         start_date, end_date = history_date_range(today, day_count)
 
-        try:
-            records = _fetch_records_cached(user_id)
-        except Exception:
-            st.error("取得飲食紀錄失敗，請稍後再試。")
-            return
+        if records is None:
+            try:
+                records = _fetch_records_cached(user_id)
+            except Exception as exc:
+                st.error(
+                    safe_data_read_failure_message(
+                        "student_history.nutrition", exc
+                    )
+                )
+                return
 
         points = build_nutrition_history_series(
             records,
@@ -1876,7 +1925,11 @@ def build_water_history_figure(
     return figure
 
 
-def _render_student_water_history(user_id: str) -> None:
+def _render_student_water_history(
+    user_id: str,
+    *,
+    records: list[dict[str, object]] | None = None,
+) -> None:
     with st.container(key="student_water_history"):
         selected_range = st.session_state.get("water_history_range", "7 天")
         if selected_range not in ("7 天", "30 天"):
@@ -1885,11 +1938,16 @@ def _render_student_water_history(user_id: str) -> None:
         today = auth.today_date()
         start_date, end_date = history_date_range(today, day_count)
 
-        try:
-            records = _fetch_records_cached(user_id)
-        except Exception:
-            st.error("取得飲水紀錄失敗，請稍後再試。")
-            return
+        if records is None:
+            try:
+                records = _fetch_records_cached(user_id)
+            except Exception as exc:
+                st.error(
+                    safe_data_read_failure_message(
+                        "student_history.water", exc
+                    )
+                )
+                return
 
         points = build_water_history_series(
             records,
@@ -1962,6 +2020,33 @@ def page_log_meal() -> None:
 
 # =============================================================================
 
+def render_student_history_charts(
+    user_id: str,
+    *,
+    allow_record_actions: bool = True,
+    history_data: StudentHistoryData | None = None,
+) -> None:
+    """Render the shared read-only history charts for one student."""
+    if history_data is None:
+        try:
+            history_data = load_student_history_data(user_id)
+        except Exception as exc:
+            st.error(
+                safe_data_read_failure_message("student_history.read", exc)
+            )
+            return
+    _render_student_weight_history(
+        user_id,
+        allow_record_actions=allow_record_actions,
+        weight_records=history_data.weights,
+    )
+    _render_student_nutrition_history(user_id, records=history_data.records)
+    _render_student_water_history(user_id, records=history_data.records)
+    _render_student_training_history(
+        user_id, training_records=history_data.trainings
+    )
+
+
 def page_history() -> None:
     with st.container(key="student_history_page"):
         uid = st.session_state.user_id
@@ -1973,10 +2058,7 @@ def page_history() -> None:
         )
         if history_tab.open:
             with history_tab:
-                _render_student_weight_history(uid)
-                _render_student_nutrition_history(uid)
-                _render_student_water_history(uid)
-                _render_student_training_history(uid)
+                render_student_history_charts(uid)
         elif edit_tab.open:
             with edit_tab:
                 try:

@@ -1,6 +1,6 @@
 """教練端頁面。"""
 from __future__ import annotations
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from io import BytesIO
 import html
 import io as _io
@@ -9,20 +9,27 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as _plt
 from matplotlib.backends.backend_pdf import PdfPages as _PdfPages
-import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 from services import application, metrics, sheets
 from services.health import run_health_checks
-from services.security import safe_failure_message
+from services.security import (
+    safe_data_read_failure_message,
+    safe_failure_message,
+)
 from domain.history import aggregate_daily as _history_aggregate_daily
 from domain.history import parse_record_date as _parse_record_date
 from services.exports import build_history_csv
+from pages.student import (
+    StudentHistoryData,
+    load_student_history_data,
+    render_student_history_charts,
+)
 from pages.common import (
     _clear_analysis_cache,
     current_auth_context,
     get_default_avatar_source,
 )
+from ui.coach_student_card import coach_student_card
 
 
 COACH_NUTRIENT_SPECS = (
@@ -30,6 +37,10 @@ COACH_NUTRIENT_SPECS = (
     ("水", "water", "water", "ml", "#90cbfb"),
     ("蛋白質", "protein", "protein", "g", "#bbf250"),
 )
+
+_EXPANDED_GOAL_STUDENT_KEY = "coach_goal_expanded_student"
+_GOAL_FLASH_KEY = "coach_goal_update_flash"
+_HISTORY_EXPORT_CACHE_KEY = "coach_history_prepared_export"
 
 
 def _non_negative_number(value: object) -> float:
@@ -204,34 +215,67 @@ def _render_password_reset_requests() -> None:
             st.divider()
 
 
-def page_coach_overview() -> None:
-    st.markdown("""<style>
-    .member-card { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 16px; }
-    .member-top-row { display: flex; align-items: center; gap: 12px; }
-    .member-avatar { width: 48px; height: 48px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-    .member-name { font-size: 18px; font-weight: 500; color: #1F2937; }
-    .member-avatar { width: 56px; height: 56px; border-radius: 50%; background: #BBE8EE; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 20px; flex-shrink: 0; }
-            .member-name { font-size: 18px; font-weight: 400; color: #1F2937; }
-    .training-badge { background: #DCFCE7; color: #16A34A; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
-    .training-badge.not-done { background: #F3F4F6; color: #9CA3AF; }
-    .coach-nutrient-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; width: 100%; padding: 4px 0 2px; }
-    .coach-nutrient { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
-    .coach-nutrient-label { overflow: hidden; color: #4B5563; font-size: 12px; font-weight: 500; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-    .coach-nutrient-track { width: 100%; height: 5px; overflow: hidden; border-radius: 999px; background: #E9ECEF; }
-    .coach-nutrient-track > span { display: block; height: 100%; border-radius: inherit; }
-    .coach-nutrient-value { display: block; width: 100%; overflow: hidden; color: #9CA3AF; font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-    @media (max-width: 480px) {
-        .member-card { gap: 12px; padding: 14px 12px; }
-        .member-avatar { width: 48px; height: 48px; margin-right: 8px; font-size: 19px; }
-        .member-name { min-width: 0; overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
-        .training-badge { margin-left: auto; padding: 4px 7px; font-size: 10px; white-space: nowrap; }
-        .coach-nutrient-grid { gap: 6px; }
-        .coach-nutrient { gap: 6px; }
-        .coach-nutrient-label { font-size: 11px; }
-        .coach-nutrient-value { font-size: 13px; }
-    }
-    </style>""", unsafe_allow_html=True)
+def _render_student_goal_editor(
+    user_id: str, goals: dict[str, object]
+) -> None:
+    """Render the three supported goal fields directly below a status card."""
+    flash = st.session_state.get(_GOAL_FLASH_KEY)
+    if isinstance(flash, dict) and flash.get("user_id") == user_id:
+        st.success(str(flash.get("message") or "目標已更新"))
+        st.session_state.pop(_GOAL_FLASH_KEY, None)
 
+    with st.container(key=f"coach_goal_editor_{user_id}", border=True):
+        with st.form(f"coach_goal_form_{user_id}"):
+            calorie_column, protein_column, water_column = st.columns(3)
+            with calorie_column:
+                calorie = st.number_input(
+                    "卡路里目標 (kcal)",
+                    min_value=1.0,
+                    value=max(1.0, float(goals.get("calorie") or 0)),
+                    step=50.0,
+                )
+            with protein_column:
+                protein = st.number_input(
+                    "蛋白質目標 (g)",
+                    min_value=1.0,
+                    value=max(1.0, float(goals.get("protein") or 0)),
+                    step=5.0,
+                )
+            with water_column:
+                water = st.number_input(
+                    "飲水目標 (ml)",
+                    min_value=1.0,
+                    value=max(1.0, float(goals.get("water") or 0)),
+                    step=100.0,
+                )
+            submitted = st.form_submit_button("更新學員目標", width="stretch")
+
+    if not submitted:
+        return
+    try:
+        if min(calorie, protein, water) <= 0:
+            raise ValueError("三項目標都必須大於 0")
+        updated = application.update_student_goals(
+            current_auth_context(),
+            user_id,
+            {"calorie": calorie, "protein": protein, "water": water},
+        )
+        if not updated:
+            raise LookupError("student not found")
+        _clear_analysis_cache()
+    except ValueError as exc:
+        st.warning(str(exc))
+    except Exception as exc:
+        st.error(safe_failure_message("coach_goals.update", exc))
+    else:
+        st.session_state[_GOAL_FLASH_KEY] = {
+            "user_id": user_id,
+            "message": "目標已更新",
+        }
+        st.rerun()
+
+
+def page_coach_overview() -> None:
     coach_name = str(st.session_state.username or "Coach")
     avatar_source = get_default_avatar_source()
     with st.container(key="coach_overview_header"):
@@ -244,10 +288,16 @@ def page_coach_overview() -> None:
     _render_password_reset_requests()
 
     if st.session_state.get("role") == "admin":
-        with st.expander("系統健康狀態"):
-            for check in run_health_checks():
-                prefix = {"ok": "正常", "warning": "注意", "error": "異常"}[check.status]
-                st.write(f"{check.name}｜{prefix}｜{check.detail}")
+        with st.container(key="admin_health_status"):
+            with st.expander("系統健康狀態"):
+                for check in run_health_checks():
+                    prefix = {"ok": "正常", "warning": "注意", "error": "異常"}[check.status]
+                    st.markdown(
+                        '<div class="admin-health-row">'
+                        f"{html.escape(str(check.name))}｜{prefix}｜{html.escape(str(check.detail))}"
+                        "</div>",
+                        unsafe_allow_html=True,
+                    )
 
     try:
         students = application.get_students(current_auth_context())
@@ -280,10 +330,20 @@ def page_coach_overview() -> None:
         training_today = training_by_student.get(uid)
         has_training = bool(training_today) and bool(training_today.get("training_types"))
 
-        card_html = build_coach_student_card_html(
-            name, has_training, totals, goals
-        )
-        st.markdown(card_html, unsafe_allow_html=True)
+        expanded = st.session_state.get(_EXPANDED_GOAL_STUDENT_KEY) == uid
+        if coach_student_card(
+            student_id=uid,
+            name=str(name),
+            has_training=has_training,
+            totals=totals,
+            goals=goals,
+            expanded=expanded,
+            key=f"coach_student_card_{uid}",
+        ):
+            st.session_state[_EXPANDED_GOAL_STUDENT_KEY] = None if expanded else uid
+            st.rerun()
+        if expanded:
+            _render_student_goal_editor(uid, goals)
 def page_coach_student_detail() -> None:
 
     uid = st.session_state.get("view_student_id")
@@ -665,539 +725,289 @@ def _build_history_pdf(student, daily, weights, trainings, notes, start_date, en
         _plt.close(fig)
     return buf.getvalue()
 
-def page_coach_student_history():
-    """教練端：檢視單一學員的歷史記錄（圖表 / 備註 / 匯出）。"""
-    uid = st.session_state.get("view_student_id")
-
-    if not uid:
-        try:
-            students = application.get_students(current_auth_context())
-        except Exception as exc:
-            st.error(safe_failure_message("coach_history.list_students", exc))
-            return
-        st.header("學員歷史")
-        if not students:
-            st.info("目前沒有學員。")
-            return
-        st.caption("從總覽點選學員，或在此手動選擇：")
-        labels = {}
-        for s in students:
-            labels[s.get("user_id", "")] = s.get("name", s.get("username", "未知"))
-        picked = st.selectbox(
-            "選擇學員",
-            options=list(labels.keys()),
-            format_func=lambda x: labels.get(x, x),
-            key="hist_picker",
-        )
-        if st.button("查看歷史", type="primary", key="hist_picker_btn"):
-            st.session_state.view_student_id = picked
-            st.rerun()
+def _render_coach_history_data_tools(
+    student: dict[str, object],
+    user_id: str,
+    display_name: str,
+    history_data: StudentHistoryData,
+) -> None:
+    """Keep import and export utilities separate from the shared charts."""
+    tools = st.expander(
+        "資料工具",
+        icon=":material/build:",
+        key="coach_history_data_tools",
+        on_change="rerun",
+    )
+    if not tools.open:
         return
 
-    student = application.get_student(current_auth_context(), uid)
-    if not student:
-        st.error("沒有權限查看此學員，請返回總覽重新選擇。")
-        if st.button("← 返回學員狀態", key="back_err"):
-            st.session_state.page = "學員狀態"
-            st.session_state.pop("view_student_id", None)
-            st.rerun()
-        return
-
-    name = student.get("name", student.get("username", "未知"))
-    col_back, col_title = st.columns([1, 5])
-    with col_back:
-        if st.button("← 返回總覽", key="back_top"):
-            st.session_state.page = "學員狀態"
-            st.session_state.pop("view_student_id", None)
-            st.rerun()
-    with col_title:
-        st.header("📚 " + str(name) + " 的歷史記錄")
-    st.divider()
-    st.subheader("匯入 Excel")
-
-    # ============================================================
-    # Excel 匯入功能
-    # ============================================================
-    with st.expander("📥 匯入 Excel 資料"):
+    with tools:
+        st.subheader("匯入 Excel")
         uploaded_file = st.file_uploader(
             "選擇 Excel 檔案（每個工作表代表一個月份）",
             type=["xlsx"],
-            key="excel_import_file_hist"
+            key="coach_history_excel_import",
         )
-
         if uploaded_file is not None:
             try:
-                file_bytes = uploaded_file.getvalue()
-
                 with st.spinner("分析 Excel 檔案中..."):
                     analysis_result = application.import_student_records(
-                        current_auth_context(), uid,
-                        excel_file_bytes=file_bytes, overwrite_duplicates=False,
+                        current_auth_context(),
+                        user_id,
+                        excel_file_bytes=uploaded_file.getvalue(),
+                        overwrite_duplicates=False,
                     )
-
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("可新增", f"{analysis_result['imported']} 筆")
-                with col2:
-                    st.metric("將覆寫", f"{analysis_result['overwritten']} 筆")
-                with col3:
-                    st.metric("將跳過", f"{analysis_result['skipped']} 筆")
-
+                metric_columns = st.columns(3)
+                metric_columns[0].metric("可新增", f"{analysis_result['imported']} 筆")
+                metric_columns[1].metric("將覆寫", f"{analysis_result['overwritten']} 筆")
+                metric_columns[2].metric("將跳過", f"{analysis_result['skipped']} 筆")
                 if analysis_result["errors"]:
-                    with st.expander("⚠️ 匯入時的錯誤"):
-                        for err in analysis_result["errors"]:
-                            st.warning(err)
-
-                if analysis_result["duplicates"]:
-                    with st.expander(f"⚠️ 發現 {len(analysis_result['duplicates'])} 筆重複"):
-                        for dup in analysis_result["duplicates"][:10]:
-                            st.write(f"📅 {dup['date']}")
-
+                    with st.expander("匯入錯誤", icon=":material/warning:"):
+                        for error in analysis_result["errors"]:
+                            st.warning(error)
                 if analysis_result["imported"] > 0 or analysis_result["skipped"] > 0:
-                    overwrite_mode = st.radio(
-                        "遇到重複日期：",
-                        ["跳過", "覆寫"],
-                        horizontal=True,
+                    overwrite_mode = st.segmented_control(
+                        "遇到重複日期",
+                        ("跳過", "覆寫"),
+                        default="跳過",
+                        required=True,
+                        key="coach_history_import_duplicate_mode",
                     )
-                    do_overwrite = (overwrite_mode == "覆寫")
-
-                    if st.button("確認匯入", type="primary", width="stretch"):
+                    if st.button(
+                        "確認匯入",
+                        type="primary",
+                        width="stretch",
+                        key="coach_history_confirm_import",
+                    ):
                         with st.spinner("匯入資料中..."):
                             final_result = application.import_student_records(
-                                current_auth_context(), uid,
-                                precomputed_data=analysis_result['parsed_data'],
-                                operation_token=analysis_result['parsed_data']['operation_token'],
-                                overwrite_duplicates=do_overwrite
+                                current_auth_context(),
+                                user_id,
+                                precomputed_data=analysis_result["parsed_data"],
+                                operation_token=analysis_result["parsed_data"]["operation_token"],
+                                overwrite_duplicates=overwrite_mode == "覆寫",
                             )
-                            _clear_analysis_cache()
-
-                            msg = f"匯入完成！新增 {final_result['imported']} 筆"
-                            if final_result["overwritten"] > 0:
-                                msg += f"，覆寫 {final_result['overwritten']} 筆"
-                            if final_result["skipped"] > 0:
-                                msg += f"，跳過 {final_result['skipped']} 筆"
-                            st.success(msg)
-
-                            st.info("請手動刷新頁面以查看最新資料")
-                else:
-                    st.info("沒有找到可匯入的資料")
-
+                        _clear_analysis_cache()
+                        st.session_state.pop(_HISTORY_EXPORT_CACHE_KEY, None)
+                        st.success(
+                            "匯入完成！新增 "
+                            f"{final_result['imported']} 筆，覆寫 "
+                            f"{final_result['overwritten']} 筆，跳過 "
+                            f"{final_result['skipped']} 筆"
+                        )
             except Exception as exc:
                 st.error(safe_failure_message("coach_history.import", exc))
 
-    st.divider()
-
-    range_mode = st.radio(
-        "範圍",
-        ["7 天", "30 天", "自訂日期"],
-        horizontal=True,
-        index=0,
-        label_visibility="collapsed",
-        key="hist_range_mode",
-    )
-    today = date.today()
-    if range_mode == "7 天":
-        start_date = today - timedelta(days=6)
-        end_date = today
-    elif range_mode == "30 天":
-        start_date = today - timedelta(days=29)
-        end_date = today
-    else:
-        c1, c2 = st.columns(2)
-        with c1:
-            start_date = st.date_input(
+        st.subheader("匯出資料")
+        range_mode = st.segmented_control(
+            "匯出範圍",
+            ("7 天", "30 天", "自訂日期"),
+            default="7 天",
+            required=True,
+            key="coach_history_export_range",
+            width="stretch",
+        )
+        today = date.today()
+        if range_mode == "30 天":
+            start_date, end_date = today - timedelta(days=29), today
+        elif range_mode == "自訂日期":
+            start_column, end_column = st.columns(2)
+            start_date = start_column.date_input(
                 "開始日期",
                 today - timedelta(days=6),
                 max_value=today,
-                key="hist_start",
+                key="coach_history_export_start",
             )
-        with c2:
-            end_date = st.date_input(
+            end_date = end_column.date_input(
                 "結束日期",
                 today,
                 max_value=today,
-                key="hist_end",
+                key="coach_history_export_end",
             )
-        if start_date > end_date:
-            st.warning("開始日期不能晚於結束日期，已自動交換。")
-            start_date, end_date = end_date, start_date
-    days_count = (end_date - start_date).days + 1
-    st.caption(
-        "顯示區間："
-        + start_date.strftime("%Y/%m/%d")
-        + " ~ "
-        + end_date.strftime("%Y/%m/%d")
-        + "（共 "
-        + str(days_count)
-        + " 天）"
-    )
-
-    try:
-        all_records = sheets.get_records(uid)
-        all_weights = sheets.get_weight_records(uid)
-        all_trainings = sheets.get_training_records(uid)
-        all_notes = sheets.get_notes(uid)
-        goals = sheets.get_user_goals(uid)
-    except Exception as exc:
-        st.error(safe_failure_message("coach_history.read", exc))
-        return
-
-    daily = _history_aggregate_daily(all_records, start_date, end_date)
-    weights = []
-    for r in all_weights:
-        d = _parse_record_date(r.get("timestamp", ""))
-        if start_date <= d <= end_date:
-            weights.append(r)
-    trainings = []
-    for r in all_trainings:
-        d = _parse_record_date(r.get("timestamp", ""))
-        if start_date <= d <= end_date:
-            trainings.append(r)
-    notes = []
-    for r in all_notes:
-        d = _parse_record_date(r.get("timestamp", ""))
-        if start_date <= d <= end_date:
-            notes.append(r)
-    st.subheader("區間摘要")
-    avg_cal = sum(v["calorie"] for v in daily.values()) / max(days_count, 1)
-    avg_pro = sum(v["protein"] for v in daily.values()) / max(days_count, 1)
-    avg_water = sum(v["water"] for v in daily.values()) / max(days_count, 1)
-    sorted_w = sorted(weights, key=lambda r: r.get("timestamp", ""))
-    first_w = None
-    last_w = None
-    weight_delta = None
-    if sorted_w:
-        first_w = sorted_w[0].get("weight_kg")
-        last_w = sorted_w[-1].get("weight_kg")
-        if first_w is not None and last_w is not None:
-            weight_delta = last_w - first_w
-    mc1, mc2, mc3, mc4 = st.columns(4)
-    with mc1:
-        st.metric("平均熱量", "%.0f kcal" % avg_cal, "目標 %.0f" % goals.get("calorie", 0))
-    with mc2:
-        st.metric("平均蛋白質", "%.0f g" % avg_pro, "目標 %.0f" % goals.get("protein", 0))
-    with mc3:
-        st.metric("平均水量", "%.0f ml" % avg_water, "目標 %.0f" % goals.get("water", 0))
-    with mc4:
-        if last_w is not None:
-            d_str = ("%+.1f kg" % weight_delta) if weight_delta is not None else None
-            st.metric("目前體重", "%.1f kg" % last_w, d_str)
+            if start_date > end_date:
+                start_date, end_date = end_date, start_date
+                st.warning("開始日期晚於結束日期，已自動交換。")
         else:
-            st.metric("目前體重", "-")
-    # 統一的高質感深夜底色
-    CARD_BG = '#2a2850'
-    # 統一強制套用系統原生高質感字型
-    FONT_SETTING = dict(family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif")
+            start_date, end_date = today - timedelta(days=6), today
 
-    # ==========================================
-    # 體重趨勢圖
-    # ==========================================
-    if weights:
-        # 準備體重數據
-        def parse_weight_date(ts):
-            ts_str = str(ts)
-            # 嘗試解析 ISO 格式: 2026-07-15T10:30:00
-            if "T" in ts_str:
-                try:
-                    dt = datetime.strptime(ts_str[:19], "%Y-%m-%dT%H:%M:%S")
-                    return dt.strftime("%m/%d")
-                except:
-                    pass
-            # 回退：直接取日期部分
-            if "-" in ts_str:
-                parts = ts_str.split(" ")[0].split("-")
-                if len(parts) >= 3:
-                    return f"{int(parts[1]):02d}/{int(parts[2]):02d}"
-            return ts_str[:10]
-
-        weight_xs = [parse_weight_date(r.get("timestamp", "")) for r in sorted_w]
-        weight_ys = [r.get("weight_kg", 0) for r in sorted_w]
-        # 自適應 Y軸範圍
-        min_w = min(weight_ys) if weight_ys else 0
-        max_w = max(weight_ys) if weight_ys else 100
-        weight_range = max_w - min_w
-
-        # 根據範圍選擇刻度間隔
-        if weight_range < 5:
-            step = 1
-        elif weight_range < 10:
-            step = 2
-        elif weight_range < 20:
-            step = 5
-        else:
-            step = 10
-
-        # 計算 Y軸範圍（加入緩衝）
-        y_min = int(min_w) - step
-        y_max = int(max_w) + step
-        # 確保不為負數
-        y_min = max(0, y_min)
-
-        # 生成刻度列表
-        weight_ticks = list(range(y_min, y_max + 1, step))
-
-        last_weight = weight_ys[-1] if weight_ys else 0
-        first_weight = weight_ys[0] if weight_ys else 0
-        weight_change = last_weight - first_weight
-
-        fig_weight = go.Figure()
-
-        fig_weight.add_trace(go.Scatter(
-            x=weight_xs,
-            y=weight_ys,
-            mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
-            hovertemplate='日期: %{x}<br>體重: %{y:.1f} kg<extra></extra>'
-        ))
-
-        change_str = f"{weight_change:+.1f}" if weight_change != 0 else "0.0"
-
-        fig_weight.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
-            height=260,
-            font=FONT_SETTING,
-            annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>{last_weight:.1f}</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>kg</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text=f"<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>體重 {change_str} kg</span>",
-                    showarrow=False, align="left")
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor="rgba(255, 255, 255, 0.05)", tickfont=dict(color="#888888", size=11), zeroline=False, showline=False, ticks="", tickvals=weight_ticks, range=[y_min, y_max]),
-            showlegend=False
+        export_signature = (
+            user_id,
+            start_date.isoformat(),
+            end_date.isoformat(),
         )
+        prepared_export = st.session_state.get(_HISTORY_EXPORT_CACHE_KEY)
+        if not isinstance(prepared_export, dict) or prepared_export.get(
+            "signature"
+        ) != export_signature:
+            st.session_state.pop(_HISTORY_EXPORT_CACHE_KEY, None)
+            prepared_export = None
 
-        st.plotly_chart(fig_weight, width="stretch", config={'displayModeBar': False})
-    else:
-        st.info("此區間沒有體重記錄。")
+        if st.button(
+            "準備下載檔案",
+            icon=":material/download:",
+            key="coach_history_prepare_export",
+            width="stretch",
+        ):
+            try:
+                note_rows = sheets.get_notes(user_id)
+                daily = _history_aggregate_daily(
+                    history_data.records, start_date, end_date
+                )
+                weights = [
+                    row
+                    for row in history_data.weights
+                    if start_date
+                    <= _parse_record_date(row.get("timestamp", ""))
+                    <= end_date
+                ]
+                trainings = [
+                    row
+                    for row in history_data.trainings
+                    if start_date
+                    <= _parse_record_date(row.get("timestamp", ""))
+                    <= end_date
+                ]
+                notes = [
+                    row
+                    for row in note_rows
+                    if start_date
+                    <= _parse_record_date(row.get("timestamp", ""))
+                    <= end_date
+                ]
+                prepared_export = {
+                    "signature": export_signature,
+                    "csv": _build_history_csv(
+                        student,
+                        daily,
+                        weights,
+                        trainings,
+                        notes,
+                        start_date,
+                        end_date,
+                    ),
+                    "pdf": _build_history_pdf(
+                        student,
+                        daily,
+                        weights,
+                        trainings,
+                        notes,
+                        start_date,
+                        end_date,
+                    ),
+                }
+                st.session_state[_HISTORY_EXPORT_CACHE_KEY] = prepared_export
+            except Exception as exc:
+                st.error(
+                    safe_data_read_failure_message(
+                        "coach_history.export", exc
+                    )
+                )
+                prepared_export = None
+
+        if prepared_export is None:
+            st.caption("選擇匯出範圍後，再準備下載檔案。")
+        else:
+            download_columns = st.columns(2)
+            filename = (
+                f"{display_name}_歷史_"
+                f"{start_date.isoformat()}_{end_date.isoformat()}"
+            )
+            download_columns[0].download_button(
+                "下載 CSV",
+                data=prepared_export["csv"],
+                file_name=f"{filename}.csv",
+                mime="text/csv",
+                width="stretch",
+                key="coach_history_download_csv",
+            )
+            download_columns[1].download_button(
+                "下載 PDF",
+                data=prepared_export["pdf"],
+                file_name=f"{filename}.pdf",
+                mime="application/pdf",
+                width="stretch",
+                key="coach_history_download_pdf",
+            )
 
 
-
-    # 統一的高質感深夜底色
-    st.subheader("每日攝取趨勢")
-
-    # 深色卡片趨勢圖 CSS
-    st.markdown("""<style>
-        .chart-card { background: #1e1e38 !important; border-radius: 20px !important; padding: 20px 20px 5px 20px !important; margin: 15px 0 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important; box-sizing: border-box !important; }
-        .chart-value { font-size: 28px !important; font-weight: 700 !important; color: #ffffff !important; }
-        .chart-unit { font-size: 14px !important; color: #a0a0a0 !important; }
-        .chart-emoji { font-size: 32px !important; }
-        .chart-header { display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 16px !important; }
-    </style>""", unsafe_allow_html=True)
-
-
-    if daily:
-        sorted_days = sorted(daily.keys())
-        xs = [d.strftime("%m/%d") for d in sorted_days]
-
-        # ----- 1. 準備數據 -----
-        cals = [daily[d]["calorie"] for d in sorted_days]
-        pros = [daily[d]["protein"] for d in sorted_days]
-
-        total_cal = sum(cals)
-        avg_cal = total_cal / len(sorted_days) if sorted_days else 0
-
-        total_pro = sum(pros)
-        avg_pro = total_pro / len(sorted_days) if sorted_days else 0
-
-
-        # ==========================================
-        # CSS：Plotly 容器圓角與陰影
-        # ==========================================
-        st.markdown("""
-        <style>
-            div[data-testid="stPlotlyChart"] {
-                border-radius: 24px !important;
-                overflow: hidden !important;
-                box-shadow: 0 12px 40px rgba(0,0,0,0.3) !important;
-                margin: 15px 0 !important;
-                background-color: #16152b !important;
+def page_coach_student_history() -> None:
+    """Render the same read-only charts used by the selected student."""
+    with st.container(key="coach_student_history_page"):
+        st.header("學員歷史")
+        user_id = str(st.session_state.get("view_student_id") or "")
+        if not user_id:
+            try:
+                students = application.get_students(current_auth_context())
+            except Exception as exc:
+                st.error(safe_failure_message("coach_history.list_students", exc))
+                return
+            if not students:
+                st.info("目前沒有學員。")
+                return
+            labels = {
+                str(student.get("user_id") or ""): str(
+                    student.get("name") or student.get("username") or "未知"
+                )
+                for student in students
             }
-        </style>
-        """, unsafe_allow_html=True)
+            selected_user = st.selectbox(
+                "選擇學員",
+                options=list(labels),
+                format_func=lambda value: labels.get(value, value),
+                key="coach_history_student_picker",
+            )
+            if st.button(
+                "查看歷史",
+                type="primary",
+                key="coach_history_student_picker_button",
+            ):
+                st.session_state.view_student_id = selected_user
+                st.session_state.pop(_HISTORY_EXPORT_CACHE_KEY, None)
+                st.rerun()
+            return
 
+        student = application.get_student(current_auth_context(), user_id)
+        if not student:
+            st.error("沒有權限查看此學員，請返回總覽重新選擇。")
+            if st.button("返回學員狀態", icon=":material/arrow_back:"):
+                st.session_state.page = "學員狀態"
+                st.session_state.pop("view_student_id", None)
+                st.session_state.pop(_HISTORY_EXPORT_CACHE_KEY, None)
+                st.rerun()
+            return
 
-        # ==========================================
-        # 1. 一體化熱量趨勢圖
-        # ==========================================
-        max_cal = max(cals) if cals else 0
-        cal_ticks = []
-        if max_cal > 0:
-            cal_ticks = [v for v in [1000, 1500, 2000, 2500, 3000, 3500, 4000] if v <= max_cal * 1.2]
-            if not cal_ticks or cal_ticks[-1] < max_cal:
-                cal_ticks.append(((max_cal // 500) + 1) * 500)
-
-        fig_cal = go.Figure()
-
-        fig_cal.add_trace(go.Scatter(
-            x=xs,
-            y=cals,
-            mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
-            hovertemplate='日期: %{x}<br>熱量: %{y:.0f} kcal<extra></extra>'
-        ))
-
-        fig_cal.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
-            height=260,
-            font=FONT_SETTING,
-            annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>" + f"{avg_cal:.1f}" + "</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>kcal</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>平均每日熱量</span>",
-                    showarrow=False, align="left")
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.05)', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks="", tickvals=cal_ticks if cal_ticks else None),
-            showlegend=False
+        display_name = str(
+            student.get("name") or student.get("username") or "未知"
         )
+        with st.container(horizontal=True, vertical_alignment="center"):
+            if st.button(
+                "返回總覽",
+                icon=":material/arrow_back:",
+                key="coach_history_back",
+            ):
+                st.session_state.page = "學員狀態"
+                st.session_state.pop("view_student_id", None)
+                st.session_state.pop(_HISTORY_EXPORT_CACHE_KEY, None)
+                st.rerun()
+            st.subheader(f"{display_name} 的歷史紀錄")
 
-        st.plotly_chart(fig_cal, width="stretch", config={'displayModeBar': False})
+        try:
+            history_data = load_student_history_data(user_id)
+        except Exception as exc:
+            st.error(
+                safe_data_read_failure_message("coach_history.read", exc)
+            )
+            return
 
-        # ==========================================
-        # 2. 一體化蛋白質趨勢圖
-        # ==========================================
-        max_pro = max(pros) if pros else 0
-        pro_ticks = []
-        if max_pro > 0:
-            pro_ticks = [v for v in [50, 100, 150, 200, 250] if v <= max_pro * 1.2]
-            if not pro_ticks or pro_ticks[-1] < max_pro:
-                pro_ticks.append(((max_pro // 25) + 1) * 25)
+        with st.container(key="student_history_page"):
+            render_student_history_charts(
+                user_id,
+                allow_record_actions=False,
+                history_data=history_data,
+            )
 
-        fig_pro = go.Figure()
-
-        fig_pro.add_trace(go.Scatter(
-            x=xs,
-            y=pros,
-            mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
-            hovertemplate='日期: %{x}<br>蛋白質: %{y:.0f} g<extra></extra>'
-        ))
-
-        fig_pro.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
-            height=260,
-            font=FONT_SETTING,
-            annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>" + f"{avg_pro:.1f}" + "</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>g</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>平均每日蛋白質</span>",
-                    showarrow=False, align="left")
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.05)', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks="", tickvals=pro_ticks if pro_ticks else None),
-            showlegend=False
-        )
-
-        st.plotly_chart(fig_pro, width="stretch", config={'displayModeBar': False})
-
-        # ----- 4. 水量趨勢圖 -----
-
-        # ==========================================
-        # 3. 一體化水量趨勢圖
-        # ==========================================
-        waters = [daily[d]["water"] for d in sorted_days]
-        max_water = max(waters) if waters else 0
-        water_ticks = []
-        if max_water > 0:
-            water_ticks = [v for v in [1000, 1500, 2000, 2500, 3000, 3500, 4000] if v <= max_water * 1.2]
-            if not water_ticks or water_ticks[-1] < max_water:
-                water_ticks.append(((max_water // 500) + 1) * 500)
-
-        fig_water = go.Figure()
-
-        fig_water.add_trace(go.Scatter(
-            x=xs,
-            y=waters,
-            mode='lines+markers',
-            line=dict(color='#ffffff', width=3, shape='spline'),
-            marker=dict(size=6, color='#16152b', line=dict(color='#ffffff', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(255, 255, 255, 0.04)',
-            hovertemplate='日期: %{x}<br>水量: %{y:.0f} ml<extra></extra>'
-        ))
-
-        fig_water.update_layout(
-            paper_bgcolor=CARD_BG,
-            plot_bgcolor=CARD_BG,
-            margin=dict(l=40, r=25, t=90, b=25),
-            height=260,
-            font=FONT_SETTING,
-            annotations=[
-                dict(x=0.01, y=1.40, xref="paper", yref="paper",
-                    text=f"<b style='font-size:32px; color:#ffffff;'>{(sum(waters)/len(waters) if waters else 0):.1f}</b> <span style='font-size:14px; color:#a0a0a0; font-weight:normal;'>ml</span>",
-                    showarrow=False, align="left"),
-                dict(x=0.01, y=1.12, xref="paper", yref="paper",
-                    text="<span style='font-size:12px; color:#a0a0a0; font-weight:normal;'>平均每日水量</span>",
-                    showarrow=False, align="left")
-            ],
-            xaxis=dict(showgrid=False, tickfont=dict(color='#888888', size=12), showline=False, ticks=""),
-            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.05)', tickfont=dict(color='#888888', size=11), zeroline=False, showline=False, ticks="", tickvals=water_ticks if water_ticks else None),
-            showlegend=False
-        )
-
-        st.plotly_chart(fig_water, width="stretch", config={'displayModeBar': False})
-
-
-    else:
-        st.info("此區間沒有飲食記錄。")
-
-
-    st.subheader("訓練記錄")
-    if trainings:
-        rows = []
-        for r in sorted(trainings, key=lambda x: x.get("timestamp", "")):
-            rows.append({
-                "日期": r.get("timestamp", "")[:10],
-                "訓練內容": sheets.format_training_record(r) or "無",
-            })
-        st.dataframe(rows, width="stretch", hide_index=True)
-    else:
-        st.info("此區間沒有訓練記錄。")
-
-
-    st.subheader("匯出資料")
-    csv_bytes = _build_history_csv(student, daily, weights, trainings, notes, start_date, end_date)
-    pdf_bytes = _build_history_pdf(student, daily, weights, trainings, notes, start_date, end_date)
-    ec1, ec2 = st.columns(2)
-    with ec1:
-        st.download_button(
-            "下載 CSV",
-            data=csv_bytes,
-            file_name=str(name) + "_歷史_" + start_date.isoformat() + "_" + end_date.isoformat() + ".csv",
-            mime="text/csv",
-            width="stretch",
-            key="dl_csv",
-        )
-    with ec2:
-        st.download_button(
-            "下載 PDF",
-            data=pdf_bytes,
-            file_name=str(name) + "_歷史_" + start_date.isoformat() + "_" + end_date.isoformat() + ".pdf",
-            mime="application/pdf",
-            width="stretch",
-            key="dl_pdf",
+        _render_coach_history_data_tools(
+            student, user_id, display_name, history_data
         )
 
 
