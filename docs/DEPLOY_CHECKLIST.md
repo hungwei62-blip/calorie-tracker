@@ -15,6 +15,7 @@
 python -m py_compile app.py pages/common.py pages/coach/__init__.py pages/student/__init__.py
 python -m pytest -q
 python tools/init_sheets.py
+python tools/migrate_record_ids.py
 python tools/audit_and_migrate.py --primary-coach-id u_20260629165506_4b525f9c
 ```
 
@@ -23,6 +24,8 @@ python tools/audit_and_migrate.py --primary-coach-id u_20260629165506_4b525f9c
 - [ ] 遷移後確認 Users 筆數不變，並保留 `Users.after.csv`
 - [ ] `python tools/init_sheets.py` 只顯示預期的 `Users` 欄位延伸與 `PasswordResetRequests` 新表
 - [ ] 完成備份後執行 `python tools/init_sheets.py --apply`
+- [ ] 先部署相容版本，再確認 `python tools/migrate_record_ids.py` 沒有未知 schema 或重複 ID
+- [ ] 執行 `python tools/migrate_record_ids.py --apply`，保留三份 before CSV 並核對筆數
 
 ## 部署後驗收
 
@@ -33,6 +36,8 @@ python tools/audit_and_migrate.py --primary-coach-id u_20260629165506_4b525f9c
 - [ ] 手動輸入可只記錄熱量與蛋白質
 - [ ] 儲存飲食後 `Records.image_url` 保持空白
 - [ ] 體重、訓練、歷史與 CSV/PDF 匯出正常
+- [ ] 學員可依日期新增、修改及刪除自己的食物、飲水、訓練與體重紀錄
+- [ ] 學員無法使用其他帳號的 record_id 修改或刪除資料
 - [ ] 忘記密碼回應不洩漏帳號是否存在
 - [ ] 教練只能核准所屬學員，且臨時密碼只顯示一次
 - [ ] 臨時密碼登入後會強制設定至少 8 字元的新密碼

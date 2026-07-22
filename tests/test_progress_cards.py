@@ -184,6 +184,62 @@ def test_weight_summary_uses_later_sheet_row_when_timestamps_match():
     assert (summary.latest_weight, summary.previous_weight) == (61, 62)
 
 
+def test_weight_summary_treats_legacy_naive_timestamp_as_taipei_time():
+    summary = summarize_weight_measurements([
+        {"timestamp": "2026-07-19T10:00:00", "weight_kg": 62},
+        {"timestamp": "2026-07-19T03:00:00+00:00", "weight_kg": 61},
+    ])
+
+    assert summary is not None
+    assert (summary.latest_weight, summary.previous_weight) == (61, 62)
+
+
+def test_weight_summary_accepts_google_sheets_single_digit_hour():
+    records = [
+        {"timestamp": "2026-07-19T23:12:13+08:00", "weight_kg": 67.0},
+        {"timestamp": "2026-07-22 7:13:14", "weight_kg": 66.6},
+    ]
+
+    summary = summarize_weight_measurements(records, end_date=date(2026, 7, 22))
+
+    assert summary is not None
+    assert summary.latest_weight == 66.6
+    assert summary.previous_weight == 67.0
+    assert student_pages._weight_summary(
+        records, end_date=date(2026, 7, 22)
+    ) == (66.6, "⇩ 0.4 Kg (-0.6%)")
+
+
+def test_weight_summary_ignores_future_taipei_dates_when_cutoff_is_given():
+    records = [
+        {"timestamp": "2026-07-21T20:00:00+08:00", "weight_kg": 67.0},
+        {"timestamp": "2026-07-22T08:00:00+08:00", "weight_kg": 66.6},
+        {"timestamp": "2026-07-23T00:30:00+08:00", "weight_kg": 99.0},
+    ]
+
+    summary = summarize_weight_measurements(records, end_date=date(2026, 7, 22))
+
+    assert summary is not None
+    assert summary.latest_weight == 66.6
+    assert summary.previous_weight == 67.0
+    assert summary.difference == pytest.approx(-0.4)
+    assert student_pages._weight_summary(
+        records, end_date=date(2026, 7, 22)
+    ) == (66.6, "⇩ 0.4 Kg (-0.6%)")
+
+
+def test_weight_summary_converts_offset_timestamp_to_taipei_before_cutoff():
+    summary = summarize_weight_measurements(
+        [
+            {"timestamp": "2026-07-22T16:30:00+00:00", "weight_kg": 80},
+            {"timestamp": "2026-07-22T16:00:00+00:00", "weight_kg": 66},
+        ],
+        end_date=date(2026, 7, 22),
+    )
+
+    assert summary is None
+
+
 def test_weight_summary_ignores_invalid_timestamps_and_weights():
     summary = summarize_weight_measurements([
         {"timestamp": "bad-date", "weight_kg": 90},
@@ -197,14 +253,17 @@ def test_weight_summary_ignores_invalid_timestamps_and_weights():
     assert summary.previous_weight is None
 
 
-def test_weight_record_form_saves_full_iso_timestamp():
+def test_weight_record_form_saves_taipei_timestamp_and_resets_after_success():
     module_source = inspect.getsource(student_pages)
     source = module_source[
         module_source.index("def _render_weight_records"):
         module_source.index("def _weight_history_summary")
     ]
 
-    assert 'timestamp=datetime.now().isoformat()' in source
+    assert 'timestamp=auth.now_iso()' in source
+    assert 'value=None, step=0.1' in source
+    assert "weight_form_version = form_version + 1" in source
+    assert '_set_record_success("體重")' in source
 
 
 def test_progress_cards_have_scoped_fixed_two_column_styles():

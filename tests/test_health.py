@@ -7,6 +7,11 @@ def test_health_checks_do_not_expose_secret_values(monkeypatch):
     monkeypatch.setattr(health.sheets, "_get_sheet", lambda: object())
     monkeypatch.setattr(health.sheets, "_ensure_worksheet", lambda *_args: object())
     monkeypatch.setattr(health.sheets, "get_primary_coach_id", lambda: "coach-secret-id")
+    monkeypatch.setattr(
+        health.sheets,
+        "get_record_id_schema_status",
+        lambda: {"Records": True, "Weight": True, "Training": True},
+    )
     monkeypatch.setattr(health.gemini, "is_configured", lambda: True)
     monkeypatch.setattr(
         health.sheets,

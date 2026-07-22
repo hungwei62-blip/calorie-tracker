@@ -88,7 +88,7 @@ USERS_HEADERS = [
     "must_change_password", # 臨時密碼登入後必須先更改密碼
 ]
 
-RECORDS_HEADERS = [
+LEGACY_RECORDS_HEADERS = [
     "timestamp",
     "user_id",
     "meal_type",
@@ -101,16 +101,18 @@ RECORDS_HEADERS = [
     "image_url",
     "portion",
 ]
+RECORDS_HEADERS = [*LEGACY_RECORDS_HEADERS, "record_id"]
 
 # 體重記錄工作表
-WEIGHT_HEADERS = [
+LEGACY_WEIGHT_HEADERS = [
     "timestamp",
     "user_id",
     "weight_kg",
 ]
+WEIGHT_HEADERS = [*LEGACY_WEIGHT_HEADERS, "record_id"]
 
 # 訓練記錄工作表
-TRAINING_HEADERS = [
+LEGACY_TRAINING_HEADERS = [
     "timestamp",
     "user_id",
     "training_types",
@@ -118,6 +120,13 @@ TRAINING_HEADERS = [
     "cardio_detail",
     "other_detail",
 ]
+TRAINING_HEADERS = [*LEGACY_TRAINING_HEADERS, "record_id"]
+
+LEGACY_RECORD_SCHEMAS = {
+    "Records": LEGACY_RECORDS_HEADERS,
+    "Weight": LEGACY_WEIGHT_HEADERS,
+    "Training": LEGACY_TRAINING_HEADERS,
+}
 
 TRAINING_TYPE_FIELDS = {
     "重量訓練": "strength_detail",
@@ -211,12 +220,29 @@ def _ensure_worksheet(sh: gspread.Spreadsheet, title: str, headers: list[str]) -
     if schema_key in _VERIFIED_WORKSHEET_SCHEMAS:
         return ws
     existing_headers = ws.row_values(1)
-    if existing_headers != headers:
+    accepted_legacy = LEGACY_RECORD_SCHEMAS.get(title)
+    if existing_headers != headers and existing_headers != accepted_legacy:
         raise RuntimeError(
             f"{title} 工作表欄位與程式定義不一致，請先執行 tools/init_sheets.py"
         )
     _VERIFIED_WORKSHEET_SCHEMAS.add(schema_key)
     return ws
+
+
+def _worksheet_supports_record_id(ws: gspread.Worksheet) -> bool:
+    """Return whether a compatible record worksheet has completed ID migration."""
+    row_values = getattr(ws, "row_values", None)
+    if callable(row_values):
+        headers = row_values(1)
+    else:
+        get_all_values = getattr(ws, "get_all_values", None)
+        values = get_all_values() if callable(get_all_values) else []
+        headers = values[0] if values else []
+    return "record_id" in headers
+
+
+def _new_record_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex}"
 
 
 def initialize_worksheets(*, apply: bool = False) -> list[dict[str, Any]]:
@@ -314,11 +340,32 @@ def clear_read_caches() -> None:
         "get_notes",
         "get_audit_logs",
         "get_password_reset_requests",
+        "get_record_id_schema_status",
     ):
         fn = globals().get(fn_name)
         clear = getattr(fn, "clear", None)
         if clear is not None:
             clear()
+
+
+@st.cache_data(ttl=CACHE_TTL)
+def get_record_id_schema_status() -> dict[str, bool]:
+    """Return full migration readiness without changing worksheet schemas."""
+    sh = _get_sheet()
+    status: dict[str, bool] = {}
+    for title in ("Records", "Weight", "Training"):
+        headers = WORKSHEET_SCHEMAS[title]
+        ws = _ensure_worksheet(sh, title, headers)
+        if not _worksheet_supports_record_id(ws):
+            status[title] = False
+            continue
+        id_col = headers.index("record_id")
+        values = ws.get_all_values()[1:]
+        record_ids = [
+            str(row[id_col]).strip() if len(row) > id_col else "" for row in values
+        ]
+        status[title] = all(record_ids) and len(record_ids) == len(set(record_ids))
+    return status
 
 
 # =============================================================================
@@ -430,10 +477,12 @@ def append_user_with_initial_weight(
         coach_id,
         False,
     ]
-    weight_row = [created_at, user_id, round(weight, 1)]
     sh = _get_sheet()
     users_ws = _ensure_worksheet(sh, "Users", USERS_HEADERS)
     weight_ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
+    weight_row = [created_at, user_id, round(weight, 1)]
+    if _worksheet_supports_record_id(weight_ws):
+        weight_row.append(_new_record_id("wgt"))
     _retry_transient(lambda: sh.batch_update(
         {
             "requests": [
@@ -863,7 +912,8 @@ def append_record(
     water_ml: float,
     image_url: str,
     portion: float,
-) -> None:
+    record_id: str | None = None,
+) -> str:
     """新增一筆飲食記錄到 Records 工作表。"""
     timestamp = valid_timestamp(timestamp)
     user_id = bounded_text(user_id, "user_id", limit=80)
@@ -880,6 +930,11 @@ def append_record(
     image_url = ""
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+    supports_record_id = _worksheet_supports_record_id(ws)
+    record_id = (
+        bounded_text(record_id or _new_record_id("rec"), "record_id", limit=80)
+        if supports_record_id else ""
+    )
     row = [
         timestamp,
         user_id,
@@ -893,8 +948,11 @@ def append_record(
         image_url or "",
         round(portion, 2),
     ]
+    if supports_record_id:
+        row.append(record_id)
     ws.append_row(row, value_input_option="USER_ENTERED")
     clear_read_caches()
+    return record_id
 
 
 @st.cache_data(ttl=CACHE_TTL)
@@ -971,20 +1029,33 @@ def delete_record(record_timestamp: str, user_id: str) -> bool:
 # Weight（體重記錄）
 # =============================================================================
 
-def append_weight(timestamp: str, user_id: str, weight_kg: float) -> None:
+def append_weight(
+    timestamp: str, user_id: str, weight_kg: float, record_id: str | None = None
+) -> str:
     """新增一筆體重記錄到 Weight 工作表。"""
     timestamp = valid_timestamp(timestamp)
     user_id = bounded_text(user_id, "user_id", limit=80)
     weight_kg = positive_number(weight_kg, "weight_kg")
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
+    supports_record_id = _worksheet_supports_record_id(ws)
+    record_id = (
+        bounded_text(record_id or _new_record_id("wgt"), "record_id", limit=80)
+        if supports_record_id else ""
+    )
     row = [
         timestamp,
         user_id,
         round(weight_kg, 1),
     ]
-    ws.append_row(row, value_input_option="USER_ENTERED")
+    if supports_record_id:
+        row.append(record_id)
+    # RAW preserves the timezone-bearing ISO timestamp. USER_ENTERED lets
+    # Google Sheets turn it into a locale-formatted value such as
+    # ``2026-07-22 7:13:14``, which is unsuitable for stable sorting.
+    ws.append_row(row, value_input_option="RAW")
     clear_read_caches()
+    return record_id
 
 
 @st.cache_data(ttl=CACHE_TTL)
@@ -1019,6 +1090,39 @@ def get_weight_by_date(user_id: str, target_date: date) -> float | None:
     ]
     summary = summarize_weight_measurements(records)
     return summary.latest_weight if summary is not None else None
+
+
+def update_weight_by_id(record_id: str, user_id: str, weight_kg: float) -> bool:
+    record_id = bounded_text(record_id, "record_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    weight = round(positive_number(weight_kg, "weight_kg"), 1)
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
+    if not _worksheet_supports_record_id(ws):
+        raise RuntimeError("Weight 尚未完成 record_id 遷移")
+    id_col = WEIGHT_HEADERS.index("record_id")
+    for row_idx, raw_row in enumerate(ws.get_all_values()[1:], start=2):
+        if len(raw_row) > id_col and raw_row[1] == user_id and raw_row[id_col] == record_id:
+            ws.update_cell(row_idx, WEIGHT_HEADERS.index("weight_kg") + 1, weight)
+            clear_read_caches()
+            return True
+    return False
+
+
+def delete_weight_by_id(record_id: str, user_id: str) -> bool:
+    record_id = bounded_text(record_id, "record_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Weight", WEIGHT_HEADERS)
+    if not _worksheet_supports_record_id(ws):
+        raise RuntimeError("Weight 尚未完成 record_id 遷移")
+    id_col = WEIGHT_HEADERS.index("record_id")
+    for row_idx, raw_row in enumerate(ws.get_all_values()[1:], start=2):
+        if len(raw_row) > id_col and raw_row[1] == user_id and raw_row[id_col] == record_id:
+            ws.delete_rows(row_idx)
+            clear_read_caches()
+            return True
+    return False
 
 
 # =============================================================================
@@ -1086,7 +1190,8 @@ def append_training(
     strength_detail: str = "",
     cardio_detail: str = "",
     other_detail: str = "",
-) -> None:
+    record_id: str | None = None,
+) -> str:
     """新增一筆訓練記錄到 Training 工作表。"""
     timestamp = valid_timestamp(timestamp)
     user_id = bounded_text(user_id, "user_id", limit=80)
@@ -1095,6 +1200,11 @@ def append_training(
     )
     sh = _get_sheet()
     ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
+    supports_record_id = _worksheet_supports_record_id(ws)
+    record_id = (
+        bounded_text(record_id or _new_record_id("trn"), "record_id", limit=80)
+        if supports_record_id else ""
+    )
     row = [
         timestamp,
         user_id,
@@ -1103,8 +1213,11 @@ def append_training(
         details["cardio_detail"],
         details["other_detail"],
     ]
+    if supports_record_id:
+        row.append(record_id)
     ws.append_row(row, value_input_option="USER_ENTERED")
     clear_read_caches()
+    return record_id
 
 
 @st.cache_data(ttl=CACHE_TTL)
@@ -1195,6 +1308,58 @@ def update_training(
     return True
 
 
+def update_training_by_id(
+    record_id: str,
+    user_id: str,
+    training_types: str | Iterable[str],
+    strength_detail: str = "",
+    cardio_detail: str = "",
+    other_detail: str = "",
+) -> bool:
+    record_id = bounded_text(record_id, "record_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    selected, details = _validated_training_values(
+        training_types, strength_detail, cardio_detail, other_detail
+    )
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
+    if not _worksheet_supports_record_id(ws):
+        raise RuntimeError("Training 尚未完成 record_id 遷移")
+    id_col = TRAINING_HEADERS.index("record_id")
+    for row_idx, raw_row in enumerate(ws.get_all_values()[1:], start=2):
+        if len(raw_row) > id_col and raw_row[1] == user_id and raw_row[id_col] == record_id:
+            values = [
+                "、".join(selected),
+                details["strength_detail"],
+                details["cardio_detail"],
+                details["other_detail"],
+            ]
+            cells = [
+                gspread.Cell(row_idx, col, value)
+                for col, value in enumerate(values, start=3)
+            ]
+            ws.update_cells(cells, value_input_option="USER_ENTERED")
+            clear_read_caches()
+            return True
+    return False
+
+
+def delete_training_by_id(record_id: str, user_id: str) -> bool:
+    record_id = bounded_text(record_id, "record_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Training", TRAINING_HEADERS)
+    if not _worksheet_supports_record_id(ws):
+        raise RuntimeError("Training 尚未完成 record_id 遷移")
+    id_col = TRAINING_HEADERS.index("record_id")
+    for row_idx, raw_row in enumerate(ws.get_all_values()[1:], start=2):
+        if len(raw_row) > id_col and raw_row[1] == user_id and raw_row[id_col] == record_id:
+            ws.delete_rows(row_idx)
+            clear_read_caches()
+            return True
+    return False
+
+
 # =============================================================================
 # Notes（教練備註）
 # =============================================================================
@@ -1257,6 +1422,61 @@ def delete_note(timestamp: str, user_id: str, coach_id: str) -> bool:
     raw_records = ws.get_all_values()
     for row_idx, raw_row in enumerate(raw_records[1:], start=2):
         if raw_row and raw_row[0] == timestamp and raw_row[1] == user_id and raw_row[2] == coach_id:
+            ws.delete_rows(row_idx)
+            clear_read_caches()
+            return True
+    return False
+
+
+def update_record_by_id(record_id: str, user_id: str, updates: dict[str, Any]) -> bool:
+    """Update one migrated food or water row owned by ``user_id``."""
+    record_id = bounded_text(record_id, "record_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    allowed = {"food_summary", "calories", "protein", "carb", "fat", "water_ml", "portion"}
+    unknown = set(updates) - allowed
+    if unknown:
+        raise ValueError(f"不支援的紀錄欄位：{', '.join(sorted(unknown))}")
+    normalized = dict(updates)
+    if "food_summary" in normalized:
+        normalized["food_summary"] = bounded_text(
+            normalized["food_summary"], "食物摘要", limit=TEXT_LIMITS["food_summary"]
+        )
+    for field in ("calories", "protein", "carb", "fat", "water_ml"):
+        if field in normalized:
+            normalized[field] = round(finite_non_negative(normalized[field], field), 2)
+    if "portion" in normalized:
+        normalized["portion"] = round(positive_number(normalized["portion"], "portion"), 2)
+
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+    if not _worksheet_supports_record_id(ws):
+        raise RuntimeError("Records 尚未完成 record_id 遷移")
+    raw_records = ws.get_all_values()
+    id_col = RECORDS_HEADERS.index("record_id")
+    for row_idx, raw_row in enumerate(raw_records[1:], start=2):
+        if len(raw_row) > id_col and raw_row[1] == user_id and raw_row[id_col] == record_id:
+            cells = [
+                gspread.Cell(row_idx, RECORDS_HEADERS.index(field) + 1, value)
+                for field, value in normalized.items()
+            ]
+            if cells:
+                ws.update_cells(cells, value_input_option="USER_ENTERED")
+            clear_read_caches()
+            return True
+    return False
+
+
+def delete_record_by_id(record_id: str, user_id: str) -> bool:
+    """Delete one migrated food or water row owned by ``user_id``."""
+    record_id = bounded_text(record_id, "record_id", limit=80)
+    user_id = bounded_text(user_id, "user_id", limit=80)
+    sh = _get_sheet()
+    ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+    if not _worksheet_supports_record_id(ws):
+        raise RuntimeError("Records 尚未完成 record_id 遷移")
+    id_col = RECORDS_HEADERS.index("record_id")
+    for row_idx, raw_row in enumerate(ws.get_all_values()[1:], start=2):
+        if len(raw_row) > id_col and raw_row[1] == user_id and raw_row[id_col] == record_id:
             ws.delete_rows(row_idx)
             clear_read_caches()
             return True
@@ -1568,6 +1788,7 @@ def import_records_from_excel(
             # 第二次執行：以單一 spreadsheet batch request 套用
             sh = _get_sheet()
             ws = _ensure_worksheet(sh, "Records", RECORDS_HEADERS)
+            supports_record_id = _worksheet_supports_record_id(ws)
             raw_rows = ws.get_all_values()
             food_rows_by_date: dict[str, int] = {}
             for row_index, raw_row in enumerate(raw_rows[1:], start=2):
@@ -1595,6 +1816,13 @@ def import_records_from_excel(
                             )
                             continue
                         record_row[3] = "由 Excel 匯入（覆寫）"
+                        if supports_record_id:
+                            existing_row = raw_rows[row_index - 1]
+                            id_col = RECORDS_HEADERS.index("record_id")
+                            existing_id = (
+                                existing_row[id_col] if len(existing_row) > id_col else ""
+                            )
+                            record_row.append(existing_id or _new_record_id("rec"))
                         requests.append(
                             {
                                 "updateCells": {
@@ -1603,7 +1831,7 @@ def import_records_from_excel(
                                         "startRowIndex": row_index - 1,
                                         "endRowIndex": row_index,
                                         "startColumnIndex": 0,
-                                        "endColumnIndex": len(RECORDS_HEADERS),
+                                        "endColumnIndex": len(record_row),
                                     },
                                     "rows": [{"values": [_batch_cell(value) for value in record_row]}],
                                     "fields": "userEnteredValue",
@@ -1614,6 +1842,8 @@ def import_records_from_excel(
                     else:
                         result["skipped"] += 1
                 else:
+                    if supports_record_id:
+                        record_row.append(_new_record_id("rec"))
                     requests.append(
                         {
                             "appendCells": {

@@ -127,12 +127,6 @@ def apply_global_styles() -> None:
 
             }
 
-            .stTabs * {
-
-                background-color: #FFFFFF !important;
-
-            }
-
             div[data-testid="stProgressBar"] > div > div {
 
                 background-color: #4A7C59 !important;
@@ -954,6 +948,195 @@ def apply_global_styles() -> None:
             .st-key-student_history_page h2,
             .st-key-student_history_page h3 {
                 color: #34423E !important;
+            }
+
+            .st-key-student_history_page,
+            .st-key-student_history_page > div[data-testid="stVerticalBlock"],
+            .st-key-student_history_page .stTabs,
+            .st-key-student_history_page div[data-testid="stTabContent"],
+            .st-key-student_history_page [data-testid="stTabsContent"],
+            .st-key-student_history_page div[data-testid="stTabContent"] > div[data-testid="stVerticalBlock"] {
+                background-color: transparent !important;
+            }
+
+            .st-key-student_history_tabs [data-baseweb="tab-list"] {
+                padding: 4px !important;
+                background: rgba(168, 213, 194, 0.18) !important;
+                border: 1px solid rgba(168, 213, 194, 0.32) !important;
+                border-radius: 12px !important;
+            }
+
+            .st-key-student_history_tabs button[data-baseweb="tab"] {
+                color: var(--history-secondary) !important;
+                background: transparent !important;
+                border-radius: 9px !important;
+            }
+
+            .st-key-student_history_tabs button[data-baseweb="tab"][aria-selected="true"] {
+                color: #3E7664 !important;
+                background: rgba(168, 213, 194, 0.34) !important;
+            }
+
+            .st-key-student_history_page button > div,
+            .st-key-student_history_page button [data-testid="stMarkdownContainer"],
+            .st-key-student_history_page button p,
+            .st-key-student_history_page button span {
+                color: inherit !important;
+                background: transparent !important;
+                background-color: transparent !important;
+            }
+
+            /* ===== 學員歷史：修改紀錄緊湊操作區 ===== */
+            .st-key-student_daily_record_manager {
+                --record-action-background: #F6E8DE;
+                --record-action-hover: #F2DED2;
+                --record-action-active: #EDD4C6;
+                --record-action-text: #B88470;
+                --record-action-border: #EBCFC0;
+                padding: 14px !important;
+                background: #FFFFFF !important;
+                border-color: var(--history-border) !important;
+                border-radius: 18px !important;
+                box-shadow: 0 8px 28px rgba(125, 140, 138, 0.08) !important;
+            }
+
+            .st-key-student_daily_record_manager > div[data-testid="stVerticalBlock"] {
+                gap: 8px !important;
+            }
+
+            .st-key-student_daily_record_manager [data-testid="stMetric"] {
+                padding: 8px 10px !important;
+                background: #F9FBFA !important;
+                border: 1px solid var(--history-border) !important;
+                border-radius: 12px !important;
+            }
+
+            .st-key-history_add_actions,
+            .st-key-history_add_actions > div[data-testid="stHorizontalBlock"],
+            .st-key-student_daily_record_manager [class*="st-key-history_record_actions_"] {
+                flex-wrap: nowrap !important;
+                gap: 6px !important;
+            }
+
+            .st-key-history_add_actions > div,
+            .st-key-history_add_actions [data-testid="stElementContainer"] {
+                min-width: 0 !important;
+            }
+
+            .st-key-student_daily_record_manager .st-key-history_add_actions button,
+            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button {
+                min-width: 0 !important;
+                min-height: 34px !important;
+                padding: 5px 10px !important;
+                color: var(--record-action-text) !important;
+                -webkit-text-fill-color: var(--record-action-text) !important;
+                white-space: nowrap !important;
+                background: var(--record-action-background) !important;
+                background-color: var(--record-action-background) !important;
+                background-image: none !important;
+                border: 1px solid var(--record-action-border) !important;
+                border-radius: 9px !important;
+                box-shadow: none !important;
+                font-size: 12px !important;
+            }
+
+            .st-key-student_daily_record_manager .st-key-history_add_actions button:hover,
+            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button:hover {
+                color: #A86E59 !important;
+                -webkit-text-fill-color: #A86E59 !important;
+                background: var(--record-action-hover) !important;
+                border-color: #E2BDAA !important;
+            }
+
+            .st-key-student_daily_record_manager .st-key-history_add_actions button:active,
+            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button:active {
+                background: var(--record-action-active) !important;
+                transform: scale(0.98) !important;
+            }
+
+            .st-key-student_daily_record_manager .st-key-history_add_actions button:focus-visible,
+            .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button:focus-visible,
+            .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button:focus-visible {
+                outline: 2px solid rgba(185, 124, 100, 0.34) !important;
+                outline-offset: 2px !important;
+            }
+
+            .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button {
+                min-width: 0 !important;
+                min-height: 34px !important;
+                padding: 5px 10px !important;
+                color: var(--history-secondary) !important;
+                -webkit-text-fill-color: var(--history-secondary) !important;
+                white-space: nowrap !important;
+                background: #FFFFFF !important;
+                border: 1px solid var(--history-border) !important;
+                border-radius: 9px !important;
+                box-shadow: none !important;
+                font-size: 12px !important;
+            }
+
+            .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button:hover {
+                color: #A86E59 !important;
+                -webkit-text-fill-color: #A86E59 !important;
+                background: #FFF8F5 !important;
+                border-color: #EBCFC0 !important;
+            }
+
+            .st-key-student_daily_record_manager button:disabled {
+                opacity: 0.58 !important;
+            }
+
+            .st-key-history_record_list > div[data-testid="stVerticalBlock"] {
+                gap: 6px !important;
+            }
+
+            .st-key-student_daily_record_manager [class*="st-key-history_record_row_"] {
+                box-sizing: border-box !important;
+                min-width: 0 !important;
+                padding: 8px 10px !important;
+                flex-wrap: nowrap !important;
+                background: #FFFFFF !important;
+                border-color: var(--history-border) !important;
+                border-radius: 12px !important;
+            }
+
+            .st-key-student_daily_record_manager [class*="st-key-history_record_content_"] {
+                min-width: 0 !important;
+                overflow: hidden !important;
+            }
+
+            .st-key-student_daily_record_manager [class*="st-key-history_record_content_"] p {
+                margin: 0 !important;
+                overflow-wrap: anywhere !important;
+                color: #34423E !important;
+                font-size: 13px !important;
+                line-height: 1.35 !important;
+            }
+
+            .st-key-student_daily_record_manager [class*="st-key-history_record_actions_"] {
+                flex: 0 0 auto !important;
+                width: auto !important;
+                min-width: max-content !important;
+            }
+
+            @media (max-width: 480px) {
+                .st-key-student_daily_record_manager {
+                    padding: 10px !important;
+                    border-radius: 15px !important;
+                }
+
+                .st-key-student_daily_record_manager .st-key-history_add_actions button,
+                .st-key-student_daily_record_manager [class*="st-key-history_edit_"] button,
+                .st-key-student_daily_record_manager [class*="st-key-history_delete_"] button {
+                    min-height: 32px !important;
+                    padding: 4px 7px !important;
+                    font-size: 11px !important;
+                }
+
+                .st-key-student_daily_record_manager [class*="st-key-history_record_row_"] {
+                    padding: 7px 8px !important;
+                    gap: 5px !important;
+                }
             }
 
             /* ===== 學員歷史：參考健康儀表板的體重圖卡 ===== */

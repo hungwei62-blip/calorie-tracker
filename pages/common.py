@@ -9,10 +9,9 @@
 from __future__ import annotations
 
 import base64
-from datetime import date
 from pathlib import Path
 import streamlit as st
-from services import metrics, sheets
+from services import auth, metrics, sheets
 from services.security import AuthContext, clear_auth_session
 
 # ---------- 常數 ----------
@@ -109,13 +108,13 @@ def _clear_analysis_cache() -> None:
 
 def _today_range() -> tuple:
 
-    today = date.today()
+    today = auth.today_date()
 
     return today, today
 
 def _week_range() -> tuple:
 
-    today = date.today()
+    today = auth.today_date()
 
     start = metrics.week_start(today)
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from typing import Any
 
 import bcrypt
@@ -38,6 +38,11 @@ def make_user_id() -> str:
 def now_iso() -> str:
     """產生台北時區 (GMT+8) 的 ISO 格式時間戳。"""
     return datetime.now(TAIPEI_TZ).isoformat(timespec="seconds")
+
+
+def today_date() -> date:
+    """Return today's calendar date in Taipei, independent of server timezone."""
+    return datetime.now(TAIPEI_TZ).date()
 
 
 def make_temporary_password(length: int = 12) -> str:

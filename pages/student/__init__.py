@@ -39,6 +39,7 @@ from pages.common import (
     current_auth_context, get_default_avatar_source,
 )
 from ui.camera import camera_capture
+from pages.student.history_records import render_daily_record_manager
 
 DAILY_RECORD_TABS = ("食物", "飲水", "訓練", "體重")
 DAILY_RECORD_TAB_TARGET_KEY = "daily_record_tab_target"
@@ -318,9 +319,13 @@ def build_calorie_figure(actual: object, goal: object) -> go.Figure:
     return figure
 
 
-def _weight_summary(weight_records: list[dict[str, object]]) -> tuple[float | None, str]:
+def _weight_summary(
+    weight_records: list[dict[str, object]],
+    *,
+    end_date: date | None = None,
+) -> tuple[float | None, str]:
     """從 Weight 紀錄取得最新體重與相較前一筆的趨勢文字。"""
-    summary = summarize_weight_measurements(weight_records)
+    summary = summarize_weight_measurements(weight_records, end_date=end_date)
     if summary is None:
         return None, ""
 
@@ -828,7 +833,7 @@ def page_personal() -> None:
     totals = metrics.sum_totals(today_records).as_dict()
 
     weight_records = sheets.get_weight_records(uid)
-    latest_weight, trend_content = _weight_summary(weight_records)
+    latest_weight, trend_content = _weight_summary(weight_records, end_date=we)
     weight_logged_today = any(
         str(record.get("timestamp", ""))[:10] == ws.isoformat()
         for record in weight_records
@@ -929,7 +934,7 @@ def _append_water_record(user_id: str, water_ml: float) -> None:
         raise ValueError("飲水量必須大於 0")
     application.append_student_record(
         current_auth_context(),
-        timestamp=datetime.now().isoformat(), user_id=user_id,
+        timestamp=auth.now_iso(), user_id=user_id,
         meal_type="飲水", food_summary="飲水",
         calories=0, protein=0, carb=0, fat=0, water_ml=water_value,
         image_url="", portion=1,
@@ -952,7 +957,7 @@ def _append_food_record(
         raise ValueError("熱量與蛋白質至少一項必須大於 0")
     application.append_student_record(
         current_auth_context(),
-        timestamp=datetime.now().isoformat(), user_id=user_id,
+        timestamp=auth.now_iso(), user_id=user_id,
         meal_type="食物", food_summary=food_summary.strip() or "手動紀錄",
         calories=calorie_value, protein=protein_value,
         carb=0, fat=0, water_ml=0, image_url="", portion=1,
@@ -1174,7 +1179,7 @@ def _prepare_daily_record_tab(current_tab: str) -> bool:
 def _render_training_records() -> None:
     uid = st.session_state.user_id
     _render_record_success("訓練")
-    today = date.today()
+    today = auth.today_date()
     today_training = sheets.get_training_by_date(uid, today)
     if today_training:
         st.info("今日已有訓練紀錄，再次儲存將覆蓋原紀錄。")
@@ -1218,22 +1223,29 @@ def _render_training_records() -> None:
 def _render_weight_records() -> None:
     st.subheader("體重")
     uid = st.session_state.user_id
-    with st.form("weight_form"):
+    _render_record_success("體重")
+    form_version = int(st.session_state.get("weight_form_version", 0))
+    with st.form(f"weight_form_{form_version}"):
         weight = st.number_input(
-            "今日體重 (kg)", value=60.0, step=0.5,
+            "今日體重 (kg)", value=None, step=0.1,
             min_value=30.0, max_value=300.0,
+            key=f"weight_kg_{form_version}",
         )
         submitted = st.form_submit_button("儲存體重紀錄", width="stretch")
     if submitted:
         try:
             application.append_student_weight(
                 current_auth_context(), uid,
-                timestamp=datetime.now().isoformat(), weight_kg=weight,
+                timestamp=auth.now_iso(), weight_kg=weight or 0,
             )
+        except ValueError as exc:
+            st.warning(str(exc))
         except Exception:
             st.error("體重紀錄儲存失敗，請稍後再試。")
         else:
-            st.success("體重紀錄已儲存")
+            _clear_analysis_cache()
+            st.session_state.weight_form_version = form_version + 1
+            _set_record_success("體重")
             st.rerun()
 
 
@@ -1320,8 +1332,13 @@ def build_weight_history_figure(
     y_range = None
     if weights:
         low, high = min(weights), max(weights)
-        padding = max((high - low) * 0.12, 0.5 if low == high else 0.3)
-        y_range = [low - padding, high + padding]
+        spread = high - low
+        if spread == 0:
+            y_range = [low - 0.5, high + 0.5]
+        else:
+            visible_span = max(spread * 1.3, 0.6)
+            padding = (visible_span - spread) / 2
+            y_range = [low - padding, high + padding]
 
     fill_gradient: dict[str, object] = {
         "type": "vertical",
@@ -1415,7 +1432,7 @@ def _render_student_weight_history(user_id: str) -> None:
         if selected_range not in ("7 天", "30 天"):
             selected_range = "7 天"
         day_count = 30 if selected_range == "30 天" else 7
-        start_date, end_date = history_date_range(date.today(), day_count)
+        start_date, end_date = history_date_range(auth.today_date(), day_count)
 
         try:
             weight_records = sheets.get_weight_records(user_id)
@@ -1508,7 +1525,7 @@ def _training_period_label(anchor_date: date, view: str) -> str:
 
 
 def _render_student_training_history(user_id: str) -> None:
-    today = date.today()
+    today = auth.today_date()
     selected_view = st.session_state.get("training_history_view", "週")
     if selected_view not in ("週", "月"):
         selected_view = "週"
@@ -1727,7 +1744,8 @@ def _render_student_nutrition_history(user_id: str) -> None:
         if selected_range not in ("7 天", "30 天"):
             selected_range = "7 天"
         day_count = 30 if selected_range == "30 天" else 7
-        start_date, end_date = history_date_range(date.today(), day_count)
+        today = auth.today_date()
+        start_date, end_date = history_date_range(today, day_count)
 
         try:
             records = _fetch_records_cached(user_id)
@@ -1739,7 +1757,7 @@ def _render_student_nutrition_history(user_id: str) -> None:
             records,
             start_date,
             end_date,
-            today=date.today(),
+            today=today,
         )
         with st.container(key="student_nutrition_history_card"):
             st.segmented_control(
@@ -1864,7 +1882,8 @@ def _render_student_water_history(user_id: str) -> None:
         if selected_range not in ("7 天", "30 天"):
             selected_range = "7 天"
         day_count = 30 if selected_range == "30 天" else 7
-        start_date, end_date = history_date_range(date.today(), day_count)
+        today = auth.today_date()
+        start_date, end_date = history_date_range(today, day_count)
 
         try:
             records = _fetch_records_cached(user_id)
@@ -1876,7 +1895,7 @@ def _render_student_water_history(user_id: str) -> None:
             records,
             start_date,
             end_date,
-            today=date.today(),
+            today=today,
         )
         with st.container(key="student_water_history_card"):
             st.segmented_control(
@@ -1948,10 +1967,24 @@ def page_history() -> None:
         st.header("歷史紀錄")
 
         uid = st.session_state.user_id
-        _render_student_weight_history(uid)
-        _render_student_nutrition_history(uid)
-        _render_student_water_history(uid)
-        _render_student_training_history(uid)
+        history_tab, edit_tab = st.tabs(
+            ("歷史紀錄", "修改紀錄"),
+            default="歷史紀錄",
+            key="student_history_tabs",
+            on_change="rerun",
+        )
+        if history_tab.open:
+            with history_tab:
+                _render_student_weight_history(uid)
+                _render_student_nutrition_history(uid)
+                _render_student_water_history(uid)
+                _render_student_training_history(uid)
+        elif edit_tab.open:
+            with edit_tab:
+                try:
+                    render_daily_record_manager(uid, _clear_analysis_cache)
+                except Exception:
+                    st.error("取得每日紀錄失敗，請稍後再試。")
 
 # =============================================================================
 

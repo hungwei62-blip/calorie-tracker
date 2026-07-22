@@ -20,9 +20,21 @@ def run_health_checks() -> list[HealthCheck]:
         spreadsheet = sheets._get_sheet()
         for title, headers in sheets.WORKSHEET_SCHEMAS.items():
             sheets._ensure_worksheet(spreadsheet, title, headers)
-        checks.append(HealthCheck("Google Sheets", "ok", "六張工作表 schema 正常"))
+        checks.append(HealthCheck("Google Sheets", "ok", "七張工作表 schema 可讀取"))
     except Exception:
         checks.append(HealthCheck("Google Sheets", "error", "連線或 schema 異常"))
+
+    try:
+        record_ids = sheets.get_record_id_schema_status()
+        ready = all(record_ids.values())
+        detail = (
+            "Records、Weight、Training 已完成 record_id 遷移"
+            if ready
+            else "尚未完成 record_id 遷移，歷史紀錄維持唯讀"
+        )
+        checks.append(HealthCheck("歷史紀錄編輯", "ok" if ready else "warning", detail))
+    except Exception:
+        checks.append(HealthCheck("歷史紀錄編輯", "warning", "無法確認 record_id schema"))
 
     try:
         sheets.get_primary_coach_id()

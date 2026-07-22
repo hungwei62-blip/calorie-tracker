@@ -72,21 +72,111 @@ def update_student_bmr(context: AuthContext, user_id: str, bmr: float) -> bool:
     return sheets.update_user_bmr(user_id, bmr)
 
 
-def append_student_record(context: AuthContext, user_id: str, **payload: Any) -> None:
+def append_student_record(context: AuthContext, user_id: str, **payload: Any) -> str:
     require_self(context, user_id)
-    sheets.append_record(user_id=user_id, **payload)
+    record_id = sheets.append_record(user_id=user_id, **payload)
+    log_event(
+        "student.record.create", result="success", actor_id=context.user_id,
+        actor_role=context.role, target_type="record", target_id=record_id,
+        metadata={"kind": str(payload.get("meal_type") or "")},
+    )
+    return record_id
 
 
 def append_student_weight(
     context: AuthContext, user_id: str, timestamp: str, weight_kg: float
-) -> None:
+) -> str:
     require_self(context, user_id)
-    sheets.append_weight(timestamp, user_id, weight_kg)
+    record_id = sheets.append_weight(timestamp, user_id, weight_kg)
+    log_event(
+        "student.weight.create", result="success", actor_id=context.user_id,
+        actor_role=context.role, target_type="weight", target_id=record_id,
+    )
+    return record_id
 
 
 def update_student_training(context: AuthContext, user_id: str, **payload: Any) -> bool:
     require_self(context, user_id)
-    return sheets.update_training(user_id=user_id, **payload)
+    updated = sheets.update_training(user_id=user_id, **payload)
+    log_event(
+        "student.training.upsert", result="success" if updated else "not_found",
+        actor_id=context.user_id, actor_role=context.role,
+        target_type="training", target_id=str(payload.get("timestamp") or ""),
+    )
+    return updated
+
+
+def update_own_record(
+    context: AuthContext, user_id: str, record_id: str, updates: dict[str, Any]
+) -> bool:
+    require_self(context, user_id)
+    updated = sheets.update_record_by_id(record_id, user_id, updates)
+    log_event(
+        "student.record.update", result="success" if updated else "not_found",
+        actor_id=context.user_id, actor_role=context.role,
+        target_type="record", target_id=record_id,
+        metadata={"fields": sorted(updates)},
+    )
+    return updated
+
+
+def delete_own_record(context: AuthContext, user_id: str, record_id: str) -> bool:
+    require_self(context, user_id)
+    deleted = sheets.delete_record_by_id(record_id, user_id)
+    log_event(
+        "student.record.delete", result="success" if deleted else "not_found",
+        actor_id=context.user_id, actor_role=context.role,
+        target_type="record", target_id=record_id,
+    )
+    return deleted
+
+
+def update_own_weight(
+    context: AuthContext, user_id: str, record_id: str, weight_kg: float
+) -> bool:
+    require_self(context, user_id)
+    updated = sheets.update_weight_by_id(record_id, user_id, weight_kg)
+    log_event(
+        "student.weight.update", result="success" if updated else "not_found",
+        actor_id=context.user_id, actor_role=context.role,
+        target_type="weight", target_id=record_id,
+    )
+    return updated
+
+
+def delete_own_weight(context: AuthContext, user_id: str, record_id: str) -> bool:
+    require_self(context, user_id)
+    deleted = sheets.delete_weight_by_id(record_id, user_id)
+    log_event(
+        "student.weight.delete", result="success" if deleted else "not_found",
+        actor_id=context.user_id, actor_role=context.role,
+        target_type="weight", target_id=record_id,
+    )
+    return deleted
+
+
+def update_own_training(
+    context: AuthContext, user_id: str, record_id: str, **payload: Any
+) -> bool:
+    require_self(context, user_id)
+    updated = sheets.update_training_by_id(record_id, user_id, **payload)
+    log_event(
+        "student.training.update", result="success" if updated else "not_found",
+        actor_id=context.user_id, actor_role=context.role,
+        target_type="training", target_id=record_id,
+    )
+    return updated
+
+
+def delete_own_training(context: AuthContext, user_id: str, record_id: str) -> bool:
+    require_self(context, user_id)
+    deleted = sheets.delete_training_by_id(record_id, user_id)
+    log_event(
+        "student.training.delete", result="success" if deleted else "not_found",
+        actor_id=context.user_id, actor_role=context.role,
+        target_type="training", target_id=record_id,
+    )
+    return deleted
 
 
 def request_password_reset(username: str) -> None:

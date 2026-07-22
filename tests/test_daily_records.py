@@ -280,7 +280,9 @@ def test_daily_record_sections_remove_duplicate_headings_and_simplify_weight():
     assert '體重趨勢' not in weight_renderer
     assert 'get_weight_records' not in weight_renderer
     assert 'line_chart' not in weight_renderer
-    assert 'step=0.5' in weight_renderer
+    assert 'value=None, step=0.1' in weight_renderer
+    assert "weight_form_version" in weight_renderer
+    assert '_set_record_success("體重")' in weight_renderer
 
 
 @pytest.mark.parametrize(

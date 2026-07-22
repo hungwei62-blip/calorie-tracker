@@ -229,7 +229,7 @@ def test_training_append_uses_new_categorized_schema(monkeypatch):
 
     assert sheets.TRAINING_HEADERS == [
         "timestamp", "user_id", "training_types", "strength_detail",
-        "cardio_detail", "other_detail",
+        "cardio_detail", "other_detail", "record_id",
     ]
     assert ws.appended_rows == [[
         "2026-07-18", "student-1", "重量訓練、有氧訓練",

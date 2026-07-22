@@ -9,6 +9,9 @@ import math
 from typing import Any
 
 
+TAIPEI_TZ = timezone(timedelta(hours=8))
+
+
 @dataclass(frozen=True)
 class WeightHistoryPoint:
     day: date
@@ -79,41 +82,60 @@ def history_date_range(end_date: date, day_count: int) -> tuple[date, date]:
     return end_date - timedelta(days=day_count - 1), end_date
 
 
-def _timestamp_order(value: object) -> float:
+def _parsed_timestamp(value: object) -> datetime | None:
     text = str(value or "").strip()
     if not text:
-        return 0.0
+        return None
     try:
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
-        return 0.0
+        # Google Sheets may reformat USER_ENTERED timestamps without a
+        # zero-padded hour (for example ``2026-07-22 7:13:14``).  Keep these
+        # existing rows sortable instead of silently dropping them.
+        parsed = None
+        for timestamp_format in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+            try:
+                parsed = datetime.strptime(text, timestamp_format)
+                break
+            except ValueError:
+                continue
+        if parsed is None:
+            return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.timestamp()
+        parsed = parsed.replace(tzinfo=TAIPEI_TZ)
+    return parsed
+
+
+def _timestamp_order(value: object) -> float:
+    parsed = _parsed_timestamp(value)
+    return parsed.timestamp() if parsed is not None else 0.0
 
 
 def _valid_measurement_timestamp(value: object) -> float | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.timestamp()
+    parsed = _parsed_timestamp(value)
+    return parsed.timestamp() if parsed is not None else None
 
 
 def summarize_weight_measurements(
     records: list[dict[str, Any]],
+    end_date: date | None = None,
 ) -> WeightMeasurementSummary | None:
-    """Return the latest and previous valid measurements by timestamp."""
+    """Return the latest and previous valid measurements by timestamp.
+
+    When ``end_date`` is provided, measurements after that Taipei calendar date
+    are ignored so a future-dated row cannot replace today's actual weight.
+    """
     measurements: list[tuple[float, int, float]] = []
     for index, record in enumerate(records):
-        timestamp_order = _valid_measurement_timestamp(record.get("timestamp"))
-        if timestamp_order is None:
+        parsed_timestamp = _parsed_timestamp(record.get("timestamp"))
+        if parsed_timestamp is None:
             continue
+        if (
+            end_date is not None
+            and parsed_timestamp.astimezone(TAIPEI_TZ).date() > end_date
+        ):
+            continue
+        timestamp_order = parsed_timestamp.timestamp()
         try:
             weight = float(record.get("weight_kg", 0) or 0)
         except (TypeError, ValueError):
